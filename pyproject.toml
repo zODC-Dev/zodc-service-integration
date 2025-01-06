@@ -1,0 +1,117 @@
+[tool.poetry]
+name = "zodc-service-integration"
+version = "0.1.0"
+description = "Integration service for zODC"
+authors = ["vphoa342 <vphoa34@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115.2"
+uvicorn = "^0.32.0"
+SQLAlchemy = "^2.0.36"
+alembic = "^1.13.3"
+pydantic = {extras = ["email"], version = "^2.10.4"}
+loguru = "^0.7.2"
+asyncpg = "^0.30.0"
+pydantic-settings = "^2.6.0"
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+pyjwt = "^2.9.0"
+requests = "^2.32.3"
+ramda = "^0.7.6"
+aiohttp = "^3.11.2"
+msal = "^1.31.1"
+redis = "^5.2.0"
+msgraph-sdk = "^1.12.0"
+sqlmodel = "^0.0.22"
+celery = "^5.4.0"
+openpyxl = "^3.1.5"
+python-multipart = "^0.0.20"
+azure-storage-blob = "^12.24.0"
+nats-py = "^2.9.0"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.8.2"
+mypy = "^1.13.0"
+pre-commit = "^4.0.1"
+types-redis = "^4.6.0.20241004"
+types-passlib = "^1.7.7.20240819"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+exclude = [
+    ".venv",
+    ".git",
+    ".ruff_cache",
+    "alembic_migrations",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "N",  # PEP8 naming convetions
+    "D"  # pydocstyle
+]
+ignore = [
+    "C901",  # too complex
+    "W191",  # indentation contains tabs
+    "D401",  # imperative mood
+    "D415",  # first line should end with a period
+    "E501",  # line too long
+    "D100",  # missing docstring in public module
+    "D104",  # missing docstring in public package
+    "D102",  # missing docstring in public method
+    "D101",  # missing docstring in public class
+    "D106",  # missing docstring in nested class
+    "D107",  # missing docstring in __init__
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends", "fastapi.Query", "fastapi.params.Query"]
+
+[tool.ruff.format]
+indent-style = "space"
+docstring-code-format = true
+line-ending = "auto"
+quote-style = "double"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint.isort]
+force-single-line = false
+force-sort-within-sections = true
+combine-as-imports = true
+
+[tool.mypy]
+disable_error_code = ["no-untyped-def", "import-untyped"]
+explicit_package_bases = true
+disallow_untyped_decorators = false
+strict = true
+ignore_missing_imports = true
+check_untyped_defs = true
+implicit_reexport = true
+implicit_optional = true  # Added for stricter checking
+exclude = [".venv", "alembic_migrations"]  # Added to match ruff excludes
+plugins = [
+    "pydantic.mypy",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
+[virtualenvs]
+in-project = true
+
