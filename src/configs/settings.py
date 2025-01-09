@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     NATS_USERNAME: str = "myuser"
     NATS_PASSWORD: str = "mypassword"
 
+    # Jira settings
+    JIRA_API_URL: str
+    JIRA_USERNAME: str
+    JIRA_API_TOKEN: str
+
     class Config:
         """Configuration settings."""
 
