@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
-RUN pip install poetry
+RUN pip install poetry==1.8.5
 
 # Copy only requirements to cache them in docker layer
 COPY pyproject.toml poetry.lock* /app/
@@ -54,4 +54,4 @@ WORKDIR /app
 EXPOSE 8000
 
 # Run migrations and start the application
-CMD ["sh", "-c", "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && python -m src.main"]
