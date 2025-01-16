@@ -39,3 +39,14 @@ class JiraTask(BaseModel):
 
         # If it's already a string, return as is
         return str(value) if value else None
+
+
+class JiraProject(BaseModel):
+    id: str
+    key: str
+    name: str
+    description: Optional[str] = None
+    project_type: Optional[str] = None
+    project_category: Optional[str] = None
+    lead: Optional[str] = None
+    url: Optional[str] = None

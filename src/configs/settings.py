@@ -60,9 +60,7 @@ class Settings(BaseSettings):
     NATS_PASSWORD: str = "mypassword"
 
     # Jira settings
-    JIRA_API_URL: str
-    JIRA_USERNAME: str
-    JIRA_API_TOKEN: str
+    JIRA_BASE_URL: str = "https://api.atlassian.com/ex/jira/cloud-id"
 
     class Config:
         """Configuration settings."""
