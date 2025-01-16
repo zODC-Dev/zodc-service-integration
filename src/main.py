@@ -9,6 +9,7 @@ from src.configs.database import init_db
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.infrastructure.services.nats_service import NATSService
+from src.app.routers.jira_router import router as jira_router
 
 
 @asynccontextmanager
@@ -54,6 +55,7 @@ if settings.BACKEND_CORS_ORIGINS:
 
 app.include_router(util_router, prefix=settings.API_V1_STR +
                    "/utils", tags=["utils"])
+app.include_router(jira_router, prefix=settings.API_V1_STR + "/jira", tags=["jira"])
 
 
 if __name__ == "__main__":
