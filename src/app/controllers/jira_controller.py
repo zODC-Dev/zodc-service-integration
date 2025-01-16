@@ -1,14 +1,11 @@
 from typing import List, Optional
+
 from fastapi import HTTPException
 
 from src.app.services.jira_service import JiraApplicationService
-from src.domain.entities.jira import JiraTask, JiraProject
-from src.domain.exceptions.jira_exceptions import (
-    JiraConnectionError,
-    JiraAuthenticationError,
-    JiraRequestError
-)
 from src.configs.logger import log
+from src.domain.entities.jira import JiraProject, JiraTask
+from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 
 
 class JiraController:
@@ -54,9 +51,9 @@ class JiraController:
                 detail="An unexpected error occurred"
             ) from e
 
-    async def get_accessible_projects(self) -> List[JiraProject]:
+    async def get_accessible_projects(self, user_id: int) -> List[JiraProject]:
         try:
-            return await self.jira_service.get_accessible_projects()
+            return await self.jira_service.get_accessible_projects(user_id)
         except JiraAuthenticationError as e:
             log.error(f"Jira authentication failed: {str(e)}")
             raise HTTPException(

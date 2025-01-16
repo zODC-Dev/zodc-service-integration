@@ -1,12 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, UploadFile, Request
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 
 from src.app.controllers.util_controller import UtilController
-from src.app.dependencies.util import get_util_controller
 from src.app.dependencies.permission import get_permission_service
+from src.app.dependencies.util import get_util_controller
 from src.app.middlewares.permission_middleware import require_permissions
 from src.domain.services.permission_service import IPermissionService
+
 router = APIRouter()
 
 

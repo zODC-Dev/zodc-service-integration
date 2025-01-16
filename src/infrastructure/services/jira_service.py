@@ -1,16 +1,13 @@
 from typing import List, Optional
+
 import aiohttp
 from aiohttp import ClientTimeout
 
 from src.configs.logger import log
 from src.configs.settings import settings
-from src.domain.entities.jira import JiraTask, JiraProject
+from src.domain.entities.jira import JiraProject, JiraTask
+from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 from src.domain.services.jira_service import IJiraService
-from src.domain.exceptions.jira_exceptions import (
-    JiraConnectionError,
-    JiraAuthenticationError,
-    JiraRequestError
-)
 from src.infrastructure.services.redis_service import RedisService
 
 
@@ -126,13 +123,15 @@ class JiraService(IJiraService):
             log.error(f"Unexpected error during Jira API request: {str(e)}")
             raise JiraRequestError(500, f"Unexpected error: {str(e)}") from e
 
-    async def get_accessible_projects(self) -> List[JiraProject]:
+    async def get_accessible_projects(self, user_id: int) -> List[JiraProject]:
         try:
+            token = await self._get_token(user_id)
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
                 async with session.get(
                     f"{settings.JIRA_BASE_URL}/rest/api/3/project",
                     headers={
-                        "Accept": "application/json"
+                        "Accept": "application/json",
+                        "Authorization": f"Bearer {token}"
                     }
                 ) as response:
                     response_text = await response.text()

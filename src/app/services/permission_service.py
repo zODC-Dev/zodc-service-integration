@@ -1,12 +1,9 @@
-import json
-from typing import Optional, List
+from typing import List, Optional
 
 import aiohttp
 from fastapi import HTTPException
 
 from src.configs.logger import log
-from src.configs.settings import settings
-
 from src.domain.entities.permission import PermissionVerificationResponse
 from src.domain.services.permission_service import IPermissionService
 from src.infrastructure.services.redis_service import RedisService

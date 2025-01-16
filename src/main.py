@@ -4,12 +4,12 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.app.routers.jira_router import router as jira_router
 from src.app.routers.util_router import router as util_router
 from src.configs.database import init_db
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.infrastructure.services.nats_service import NATSService
-from src.app.routers.jira_router import router as jira_router
 
 
 @asynccontextmanager

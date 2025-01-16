@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from src.domain.entities.jira import JiraTask, JiraProject
+from src.domain.entities.jira import JiraProject, JiraTask
 
 
 class IJiraService(ABC):

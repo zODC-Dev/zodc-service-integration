@@ -11,7 +11,7 @@ from src.domain.services.excel_file_service import IExcelFileService
 class ExcelFileService(IExcelFileService):
     async def extract_file(self, file: UploadFile) -> Dict[str, Any]:
         # Validate file type
-        if not file.filename.endswith((".xlsx", ".xls")):
+        if file.filename is None or not file.filename.endswith((".xlsx", ".xls")):
             raise ExcelFileInvalidFormatError(
                 "Invalid file format. Please upload an Excel file.") from None
 

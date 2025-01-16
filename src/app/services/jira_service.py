@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from src.domain.entities.jira import JiraTask, JiraProject
+from src.domain.entities.jira import JiraProject, JiraTask
 from src.domain.services.jira_service import IJiraService
 
 
@@ -22,5 +22,5 @@ class JiraApplicationService:
             limit=limit
         )
 
-    async def get_accessible_projects(self) -> List[JiraProject]:
-        return await self.jira_service.get_accessible_projects()
+    async def get_accessible_projects(self, user_id: int) -> List[JiraProject]:
+        return await self.jira_service.get_accessible_projects(user_id)
