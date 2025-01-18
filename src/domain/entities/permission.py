@@ -1,5 +1,7 @@
-from typing import Optional, List
+from typing import List, Optional
+
 from pydantic import BaseModel
+
 
 class PermissionVerificationRequest(BaseModel):
     token: str
@@ -14,4 +16,4 @@ class PermissionVerificationResponse(BaseModel):
     permissions: List[str]
     scope: str
     project_id: Optional[int] = None
-    error: Optional[str] = None 
+    error: Optional[str] = None

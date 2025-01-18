@@ -1,7 +1,6 @@
 from azure.storage.blob.aio import BlobServiceClient
 from fastapi import UploadFile
 
-from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.services.blob_storage_service import IBlobStorageService
 

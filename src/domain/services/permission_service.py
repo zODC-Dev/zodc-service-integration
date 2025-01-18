@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from src.domain.entities.permission import PermissionVerificationResponse
 
+
 class IPermissionService(ABC):
     @abstractmethod
     async def verify_permissions(
@@ -34,4 +35,4 @@ class IPermissionService(ABC):
         project_id: Optional[int] = None
     ) -> Optional[PermissionVerificationResponse]:
         """Get cached permission verification result"""
-        pass 
+        pass

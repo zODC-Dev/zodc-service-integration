@@ -1,15 +1,16 @@
 from functools import wraps
-from typing import List, Optional
+from typing import List
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 import jwt
 
 from src.configs.auth import JWT_SETTINGS
-from src.domain.services.permission_service import IPermissionService
 from src.configs.logger import log
+from src.domain.services.permission_service import IPermissionService
 
 
 def require_permissions(permissions: List[str], scope: str):
+    """Require permissions middleware."""
     def decorator(func):
         @wraps(func)
         async def wrapper(request: Request, *args, permission_service: IPermissionService, **kwargs):

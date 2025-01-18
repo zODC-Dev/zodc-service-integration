@@ -1,6 +1,9 @@
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, field_validator
+
+from src.domain.constants.jira import JiraIssueType
 
 
 class JiraTask(BaseModel):
@@ -50,3 +53,14 @@ class JiraProject(BaseModel):
     project_category: Optional[str] = None
     lead: Optional[str] = None
     url: Optional[str] = None
+
+
+class JiraIssueCreate(BaseModel):
+    project_key: str
+    summary: str
+    description: Optional[str] = None
+    issue_type: JiraIssueType
+    priority: Optional[str] = None
+    assignee: Optional[str] = None
+    labels: Optional[List[str]] = None
+    epic_link: Optional[str] = None  # For linking to an epic
