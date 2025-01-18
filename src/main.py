@@ -15,6 +15,7 @@ from src.domain.entities.user_events import UserEventType
 from src.infrastructure.messaging.user_event_handler import UserEventHandler
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.redis_service import RedisService
+from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
 
 
 @asynccontextmanager
@@ -75,6 +76,7 @@ if settings.BACKEND_CORS_ORIGINS:
 app.include_router(util_router, prefix=settings.API_V1_STR +
                    "/utils", tags=["utils"])
 app.include_router(jira_router, prefix=settings.API_V1_STR + "/jira", tags=["jira"])
+app.include_router(microsoft_calendar_router, prefix=settings.API_V1_STR + "/calendar", tags=["calendar"])
 
 
 async def start_nats_subscribers(
