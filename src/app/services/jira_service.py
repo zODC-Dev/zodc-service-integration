@@ -1,6 +1,7 @@
 from typing import List, Optional
 
-from src.domain.entities.jira import JiraProject, JiraTask
+from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraTask
+from src.domain.entities.jira_api import JiraCreateIssueResponse
 from src.domain.services.jira_service import IJiraService
 
 
@@ -24,3 +25,6 @@ class JiraApplicationService:
 
     async def get_accessible_projects(self, user_id: int) -> List[JiraProject]:
         return await self.jira_service.get_accessible_projects(user_id)
+
+    async def create_issue(self, user_id: int, issue: JiraIssueCreate) -> JiraCreateIssueResponse:
+        return await self.jira_service.create_issue(user_id, issue)

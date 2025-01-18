@@ -5,7 +5,19 @@ from aiohttp import ClientTimeout
 
 from src.configs.logger import log
 from src.configs.settings import settings
-from src.domain.entities.jira import JiraProject, JiraTask
+from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraTask
+from src.domain.entities.jira_api import (
+    JiraADFContent,
+    JiraADFDocument,
+    JiraADFParagraph,
+    JiraCreateIssueFields,
+    JiraCreateIssueRequest,
+    JiraCreateIssueResponse,
+    JiraIssueTypeReference,
+    JiraPriorityReference,
+    JiraProjectReference,
+    JiraUserReference,
+)
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 from src.domain.services.jira_service import IJiraService
 from src.infrastructure.services.redis_service import RedisService
@@ -176,3 +188,103 @@ class JiraService(IJiraService):
             raise JiraConnectionError(f"Jira API request failed: {str(e)}") from e
         except Exception as e:
             raise JiraRequestError(500, f"Unexpected error: {str(e)}") from e
+
+    async def create_issue(self, user_id: int, issue: JiraIssueCreate) -> JiraCreateIssueResponse:
+        token = await self._get_token(user_id)
+
+        # Create type-safe request using Pydantic models
+        issue_request = JiraCreateIssueRequest(
+            fields=JiraCreateIssueFields(
+                project=JiraProjectReference(
+                    key=issue.project_key
+                ),
+                summary=issue.summary,
+                issuetype=JiraIssueTypeReference(
+                    name=issue.issue_type.value
+                ),
+                description=JiraADFDocument(
+                    content=[
+                        JiraADFParagraph(
+                            content=[
+                                JiraADFContent(
+                                    text=issue.description or ""
+                                )
+                            ]
+                        )
+                    ]
+                ),
+                priority=JiraPriorityReference(name=issue.priority) if issue.priority else None,
+                assignee=JiraUserReference(id=issue.assignee) if issue.assignee else None,
+                labels=issue.labels
+            )
+        )
+
+        try:
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            }
+
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                async with session.post(
+                    f"{settings.JIRA_BASE_URL}/rest/api/3/issue",
+                    json=issue_request.model_dump(exclude_none=True),
+                    headers=headers
+                ) as response:
+                    response_data = await response.json()
+
+                    if response.status != 201:
+                        raise JiraRequestError(
+                            response.status,
+                            f"Failed to create Jira issue: {response_data}"
+                        )
+
+                    log.info(f"Response data: {response_data}")
+                    # Parse the create response
+                    create_response = JiraCreateIssueResponse.model_validate(response_data)
+
+                    # Get the full issue details
+                    return create_response
+
+        except aiohttp.ClientConnectorError as e:
+            raise JiraConnectionError(f"Could not connect to Jira API: {str(e)}") from e
+        except Exception as e:
+            log.error(f"Error creating issue: {str(e)}")
+            raise JiraRequestError(500, f"Unexpected error: {str(e)}") from e
+
+    async def get_issue(self, user_id: int, issue_id: str) -> JiraTask:
+        token = await self._get_token(user_id)
+
+        try:
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json"
+            }
+
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                async with session.get(
+                    f"{settings.JIRA_BASE_URL}/rest/api/3/issue/{issue_id}",
+                    headers=headers
+                ) as response:
+                    if response.status != 200:
+                        raise JiraRequestError(
+                            response.status,
+                            "Failed to fetch created issue details"
+                        )
+
+                    data = await response.json()
+                    return JiraTask(
+                        id=data["id"],
+                        key=data["key"],
+                        summary=data["fields"]["summary"],
+                        description=data["fields"].get("description"),
+                        status=data["fields"]["status"]["name"],
+                        assignee=data["fields"].get("assignee", {}).get("displayName"),
+                        created_at=data["fields"]["created"],
+                        updated_at=data["fields"]["updated"],
+                        priority=data["fields"].get("priority", {}).get("name")
+                    )
+
+        except Exception as e:
+            raise JiraRequestError(500, f"Failed to fetch issue details: {str(e)}") from e
