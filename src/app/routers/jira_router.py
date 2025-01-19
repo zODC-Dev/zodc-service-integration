@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 
 from src.app.controllers.jira_controller import JiraController
 from src.app.dependencies.jira import get_jira_controller
-from src.app.schemas.requests.jira import JiraIssueCreateRequest
+from src.app.schemas.requests.jira import JiraIssueCreateRequest, JiraTaskUpdateRequest
 from src.app.schemas.responses.jira import JiraCreateIssueResponse, JiraProjectResponse, JiraTaskResponse
 
 router = APIRouter()
@@ -45,3 +45,14 @@ async def create_issue(
 ) -> JiraCreateIssueResponse:
     """Create a new Jira issue"""
     return await controller.create_issue(user_id, issue)
+
+
+@router.patch("/issues/{issue_id}", response_model=JiraTaskResponse)
+async def update_issue(
+    issue_id: str,
+    user_id: int,
+    update: JiraTaskUpdateRequest,
+    controller: JiraController = Depends(get_jira_controller),
+) -> JiraTaskResponse:
+    """Update a Jira issue"""
+    return await controller.update_issue(user_id, issue_id, update)

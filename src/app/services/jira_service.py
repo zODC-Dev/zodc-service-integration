@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraTask
+from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraTask, JiraTaskUpdate
 from src.domain.entities.jira_api import JiraCreateIssueResponse
 from src.domain.services.jira_service import IJiraService
 
@@ -28,3 +28,16 @@ class JiraApplicationService:
 
     async def create_issue(self, user_id: int, issue: JiraIssueCreate) -> JiraCreateIssueResponse:
         return await self.jira_service.create_issue(user_id, issue)
+
+    async def update_issue(
+        self,
+        user_id: int,
+        issue_id: str,
+        update: JiraTaskUpdate
+    ) -> JiraTask:
+        """Update a Jira issue"""
+        return await self.jira_service.update_issue(
+            user_id=user_id,
+            issue_id=issue_id,
+            update=update
+        )

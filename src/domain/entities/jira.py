@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, field_validator
 
-from src.domain.constants.jira import JiraIssueType
+from src.domain.constants.jira import JiraIssueType, JiraTaskStatus
 
 
 class JiraTask(BaseModel):
@@ -11,7 +11,7 @@ class JiraTask(BaseModel):
     key: str
     summary: str
     description: Optional[str] = None
-    status: str
+    status: JiraTaskStatus
     assignee: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -64,3 +64,10 @@ class JiraIssueCreate(BaseModel):
     assignee: Optional[str] = None
     labels: Optional[List[str]] = None
     epic_link: Optional[str] = None  # For linking to an epic
+
+
+class JiraTaskUpdate(BaseModel):
+    assignee: Optional[str] = None
+    status: Optional[JiraTaskStatus] = None
+    estimate_points: Optional[float] = None
+    actual_points: Optional[float] = None

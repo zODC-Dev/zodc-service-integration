@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraTask
+from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraTask, JiraTaskUpdate
 from src.domain.entities.jira_api import JiraCreateIssueResponse
 
 
@@ -29,4 +29,14 @@ class IJiraService(ABC):
         issue: JiraIssueCreate
     ) -> JiraCreateIssueResponse:
         """Create a new Jira issue"""
+        pass
+
+    @abstractmethod
+    async def update_issue(
+        self,
+        user_id: int,
+        issue_id: str,
+        update: JiraTaskUpdate
+    ) -> JiraTask:
+        """Update an existing Jira issue"""
         pass
