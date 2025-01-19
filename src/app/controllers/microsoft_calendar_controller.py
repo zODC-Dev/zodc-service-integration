@@ -32,7 +32,7 @@ class MicrosoftCalendarController:
             return MicrosoftCalendarEventsResponse(**events.model_dump())
         except CalendarError as e:
             log.error(f"Calendar error: {str(e)}")
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:
             log.error(f"Unexpected error: {str(e)}")
-            raise HTTPException(status_code=500, detail="Internal server error")
+            raise HTTPException(status_code=500, detail="Internal server error") from e

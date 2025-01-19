@@ -19,13 +19,12 @@ async def get_project_tasks(
     controller: JiraController = Depends(get_jira_controller),
 ) -> List[JiraTaskResponse]:
     """Get tasks from a specific Jira project"""
-    tasks = await controller.get_project_tasks(
+    return await controller.get_project_tasks(
         user_id=user_id,
         project_id=project_id,
         status=status,
         limit=limit
     )
-    return tasks
 
 
 @router.get("/projects", response_model=List[JiraProjectResponse])

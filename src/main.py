@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
 
 from src.app.routers.jira_router import router as jira_router
+from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
 from src.app.routers.util_router import router as util_router
 from src.app.services.user_event_service import UserEventService
 from src.configs.database import init_db
@@ -15,7 +16,6 @@ from src.domain.entities.user_events import UserEventType
 from src.infrastructure.messaging.user_event_handler import UserEventHandler
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.redis_service import RedisService
-from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
 
 
 @asynccontextmanager

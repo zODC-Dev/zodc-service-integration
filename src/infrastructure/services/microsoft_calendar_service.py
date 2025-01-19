@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from httpx import AsyncClient
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
 from src.configs.settings import settings

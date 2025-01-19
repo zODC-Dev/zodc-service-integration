@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, Query
 from src.app.controllers.microsoft_calendar_controller import MicrosoftCalendarController
 from src.app.dependencies.microsoft_calendar import get_microsoft_calendar_controller
 from src.app.schemas.responses.microsoft_calendar import MicrosoftCalendarEventsResponse
-from src.app.middlewares.permission_middleware import require_permissions
 
 router = APIRouter()
 

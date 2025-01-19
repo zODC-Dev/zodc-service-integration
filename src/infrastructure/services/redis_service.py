@@ -1,5 +1,6 @@
 import json
 from typing import Any, Dict
+
 from redis.asyncio import Redis
 
 from src.domain.services.redis_service import IRedisService
