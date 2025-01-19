@@ -3,10 +3,10 @@ from typing import List, Optional
 from fastapi import HTTPException
 
 from src.app.schemas.requests.jira import JiraIssueCreateRequest
-from src.app.schemas.responses.jira import JiraCreateIssueResponse
+from src.app.schemas.responses.jira import JiraCreateIssueResponse, JiraProjectResponse, JiraTaskResponse
 from src.app.services.jira_service import JiraApplicationService
 from src.configs.logger import log
-from src.domain.entities.jira import JiraProject, JiraTask, JiraIssueCreate
+from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraTask
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 
 
@@ -20,14 +20,15 @@ class JiraController:
         project_id: str,
         status: Optional[str] = None,
         limit: int = 50
-    ) -> List[JiraTask]:
+    ) -> List[JiraTaskResponse]:
         try:
-            return await self.jira_service.get_project_tasks(
+            tasks = await self.jira_service.get_project_tasks(
                 user_id=user_id,
                 project_id=project_id,
                 status=status,
                 limit=limit
             )
+            return [JiraTaskResponse(**task.model_dump()) for task in tasks]
         except JiraAuthenticationError as e:
             log.error(f"Jira authentication failed: {str(e)}")
             raise HTTPException(
@@ -53,9 +54,10 @@ class JiraController:
                 detail="An unexpected error occurred"
             ) from e
 
-    async def get_accessible_projects(self, user_id: int) -> List[JiraProject]:
+    async def get_accessible_projects(self, user_id: int) -> List[JiraProjectResponse]:
         try:
-            return await self.jira_service.get_accessible_projects(user_id)
+            projects = await self.jira_service.get_accessible_projects(user_id)
+            return [JiraProjectResponse(**project.model_dump()) for project in projects]
         except JiraAuthenticationError as e:
             log.error(f"Jira authentication failed: {str(e)}")
             raise HTTPException(

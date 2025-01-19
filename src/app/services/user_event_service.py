@@ -14,4 +14,7 @@ class UserEventService:
         # Clear Jira token cache for the user
         await self.redis_service.delete(f"jira_token:{event.user_id}")
 
+        # Clear Microsoft token cache for the user
+        await self.redis_service.delete(f"microsoft_token:{event.user_id}")
+
         log.info(f"Cleared cache for user {event.user_id}")

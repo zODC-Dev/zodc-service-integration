@@ -1,5 +1,6 @@
 import json
 from typing import Any, Dict
+
 from redis.asyncio import Redis
 
 from src.domain.services.redis_service import IRedisService
@@ -53,5 +54,17 @@ class RedisService(IRedisService):
     async def get_cached_jira_token(self, user_id: int) -> str:
         """Get Jira access token from cache if exists."""
         key = f"jira_token:{user_id}"
+        token_data = await self.get(key)
+        return token_data.get("access_token", "") if token_data else ""
+
+    async def cache_microsoft_token(self, user_id: int, access_token: str, expiry: int = 3600) -> None:
+        """Cache Microsoft access token with expiry."""
+        key = f"microsoft_token:{user_id}"
+        token_data = {"access_token": access_token}
+        await self.set(key, token_data, expiry)
+
+    async def get_cached_microsoft_token(self, user_id: int) -> str:
+        """Get Microsoft access token from cache if exists."""
+        key = f"microsoft_token:{user_id}"
         token_data = await self.get(key)
         return token_data.get("access_token", "") if token_data else ""
