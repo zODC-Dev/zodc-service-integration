@@ -19,11 +19,6 @@ class Settings(BaseSettings):
     # API settings
     API_V1_STR: str = "/api/v1"
 
-    # JWT settings
-    JWT_SECRET: str
-    JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-
     # Logging
     LOG_LEVEL: str = "INFO"
 
@@ -58,6 +53,10 @@ class Settings(BaseSettings):
     NATS_CLUSTER_ID: str = "test-cluster"
     NATS_USERNAME: str = "myuser"
     NATS_PASSWORD: str = "mypassword"
+
+    # Jira settings
+    JIRA_BASE_URL: str = "https://api.atlassian.com/ex/jira/cloud-id"
+    AUTH_SERVICE_URL: str = "http://localhost:8081"
 
     class Config:
         """Configuration settings."""

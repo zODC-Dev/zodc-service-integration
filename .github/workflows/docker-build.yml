@@ -1,0 +1,31 @@
+name: Build and Deploy zODC Integration Service
+
+on:
+  push:
+    branches:
+      - main
+env:
+  SERVICE_NAME: zodc-service-integration
+  VERSION: 0.1.0
+  REGISTRY_PROJECT: zodc
+
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Image
+        run: |
+          docker build -t ${{ secrets.REGISTRY_HOST }}/${{ env.REGISTRY_PROJECT }}/${{ env.SERVICE_NAME }}:${{ env.VERSION }} .
+
+      - name: Login to Docker Registry
+        run: |
+          echo ${{ secrets.REGISTRY_PASSWORD }} | docker login ${{ secrets.REGISTRY_HOST }} -u ${{ secrets.REGISTRY_USER }} --password-stdin
+
+      - name: Push Image
+        run: |
+          docker push ${{ secrets.REGISTRY_HOST }}/${{ env.REGISTRY_PROJECT }}/${{ env.SERVICE_NAME }}:${{ env.VERSION }}
