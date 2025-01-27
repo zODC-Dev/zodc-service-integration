@@ -40,7 +40,7 @@ class JiraService(IJiraService):
         # If not in cache, request new token from auth service
         async with aiohttp.ClientSession(timeout=self.timeout) as session:
             async with session.get(
-                f"http://localhost:8000/api/v1/internal/jira/token/{user_id}",
+                f"{settings.AUTH_SERVICE_URL}/api/v1/internal/jira/token/{user_id}",
             ) as response:
                 if response.status != 200:
                     raise JiraAuthenticationError("Failed to obtain Jira token")
