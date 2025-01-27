@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from src.domain.constants.jira import JiraIssueType
+from src.domain.constants.jira import JiraIssueType, JiraTaskStatus
 
 
 class JiraIssueResponse(BaseModel):
@@ -35,7 +35,7 @@ class JiraTaskResponse(BaseModel):
     key: str
     summary: str
     description: Optional[str] = None
-    status: str
+    status: JiraTaskStatus
     assignee: Optional[str] = None
     created_at: datetime
     updated_at: datetime

@@ -1,11 +1,12 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 from aiohttp import ClientTimeout
 
 from src.configs.logger import log
 from src.configs.settings import settings
-from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraTask
+from src.domain.constants.jira import JiraTaskStatus
+from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraTask, JiraTaskUpdate
 from src.domain.entities.jira_api import (
     JiraADFContent,
     JiraADFDocument,
@@ -39,7 +40,7 @@ class JiraService(IJiraService):
         # If not in cache, request new token from auth service
         async with aiohttp.ClientSession(timeout=self.timeout) as session:
             async with session.get(
-                f"http://localhost:8000/api/v1/internal/jira/token/{user_id}",
+                f"{settings.AUTH_SERVICE_URL}/api/v1/internal/jira/token/{user_id}",
             ) as response:
                 if response.status != 200:
                     raise JiraAuthenticationError("Failed to obtain Jira token")
@@ -112,7 +113,9 @@ class JiraService(IJiraService):
                             key=issue.get("key", ""),
                             summary=issue.get("fields", {}).get("summary", ""),
                             description=issue.get("fields", {}).get("description"),
-                            status=issue.get("fields", {}).get("status", {}).get("name", "Unknown"),
+                            status=JiraTaskStatus.from_str(
+                                issue.get("fields", {}).get("status", {}).get("name", "Unknown")
+                            ),
                             assignee=issue.get("fields", {}).get("assignee", {}).get(
                                 "displayName") if issue.get("fields", {}).get("assignee") else None,
                             created_at=issue.get("fields", {}).get("created", ""),
@@ -288,3 +291,83 @@ class JiraService(IJiraService):
 
         except Exception as e:
             raise JiraRequestError(500, f"Failed to fetch issue details: {str(e)}") from e
+
+    async def update_issue(
+        self,
+        user_id: int,
+        issue_id: str,
+        update: JiraTaskUpdate
+    ) -> JiraTask:
+        token = await self._get_token(user_id)
+
+        try:
+            # Prepare update fields
+            update_fields: Dict[str, Any] = {}
+
+            if update.assignee is not None:
+                update_fields["assignee"] = {"id": update.assignee} if update.assignee else None
+
+            if update.status is not None:
+                # First, get available transitions
+                async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                    async with session.get(
+                        f"{settings.JIRA_BASE_URL}/rest/api/3/issue/{issue_id}/transitions",
+                        headers={
+                            "Authorization": f"Bearer {token}",
+                            "Accept": "application/json"
+                        }
+                    ) as response:
+                        if response.status != 200:
+                            raise JiraRequestError(
+                                response.status,
+                                "Failed to get issue transitions"
+                            )
+                        transitions = await response.json()
+
+                        # Find the transition ID for the desired status
+                        transition_id = None
+                        for transition in transitions["transitions"]:
+                            if transition["to"]["name"].lower() == update.status.value.lower():
+                                transition_id = transition["id"]
+                                break
+
+                        if transition_id:
+                            # Perform the transition
+                            await session.post(
+                                f"{settings.JIRA_BASE_URL}/rest/api/3/issue/{issue_id}/transitions",
+                                headers={
+                                    "Authorization": f"Bearer {token}",
+                                    "Accept": "application/json",
+                                    "Content-Type": "application/json"
+                                },
+                                json={
+                                    "transition": {"id": transition_id}
+                                }
+                            )
+
+            if update.estimate_points is not None:
+                update_fields["customfield_10016"] = update.estimate_points
+
+            if update.actual_points is not None:
+                update_fields["customfield_10017"] = update.actual_points
+
+            # Update the issue if there are fields to update
+            if update_fields:
+                async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                    await session.put(
+                        f"{settings.JIRA_BASE_URL}/rest/api/3/issue/{issue_id}",
+                        headers={
+                            "Authorization": f"Bearer {token}",
+                            "Accept": "application/json",
+                            "Content-Type": "application/json"
+                        },
+                        json={"fields": update_fields}
+                    )
+
+            # Get and return the updated issue
+            return await self.get_issue(user_id, issue_id)
+
+        except aiohttp.ClientConnectorError as e:
+            raise JiraConnectionError(f"Could not connect to Jira API: {str(e)}") from e
+        except Exception as e:
+            raise JiraRequestError(500, f"Failed to update issue: {str(e)}") from e
