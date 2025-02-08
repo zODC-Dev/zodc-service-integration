@@ -29,6 +29,7 @@ openpyxl = "^3.1.5"
 python-multipart = "^0.0.20"
 azure-storage-blob = "^12.24.0"
 nats-py = "^2.9.0"
+prometheus-fastapi-instrumentator = "^7.0.2"
 
 
 [tool.poetry.group.dev.dependencies]

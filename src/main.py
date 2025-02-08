@@ -3,6 +3,7 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
 
 from src.app.routers.jira_router import router as jira_router
@@ -16,6 +17,19 @@ from src.domain.entities.user_events import UserEventType
 from src.infrastructure.messaging.user_event_handler import UserEventHandler
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.redis_service import RedisService
+
+
+# Define Prometheus instrumentator first
+instrumentator = Instrumentator(
+    should_respect_env_var=True,
+    env_var_name="ENABLE_METRICS",
+    # Add these configurations
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=[".*admin.*", "/metrics"],
+    # env_var_name="ENABLE_METRICS",
+    inprogress_name="fastapi_inprogress",
+    inprogress_labels=True
+)
 
 
 @asynccontextmanager
@@ -62,6 +76,9 @@ app = FastAPI(
         "appName": settings.APP_NAME,
     },
 )
+
+# Add Prometheus instrumentation AFTER FastAPI app creation
+instrumentator.instrument(app).expose(app, include_in_schema=True)
 
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(

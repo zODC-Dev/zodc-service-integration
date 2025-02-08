@@ -9,6 +9,9 @@ class Settings(BaseSettings):
         BaseSettings: Base settings class
     """
 
+    # Prometheus settings
+    ENABLE_METRICS: bool = False
+
     # Database settings
     DATABASE_URL: PostgresDsn
 
