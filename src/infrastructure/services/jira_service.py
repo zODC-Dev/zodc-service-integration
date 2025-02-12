@@ -549,11 +549,7 @@ class JiraService(IJiraService):
                             sprints_dict[sprint["id"]] = JiraSprint(
                                 id=sprint["id"],
                                 name=sprint["name"],
-                                state=sprint["state"].lower(),  # Normalize state to match Agile API
-                                start_date=sprint.get("startDate"),
-                                end_date=sprint.get("endDate"),
-                                goal=sprint.get("goal", None),
-                                board_id=sprint.get("originBoardId", 0)
+                                state=JiraSprintState.from_str(sprint["state"].lower())
                             )
 
                 return list(sprints_dict.values())

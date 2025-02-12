@@ -62,10 +62,6 @@ class JiraSprintResponse(JiraResponseBase):
     id: int
     name: str
     state: str  # active, closed, future
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    goal: Optional[str] = None
-    board_id: int
 
 
 class JiraCreateIssueResponse(JiraResponseBase):

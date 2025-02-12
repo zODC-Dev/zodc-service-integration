@@ -104,11 +104,7 @@ class JiraIssueUpdate(JiraBaseModel):
     actual_points: Optional[float] = None
 
 
-class JiraSprint(BaseModel):
+class JiraSprint(JiraBaseModel):
     id: int
     name: str
-    state: str  # active, closed, future
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    goal: Optional[str] = None
-    board_id: int
+    state: JiraSprintState
