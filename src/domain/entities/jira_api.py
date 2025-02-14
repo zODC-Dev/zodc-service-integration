@@ -31,7 +31,7 @@ class JiraUserReference(BaseModel):
     id: str  # accountId in Jira
 
 
-class JiraPriorityReference(BaseModel):
+class JiraIssuePriorityReference(BaseModel):
     name: Literal["Highest", "High", "Medium", "Low", "Lowest"]
 
 
@@ -40,7 +40,7 @@ class JiraCreateIssueFields(BaseModel):
     summary: str
     issuetype: JiraIssueTypeReference
     description: JiraADFDocument
-    priority: Optional[JiraPriorityReference] = None
+    priority: Optional[JiraIssuePriorityReference] = None
     assignee: Optional[JiraUserReference] = None
     labels: Optional[List[str]] = None
 

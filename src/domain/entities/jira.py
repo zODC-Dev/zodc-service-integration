@@ -1,26 +1,57 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from pydantic import BaseModel, field_validator, ConfigDict
+from pydantic.alias_generators import to_camel
 
-from pydantic import BaseModel, field_validator
-
-from src.domain.constants.jira import JiraIssueType, JiraTaskStatus
+from src.domain.constants.jira import JiraIssueType, JiraIssueStatus, JiraSprintState
 
 
-class JiraTask(BaseModel):
+class JiraBaseModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,  # Allow both snake_case and camelCase input fields
+        from_attributes=True
+    )
+
+
+class JiraAssignee(JiraBaseModel):
+    account_id: str
+    email_address: str
+    avatar_urls: str
+    display_name: str
+
+
+class JiraIssuePriority(JiraBaseModel):
+    id: str
+    icon_url: str
+    name: str
+
+
+class JiraIssueSprint(JiraBaseModel):
+    id: int
+    name: str
+    state: JiraSprintState
+
+
+class JiraIssue(JiraBaseModel):
     id: str
     key: str
     summary: str
+    assignee: Optional[JiraAssignee] = None
+    priority: Optional[JiraIssuePriority] = None
+    type: JiraIssueType
+    sprint: Optional[JiraIssueSprint] = None
+    estimate_point: float = 0
+    actual_point: Optional[float] = None
     description: Optional[str] = None
-    status: JiraTaskStatus
-    assignee: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
-    priority: Optional[str] = None
+    created: str
+    status: JiraIssueStatus
+    updated: str
 
     @field_validator('description', mode='before')
     @classmethod
-    def parse_description(cls, value: Optional[Dict[str, Any]]) -> Optional[str]:
-        if not value:
+    def parse_description(cls, value: Optional[Any]) -> Optional[str]:
+        if value is None:
             return None
 
         # Handle Jira's Atlassian Document Format (ADF)
@@ -44,7 +75,7 @@ class JiraTask(BaseModel):
         return str(value) if value else None
 
 
-class JiraProject(BaseModel):
+class JiraProject(JiraBaseModel):
     id: str
     key: str
     name: str
@@ -55,7 +86,7 @@ class JiraProject(BaseModel):
     url: Optional[str] = None
 
 
-class JiraIssueCreate(BaseModel):
+class JiraIssueCreate(JiraBaseModel):
     project_key: str
     summary: str
     description: Optional[str] = None
@@ -66,8 +97,14 @@ class JiraIssueCreate(BaseModel):
     epic_link: Optional[str] = None  # For linking to an epic
 
 
-class JiraTaskUpdate(BaseModel):
+class JiraIssueUpdate(JiraBaseModel):
     assignee: Optional[str] = None
-    status: Optional[JiraTaskStatus] = None
+    status: Optional[JiraIssueStatus] = None
     estimate_points: Optional[float] = None
     actual_points: Optional[float] = None
+
+
+class JiraSprint(JiraBaseModel):
+    id: int
+    name: str
+    state: JiraSprintState

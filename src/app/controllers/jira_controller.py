@@ -2,11 +2,12 @@ from typing import List, Optional
 
 from fastapi import HTTPException
 
-from src.app.schemas.requests.jira import JiraIssueCreateRequest, JiraTaskUpdateRequest
-from src.app.schemas.responses.jira import JiraCreateIssueResponse, JiraProjectResponse, JiraTaskResponse
+from src.domain.constants.jira import JiraIssueType
+from src.app.schemas.requests.jira import JiraIssueCreateRequest, JiraIssueUpdateRequest
+from src.app.schemas.responses.jira import JiraCreateIssueResponse, JiraProjectResponse, JiraIssueResponse, JiraSprintResponse
 from src.app.services.jira_service import JiraApplicationService
 from src.configs.logger import log
-from src.domain.entities.jira import JiraIssueCreate, JiraTaskUpdate
+from src.domain.entities.jira import JiraIssueCreate, JiraIssueUpdate
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 
 
@@ -14,21 +15,25 @@ class JiraController:
     def __init__(self, jira_service: JiraApplicationService):
         self.jira_service = jira_service
 
-    async def get_project_tasks(
+    async def get_project_issues(
         self,
         user_id: int,
         project_id: str,
-        status: Optional[str] = None,
+        sprint: Optional[str] = None,
+        is_backlog: Optional[bool] = None,
+        issue_type: Optional[JiraIssueType] = None,
         limit: int = 50
-    ) -> List[JiraTaskResponse]:
+    ) -> List[JiraIssueResponse]:
         try:
-            tasks = await self.jira_service.get_project_tasks(
+            issues = await self.jira_service.get_project_issues(
                 user_id=user_id,
                 project_id=project_id,
-                status=status,
+                sprint=sprint,
+                is_backlog=is_backlog,
+                issue_type=issue_type,
                 limit=limit
             )
-            return [JiraTaskResponse(**task.model_dump()) for task in tasks]
+            return [JiraIssueResponse(**issue.model_dump()) for issue in issues]
         except JiraAuthenticationError as e:
             log.error(f"Jira authentication failed: {str(e)}")
             raise HTTPException(
@@ -48,7 +53,7 @@ class JiraController:
                 detail=e.message
             ) from e
         except Exception as e:
-            log.error(f"Unexpected error while fetching Jira tasks: {str(e)}")
+            log.error(f"Unexpected error while fetching Jira issues: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail="An unexpected error occurred"
@@ -126,11 +131,11 @@ class JiraController:
         self,
         user_id: int,
         issue_id: str,
-        update: JiraTaskUpdateRequest
-    ) -> JiraTaskResponse:
+        update: JiraIssueUpdateRequest
+    ) -> JiraIssueResponse:
         try:
             # Convert request model to domain model
-            domain_update = JiraTaskUpdate(
+            domain_update = JiraIssueUpdate(
                 assignee=update.assignee,
                 status=update.status,
                 estimate_points=update.estimate_points,
@@ -142,7 +147,7 @@ class JiraController:
                 issue_id=issue_id,
                 update=domain_update
             )
-            return JiraTaskResponse(**updated_task.model_dump())
+            return JiraIssueResponse(**updated_task.model_dump())
         except JiraAuthenticationError as e:
             log.error(f"Jira authentication failed: {str(e)}")
             raise HTTPException(
@@ -163,6 +168,42 @@ class JiraController:
             ) from e
         except Exception as e:
             log.error(f"Unexpected error while updating Jira issue: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail="An unexpected error occurred"
+            ) from e
+
+    async def get_project_sprints(
+        self,
+        user_id: int,
+        project_id: str,
+    ) -> List[JiraSprintResponse]:
+        try:
+            sprints = await self.jira_service.get_project_sprints(
+                user_id=user_id,
+                project_id=project_id
+            )
+            return [JiraSprintResponse(**sprint.model_dump()) for sprint in sprints]
+        except JiraAuthenticationError as e:
+            log.error(f"Jira authentication failed: {str(e)}")
+            raise HTTPException(
+                status_code=401,
+                detail="Failed to authenticate with Jira"
+            ) from e
+        except JiraConnectionError as e:
+            log.error(f"Failed to connect to Jira: {str(e)}")
+            raise HTTPException(
+                status_code=503,
+                detail="Jira service is currently unavailable"
+            ) from e
+        except JiraRequestError as e:
+            log.error(f"Jira request failed: {str(e)}")
+            raise HTTPException(
+                status_code=e.status_code,
+                detail=e.message
+            ) from e
+        except Exception as e:
+            log.error(f"Unexpected error while fetching Jira sprints: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail="An unexpected error occurred"
