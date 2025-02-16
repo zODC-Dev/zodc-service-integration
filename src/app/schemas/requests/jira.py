@@ -25,8 +25,6 @@ class JiraIssueUpdateRequest(BaseRequest):
 
 
 class JiraIssueGetRequest(BaseRequest):
-    project_key: str
-    issue_id: str
     sprint_id: Optional[str] = Query(None, description="Filter by sprint number (use 'backlog' for backlog items)")
     issue_type: Optional[JiraIssueType] = Query(None, description="Filter by issue type (Bug, Task, Story, Epic)")
     limit: int = Query(50, ge=1, le=100)

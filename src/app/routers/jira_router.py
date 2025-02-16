@@ -11,9 +11,10 @@ from src.app.schemas.responses.jira import JiraCreateIssueResponse, JiraProjectR
 router = APIRouter()
 
 
-@router.get("/projects/{project_id}/issues", response_model=List[JiraIssueResponse])
+@router.get("/projects/{project_key}/issues", response_model=List[JiraIssueResponse])
 async def get_project_issues(
     request: JiraIssueGetRequest,
+    project_key: str,
     controller: JiraController = Depends(get_jira_controller),
 ) -> List[JiraIssueResponse]:
     """Get issues from a specific Jira project"""
@@ -24,7 +25,7 @@ async def get_project_issues(
 
     return await controller.get_project_issues(
         user_id=request.user_id,
-        project_id=request.project_key,
+        project_id=project_key,
         sprint_id=sprint_id,
         is_backlog=is_backlog,
         issue_type=request.issue_type,
@@ -63,14 +64,14 @@ async def update_issue(
     return await controller.update_issue(user_id, issue_id, update)
 
 
-@router.get("/projects/{project_id}/sprints", response_model=List[JiraSprintResponse])
+@router.get("/projects/{project_key}/sprints", response_model=List[JiraSprintResponse])
 async def get_project_sprints(
-    project_id: str,
+    project_key: str,
     user_id: int,
     controller: JiraController = Depends(get_jira_controller),
 ) -> List[JiraSprintResponse]:
     """Get all sprints from a specific Jira project"""
     return await controller.get_project_sprints(
         user_id=user_id,
-        project_id=project_id
+        project_id=project_key
     )
