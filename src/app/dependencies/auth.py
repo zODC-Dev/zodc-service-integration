@@ -1,9 +1,11 @@
 from functools import partial
+import json
 from typing import Any, Callable, Dict, List, Optional
 
-from fastapi import Depends
+from fastapi import Depends, Request
 
 from src.app.middlewares.auth_middleware import JWTAuth
+from src.app.schemas.requests.auth import JWTClaims
 
 
 def require_auth(
@@ -34,3 +36,45 @@ require_project_management = staticmethod(
         require_all=True
     )
 )
+
+
+async def get_jwt_claims(request: Request) -> JWTClaims:
+    """Extract JWT claims from Kong headers and return as a structured object"""
+    headers = request.headers
+
+    # Parse list and dict headers with proper fallbacks
+    try:
+        system_permissions_str = headers.get("x-kong-jwt-claim-system_permissions", "[]")
+        system_permissions = json.loads(system_permissions_str)
+        # Convert dict to list if empty dict is received
+        if isinstance(system_permissions, dict) and not system_permissions:
+            system_permissions = []
+    except json.JSONDecodeError:
+        system_permissions = []
+
+    try:
+        project_roles = json.loads(headers.get("x-kong-jwt-claim-project_roles", "{}"))
+    except json.JSONDecodeError:
+        project_roles = {}
+
+    try:
+        project_permissions = json.loads(headers.get("x-kong-jwt-claim-project_permissions", "{}"))
+    except json.JSONDecodeError:
+        project_permissions = {}
+
+    # Convert string boolean to Python boolean
+    is_jira_linked = headers.get("x-kong-jwt-claim-is_jira_linked", "").lower() == "true"
+
+    return JWTClaims(
+        sub=headers.get("x-kong-jwt-claim-sub", ""),
+        email=headers.get("x-kong-jwt-claim-email", ""),
+        name=headers.get("x-kong-jwt-claim-name", ""),
+        system_role=headers.get("x-kong-jwt-claim-system_role", ""),
+        system_permissions=system_permissions,
+        project_roles=project_roles,
+        project_permissions=project_permissions,
+        is_jira_linked=is_jira_linked,
+        exp=int(headers.get("x-kong-jwt-claim-exp", 0)),
+        iat=int(headers.get("x-kong-jwt-claim-iat", 0)),
+        iss=headers.get("x-kong-jwt-claim-iss", "")
+    )

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from src.domain.constants.jira import JiraIssueType
-from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraIssue, JiraIssueUpdate, JiraSprint
+from src.domain.entities.jira import JiraIssue, JiraIssueCreate, JiraIssueUpdate, JiraProject, JiraSprint
 from src.domain.entities.jira_api import JiraCreateIssueResponse
 
 
@@ -11,10 +11,11 @@ class IJiraService(ABC):
     async def get_project_issues(
         self,
         user_id: int,
-        project_id: str,
+        project_key: str,
         sprint_id: Optional[str] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
+        search: Optional[str] = None,
         limit: int = 50
     ) -> List[JiraIssue]:
         """Get issues from a specific Jira project"""

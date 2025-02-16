@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from src.domain.constants.jira import JiraIssueType
-from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraIssue, JiraIssueUpdate, JiraSprint
+from src.domain.entities.jira import JiraIssue, JiraIssueCreate, JiraIssueUpdate, JiraProject, JiraSprint
 from src.domain.entities.jira_api import JiraCreateIssueResponse
 from src.domain.services.jira_service import IJiraService
 
@@ -13,18 +13,20 @@ class JiraApplicationService:
     async def get_project_issues(
         self,
         user_id: int,
-        project_id: str,
+        project_key: str,
         sprint_id: Optional[str] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
+        search: Optional[str] = None,
         limit: int = 50
     ) -> List[JiraIssue]:
         return await self.jira_service.get_project_issues(
             user_id=user_id,
-            project_id=project_id,
+            project_key=project_key,
             sprint_id=sprint_id,
             is_backlog=is_backlog,
             issue_type=issue_type,
+            search=search,
             limit=limit
         )
 

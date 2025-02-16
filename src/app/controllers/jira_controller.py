@@ -2,11 +2,16 @@ from typing import List, Optional
 
 from fastapi import HTTPException
 
-from src.domain.constants.jira import JiraIssueType
 from src.app.schemas.requests.jira import JiraIssueCreateRequest, JiraIssueUpdateRequest
-from src.app.schemas.responses.jira import JiraCreateIssueResponse, JiraProjectResponse, JiraIssueResponse, JiraSprintResponse
+from src.app.schemas.responses.jira import (
+    JiraCreateIssueResponse,
+    JiraIssueResponse,
+    JiraProjectResponse,
+    JiraSprintResponse,
+)
 from src.app.services.jira_service import JiraApplicationService
 from src.configs.logger import log
+from src.domain.constants.jira import JiraIssueType
 from src.domain.entities.jira import JiraIssueCreate, JiraIssueUpdate
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 
@@ -18,19 +23,22 @@ class JiraController:
     async def get_project_issues(
         self,
         user_id: int,
-        project_id: str,
+        project_key: str,
         sprint_id: Optional[str] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
+        search: Optional[str] = None,
         limit: int = 50
     ) -> List[JiraIssueResponse]:
         try:
+            log.info(f"User {user_id} is fetching issues for project {project_key}")
             issues = await self.jira_service.get_project_issues(
                 user_id=user_id,
-                project_id=project_id,
+                project_key=project_key,
                 sprint_id=sprint_id,
                 is_backlog=is_backlog,
                 issue_type=issue_type,
+                search=search,
                 limit=limit
             )
             return [JiraIssueResponse(**issue.model_dump()) for issue in issues]

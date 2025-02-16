@@ -1,7 +1,7 @@
+import logging
 import sys
 
 from loguru import logger
-import logging
 
 # Configure logger
 logger.remove()  # Remove the default handler

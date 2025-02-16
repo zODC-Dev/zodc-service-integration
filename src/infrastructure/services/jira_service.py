@@ -5,8 +5,17 @@ from aiohttp import ClientTimeout
 
 from src.configs.logger import log
 from src.configs.settings import settings
-from src.domain.constants.jira import JiraIssueType, JiraIssueStatus, JiraSprintState
-from src.domain.entities.jira import JiraIssueCreate, JiraProject, JiraIssue, JiraIssueUpdate, JiraSprint, JiraAssignee, JiraIssuePriority, JiraIssueSprint
+from src.domain.constants.jira import JiraIssueStatus, JiraIssueType, JiraSprintState
+from src.domain.entities.jira import (
+    JiraAssignee,
+    JiraIssue,
+    JiraIssueCreate,
+    JiraIssuePriority,
+    JiraIssueSprint,
+    JiraIssueUpdate,
+    JiraProject,
+    JiraSprint,
+)
 from src.domain.entities.jira_api import (
     JiraADFContent,
     JiraADFDocument,
@@ -14,8 +23,8 @@ from src.domain.entities.jira_api import (
     JiraCreateIssueFields,
     JiraCreateIssueRequest,
     JiraCreateIssueResponse,
-    JiraIssueTypeReference,
     JiraIssuePriorityReference,
+    JiraIssueTypeReference,
     JiraProjectReference,
     JiraUserReference,
 )
@@ -52,16 +61,17 @@ class JiraService(IJiraService):
     async def get_project_issues(
         self,
         user_id: int,
-        project_id: str,
+        project_key: str,
         sprint_id: Optional[str] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
+        search: Optional[str] = None,
         limit: int = 50
     ) -> List[JiraIssue]:
         token = await self._get_token(user_id)
 
         # Build JQL query
-        jql_conditions = [f"project = {project_id}"]
+        jql_conditions = [f"project = {project_key}"]
 
         # Handle sprint/backlog filter
         if sprint_id:
@@ -72,6 +82,13 @@ class JiraService(IJiraService):
         # Handle issue type filter
         if issue_type:
             jql_conditions.append(f"issuetype = '{issue_type.value}'")
+
+        # Handle search - only using trailing wildcard
+        if search:
+            # Escape special characters in search term
+            escaped_search = search.replace('"', '\\"')
+            search_condition = f'(summary ~ "{escaped_search}*" OR description ~ "{escaped_search}*")'
+            jql_conditions.append(search_condition)
 
         jql = " AND ".join(jql_conditions)
 
@@ -310,7 +327,6 @@ class JiraService(IJiraService):
                         key=data["key"],
                         summary=data["fields"]["summary"],
                         description=data["fields"].get("description"),
-                        state=data["fields"]["status"]["name"],
                         assignee=JiraAssignee(
                             account_id=data["fields"].get("assignee", {}).get("accountId", ""),
                             email_address=data["fields"].get("assignee", {}).get("emailAddress", ""),
@@ -325,13 +341,15 @@ class JiraService(IJiraService):
                         type=JiraIssueType(data["fields"]["issuetype"]["name"]),
                         sprint=JiraIssueSprint(
                             id=data["fields"].get("sprint", {}).get("id"),
-                            name=data["fields"].get("sprint", {}).get("name")
+                            name=data["fields"].get("sprint", {}).get("name"),
+                            state=JiraSprintState.from_str(data["fields"].get("sprint", {}).get("state", "Unknown"))
                         ) if data["fields"].get("sprint") else None,
                         estimate_point=float(data["fields"].get("customfield_10016", 0) or 0),
                         actual_point=float(data["fields"].get("customfield_10017")
                                            ) if data["fields"].get("customfield_10017") else None,
                         created=data["fields"]["created"],
-                        updated=data["fields"]["updated"]
+                        updated=data["fields"]["updated"],
+                        status=JiraIssueStatus.from_str(data["fields"]["status"]["name"])
                     )
 
         except Exception as e:
@@ -556,4 +574,4 @@ class JiraService(IJiraService):
 
         except Exception as e:
             log.error(f"Failed to fetch sprints via REST API: {str(e)}")
-            raise JiraRequestError(500, f"Failed to fetch sprints via REST API: {str(e)}")
+            raise JiraRequestError(500, f"Failed to fetch sprints via REST API: {str(e)}") from e

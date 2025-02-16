@@ -18,7 +18,6 @@ from src.infrastructure.messaging.user_event_handler import UserEventHandler
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.redis_service import RedisService
 
-
 # Define Prometheus instrumentator first
 instrumentator = Instrumentator(
     should_respect_env_var=True,
@@ -93,7 +92,7 @@ if settings.BACKEND_CORS_ORIGINS:
 app.include_router(util_router, prefix=settings.API_V1_STR +
                    "/utils", tags=["utils"])
 app.include_router(jira_router, prefix=settings.API_V1_STR + "/jira", tags=["jira"])
-app.include_router(microsoft_calendar_router, prefix=settings.API_V1_STR + "/calendar", tags=["calendar"])
+app.include_router(microsoft_calendar_router, prefix=settings.API_V1_STR + "/microsoft", tags=["microsoft"])
 
 
 async def start_nats_subscribers(

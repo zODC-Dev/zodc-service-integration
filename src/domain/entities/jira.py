@@ -1,9 +1,9 @@
-from datetime import datetime
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, field_validator, ConfigDict
+from typing import Any, List, Optional
+
+from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic.alias_generators import to_camel
 
-from src.domain.constants.jira import JiraIssueType, JiraIssueStatus, JiraSprintState
+from src.domain.constants.jira import JiraIssueStatus, JiraIssueType, JiraSprintState
 
 
 class JiraBaseModel(BaseModel):
