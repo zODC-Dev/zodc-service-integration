@@ -1,6 +1,7 @@
 import sys
 
 from loguru import logger
+import logging
 
 # Configure logger
 logger.remove()  # Remove the default handler
@@ -18,6 +19,8 @@ logger.add(
     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
     level="DEBUG",
 )
+
+logging.getLogger("sqlalchemy.engine").setLevel(logging.ERROR)
 
 # Export the logger
 log = logger

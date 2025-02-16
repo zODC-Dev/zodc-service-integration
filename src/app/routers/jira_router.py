@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from src.domain.constants.jira import JiraIssueType
 from src.app.controllers.jira_controller import JiraController
 from src.app.dependencies.jira import get_jira_controller
-from src.app.schemas.requests.jira import JiraIssueCreateRequest, JiraIssueUpdateRequest
+from src.app.schemas.requests.jira import JiraIssueCreateRequest, JiraIssueGetRequest, JiraIssueUpdateRequest
 from src.app.schemas.responses.jira import JiraCreateIssueResponse, JiraProjectResponse, JiraIssueResponse, JiraSprintResponse
 
 router = APIRouter()
@@ -13,26 +13,22 @@ router = APIRouter()
 
 @router.get("/projects/{project_id}/issues", response_model=List[JiraIssueResponse])
 async def get_project_issues(
-    project_id: str,
-    user_id: int,
-    sprint: Optional[str] = Query(None, description="Filter by sprint number (use 'backlog' for backlog items)"),
-    issue_type: Optional[JiraIssueType] = Query(None, description="Filter by issue type (Bug, Task, Story, Epic)"),
-    limit: int = Query(50, ge=1, le=100),
+    request: JiraIssueGetRequest,
     controller: JiraController = Depends(get_jira_controller),
 ) -> List[JiraIssueResponse]:
     """Get issues from a specific Jira project"""
     is_backlog = None
-    if sprint == "backlog":
+    if request.sprint_id == "backlog":
         is_backlog = True
-        sprint = None
+        sprint_id = None
 
     return await controller.get_project_issues(
-        user_id=user_id,
-        project_id=project_id,
-        sprint=sprint,
+        user_id=request.user_id,
+        project_id=request.project_key,
+        sprint_id=sprint_id,
         is_backlog=is_backlog,
-        issue_type=issue_type,
-        limit=limit
+        issue_type=request.issue_type,
+        limit=request.limit
     )
 
 

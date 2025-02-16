@@ -1,10 +1,12 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, HttpUrl
+from pydantic import EmailStr, HttpUrl
+
+from src.app.schemas.responses.base import BaseResponse
 
 
-class MicrosoftCalendarEventResponse(BaseModel):
+class MicrosoftCalendarEventResponse(BaseResponse):
     id: str
     subject: str
     start_time: datetime
@@ -21,7 +23,7 @@ class MicrosoftCalendarEventResponse(BaseModel):
         from_attributes = True
 
 
-class MicrosoftCalendarEventsResponse(BaseModel):
+class MicrosoftCalendarEventsResponse(BaseResponse):
     events: List[MicrosoftCalendarEventResponse]
     next_link: Optional[HttpUrl] = None
 
@@ -29,7 +31,7 @@ class MicrosoftCalendarEventsResponse(BaseModel):
         from_attributes = True
 
 
-class CreateCalendarEventResponse(BaseModel):
+class CreateCalendarEventResponse(BaseResponse):
     event_id: str
     subject: str
     start_time: datetime
@@ -40,7 +42,7 @@ class CreateCalendarEventResponse(BaseModel):
         from_attributes = True
 
 
-class UpdateCalendarEventResponse(BaseModel):
+class UpdateCalendarEventResponse(BaseResponse):
     success: bool
     event_id: str
     message: str = "Event updated successfully"
@@ -49,7 +51,7 @@ class UpdateCalendarEventResponse(BaseModel):
         from_attributes = True
 
 
-class DeleteCalendarEventResponse(BaseModel):
+class DeleteCalendarEventResponse(BaseResponse):
     success: bool
     event_id: str
     message: str = "Event deleted successfully"

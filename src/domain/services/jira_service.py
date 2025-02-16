@@ -12,7 +12,7 @@ class IJiraService(ABC):
         self,
         user_id: int,
         project_id: str,
-        sprint: Optional[str] = None,
+        sprint_id: Optional[str] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
         limit: int = 50
