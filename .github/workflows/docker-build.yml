@@ -25,6 +25,10 @@ jobs:
         run: |
           echo ${{ secrets.REGISTRY_PASSWORD }} | docker login ${{ secrets.REGISTRY_HOST }} -u ${{ secrets.REGISTRY_USER }} --password-stdin
 
-      - name: Push Image
+      - name: Push Versioned Image
         run: |
           docker push ${{ secrets.REGISTRY_HOST }}/${{ env.REGISTRY_PROJECT }}/${{ env.SERVICE_NAME }}:${{ env.VERSION }}
+
+      - name: Push Latest Image
+        run: |
+          docker push ${{ secrets.REGISTRY_HOST }}/${{ env.REGISTRY_PROJECT }}/${{ env.SERVICE_NAME }}:latest
