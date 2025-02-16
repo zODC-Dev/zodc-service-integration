@@ -2,8 +2,8 @@ from typing import List, Optional
 
 from fastapi import Query
 
-from src.domain.constants.jira import JiraIssueType, JiraIssueStatus
 from src.app.schemas.requests.base import BaseRequest
+from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 
 
 class JiraIssueCreateRequest(BaseRequest):

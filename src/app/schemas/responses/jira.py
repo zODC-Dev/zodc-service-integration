@@ -1,5 +1,4 @@
-from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 
 from src.app.schemas.responses.base import BaseResponse
 

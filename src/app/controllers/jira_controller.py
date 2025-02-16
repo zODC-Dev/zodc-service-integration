@@ -2,11 +2,16 @@ from typing import List, Optional
 
 from fastapi import HTTPException
 
-from src.domain.constants.jira import JiraIssueType
 from src.app.schemas.requests.jira import JiraIssueCreateRequest, JiraIssueUpdateRequest
-from src.app.schemas.responses.jira import JiraCreateIssueResponse, JiraProjectResponse, JiraIssueResponse, JiraSprintResponse
+from src.app.schemas.responses.jira import (
+    JiraCreateIssueResponse,
+    JiraIssueResponse,
+    JiraProjectResponse,
+    JiraSprintResponse,
+)
 from src.app.services.jira_service import JiraApplicationService
 from src.configs.logger import log
+from src.domain.constants.jira import JiraIssueType
 from src.domain.entities.jira import JiraIssueCreate, JiraIssueUpdate
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 

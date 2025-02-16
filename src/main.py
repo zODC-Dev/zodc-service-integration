@@ -3,8 +3,6 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.routing import APIRoute
-from pydantic.alias_generators import to_camel
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
 
@@ -19,7 +17,6 @@ from src.domain.entities.user_events import UserEventType
 from src.infrastructure.messaging.user_event_handler import UserEventHandler
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.redis_service import RedisService
-
 
 # Define Prometheus instrumentator first
 instrumentator = Instrumentator(
@@ -95,13 +92,7 @@ if settings.BACKEND_CORS_ORIGINS:
 app.include_router(util_router, prefix=settings.API_V1_STR +
                    "/utils", tags=["utils"])
 app.include_router(jira_router, prefix=settings.API_V1_STR + "/jira", tags=["jira"])
-app.include_router(microsoft_calendar_router, prefix=settings.API_V1_STR + "/calendar", tags=["calendar"])
-
-for route in app.routes:
-    if isinstance(route, APIRoute):
-        for param in route.dependant.query_params:
-            if not param.field_info.alias:
-                param.alias = to_camel(param.name)
+app.include_router(microsoft_calendar_router, prefix=settings.API_V1_STR + "/microsoft", tags=["microsoft"])
 
 
 async def start_nats_subscribers(
