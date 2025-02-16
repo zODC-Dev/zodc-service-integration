@@ -52,16 +52,17 @@ class JiraService(IJiraService):
     async def get_project_issues(
         self,
         user_id: int,
-        project_id: str,
+        project_key: str,
         sprint_id: Optional[str] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
+        search: Optional[str] = None,
         limit: int = 50
     ) -> List[JiraIssue]:
         token = await self._get_token(user_id)
 
         # Build JQL query
-        jql_conditions = [f"project = {project_id}"]
+        jql_conditions = [f"project = {project_key}"]
 
         # Handle sprint/backlog filter
         if sprint_id:
@@ -72,6 +73,11 @@ class JiraService(IJiraService):
         # Handle issue type filter
         if issue_type:
             jql_conditions.append(f"issuetype = '{issue_type.value}'")
+
+        # Handle search - using contains (~) operator without wildcards
+        if search:
+            search_condition = f"(summary ~ \"{search}\" OR description ~ \"{search}\")"
+            jql_conditions.append(search_condition)
 
         jql = " AND ".join(jql_conditions)
 
