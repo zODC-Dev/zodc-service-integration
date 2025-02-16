@@ -19,7 +19,7 @@ class JiraController:
         self,
         user_id: int,
         project_id: str,
-        sprint: Optional[str] = None,
+        sprint_id: Optional[str] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
         limit: int = 50
@@ -28,7 +28,7 @@ class JiraController:
             issues = await self.jira_service.get_project_issues(
                 user_id=user_id,
                 project_id=project_id,
-                sprint=sprint,
+                sprint_id=sprint_id,
                 is_backlog=is_backlog,
                 issue_type=issue_type,
                 limit=limit
