@@ -13,6 +13,7 @@ class UserEventType(str, Enum):
     USER_UPDATED = "user.updated"
     USER_DELETED = "user.deleted"
     USER_CREATED = "user.created"
+    USER_LOGOUT = "user.logout"
 
 
 class UserEvent(BaseModel):
