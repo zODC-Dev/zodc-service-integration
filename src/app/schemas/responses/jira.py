@@ -1,37 +1,29 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict
-from pydantic.alias_generators import to_camel
+
+from src.app.schemas.responses.base import BaseResponse
 
 
-class JiraResponseBase(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-        from_attributes=True
-    )
-
-
-class JiraAssigneeResponse(JiraResponseBase):
+class JiraAssigneeResponse(BaseResponse):
     account_id: str
     email_address: str
     avatar_urls: str
     display_name: str
 
 
-class JiraIssuePriorityResponse(JiraResponseBase):
+class JiraIssuePriorityResponse(BaseResponse):
     id: str
     icon_url: str
     name: str
 
 
-class JiraIssueSprintResponse(JiraResponseBase):
+class JiraIssueSprintResponse(BaseResponse):
     id: int
     name: str
     state: str  # active, closed, future
 
 
-class JiraIssueResponse(JiraResponseBase):
+class JiraIssueResponse(BaseResponse):
     id: str
     key: str
     summary: str
@@ -47,7 +39,7 @@ class JiraIssueResponse(JiraResponseBase):
     updated: str
 
 
-class JiraProjectResponse(JiraResponseBase):
+class JiraProjectResponse(BaseResponse):
     id: str
     key: str
     name: str
@@ -58,13 +50,13 @@ class JiraProjectResponse(JiraResponseBase):
     url: Optional[str] = None
 
 
-class JiraSprintResponse(JiraResponseBase):
+class JiraSprintResponse(BaseResponse):
     id: int
     name: str
     state: str  # active, closed, future
 
 
-class JiraCreateIssueResponse(JiraResponseBase):
+class JiraCreateIssueResponse(BaseResponse):
     id: str
     key: str
     self: str  # API URL of the created issue

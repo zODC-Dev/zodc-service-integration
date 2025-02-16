@@ -53,7 +53,7 @@ class JiraService(IJiraService):
         self,
         user_id: int,
         project_id: str,
-        sprint: Optional[str] = None,
+        sprint_id: Optional[str] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
         limit: int = 50
@@ -64,8 +64,8 @@ class JiraService(IJiraService):
         jql_conditions = [f"project = {project_id}"]
 
         # Handle sprint/backlog filter
-        if sprint:
-            jql_conditions.append(f"sprint = {sprint}")
+        if sprint_id:
+            jql_conditions.append(f"sprint = {sprint_id}")
         elif is_backlog:
             jql_conditions.append("sprint is EMPTY")
 
