@@ -17,7 +17,7 @@ class JiraBaseModel(BaseModel):
 class JiraAssignee(JiraBaseModel):
     account_id: str
     email_address: str
-    avatar_urls: str
+    avatar_url: str
     display_name: str
 
 
@@ -84,6 +84,7 @@ class JiraProject(JiraBaseModel):
     project_category: Optional[str] = None
     lead: Optional[str] = None
     url: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 class JiraIssueCreate(JiraBaseModel):

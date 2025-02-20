@@ -146,8 +146,8 @@ class JiraService(IJiraService):
                             assignee=JiraAssignee(
                                 account_id=issue.get("fields", {}).get("assignee", {}).get("accountId", ""),
                                 email_address=issue.get("fields", {}).get("assignee", {}).get("emailAddress", ""),
-                                avatar_urls=issue.get("fields", {}).get(
-                                    "assignee", {}).get("avatarUrls", {}).get("24x24", ""),
+                                avatar_url=issue.get("fields", {}).get(
+                                    "assignee", {}).get("avatarUrls", {}).get("48x48", ""),
                                 display_name=issue.get("fields", {}).get("assignee", {}).get("displayName", "")
                             ) if issue.get("fields", {}).get("assignee") else None,
                             priority=JiraIssuePriority(
@@ -226,7 +226,8 @@ class JiraService(IJiraService):
                             project_type=project.get("projectTypeKey"),
                             project_category=project.get("projectCategory", {}).get("name"),
                             lead=project.get("lead", {}).get("displayName"),
-                            url=project.get("self")
+                            url=project.get("self"),
+                            avatar_url=project.get("avatarUrls", {}).get("48x48")
                         )
                         for project in data
                     ]
@@ -330,7 +331,7 @@ class JiraService(IJiraService):
                         assignee=JiraAssignee(
                             account_id=data["fields"].get("assignee", {}).get("accountId", ""),
                             email_address=data["fields"].get("assignee", {}).get("emailAddress", ""),
-                            avatar_urls=data["fields"].get("assignee", {}).get("avatarUrls", {}).get("48x48", ""),
+                            avatar_url=data["fields"].get("assignee", {}).get("avatarUrls", {}).get("48x48", ""),
                             display_name=data["fields"].get("assignee", {}).get("displayName", "")
                         ) if data["fields"].get("assignee") else None,
                         priority=JiraIssuePriority(

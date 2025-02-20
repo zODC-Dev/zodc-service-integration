@@ -6,7 +6,7 @@ from src.app.schemas.responses.base import BaseResponse
 class JiraAssigneeResponse(BaseResponse):
     account_id: str
     email_address: str
-    avatar_urls: str
+    avatar_url: str
     display_name: str
 
 
@@ -47,6 +47,7 @@ class JiraProjectResponse(BaseResponse):
     project_category: Optional[str] = None
     lead: Optional[str] = None
     url: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 class JiraSprintResponse(BaseResponse):
