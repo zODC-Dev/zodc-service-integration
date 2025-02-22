@@ -35,7 +35,7 @@ class ExcelFileService(IExcelFileService):
 
             # Extract all content in 1 sheet
             for row in sheet.iter_rows(min_row=2):
-                for cell, header in zip(row, headers):
+                for cell, header in zip(row, headers, strict=False):
                     sheet_result[header].append(
                         str(cell.value) if cell.value is not None else "")
 

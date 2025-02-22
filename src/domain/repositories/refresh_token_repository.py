@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from src.domain.constants.auth import TokenType
-from src.domain.entities.auth import RefreshTokenEntity
+from src.domain.constants.refresh_tokens import TokenType
+from src.domain.entities.refresh_token import RefreshTokenEntity
 
 
 class IRefreshTokenRepository(ABC):

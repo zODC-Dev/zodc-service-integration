@@ -6,7 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.domain.entities.project import Project as ProjectEntity, ProjectCreate, ProjectUpdate
 from src.domain.exceptions.project_exceptions import ProjectNotFoundError
 from src.domain.repositories.project_repository import IProjectRepository
-from src.infrastructure.models.project import Project, UserProjectRole
+from src.infrastructure.models.project import Project
 
 
 class SQLAlchemyProjectRepository(IProjectRepository):
@@ -63,21 +63,10 @@ class SQLAlchemyProjectRepository(IProjectRepository):
             await self.session.delete(project)
             await self.session.commit()
 
-    async def get_user_projects(self, user_id: int) -> List[ProjectEntity]:
-        result = await self.session.exec(
-            select(Project)
-            .join(UserProjectRole)
-            .where(UserProjectRole.user_id == user_id)
-            .distinct()
-        )
-        projects = result.all()
-        return [self._to_domain(p) for p in projects]
-
     def _to_domain(self, project: Project) -> ProjectEntity:
         return ProjectEntity(
             id=project.id,
             name=project.name,
             key=project.key,
             description=project.description,
-            user_project_roles=[]
         )

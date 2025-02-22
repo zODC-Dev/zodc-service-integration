@@ -28,7 +28,3 @@ class IProjectRepository(ABC):
     @abstractmethod
     async def delete_project(self, project_id: int) -> None:
         pass
-
-    @abstractmethod
-    async def get_user_projects(self, user_id: int) -> List[Project]:
-        pass

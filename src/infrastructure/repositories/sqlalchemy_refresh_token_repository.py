@@ -4,8 +4,8 @@ from typing import Optional
 from sqlmodel import and_, col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.domain.constants.auth import TokenType
-from src.domain.entities.auth import RefreshTokenEntity
+from src.domain.constants.refresh_tokens import TokenType
+from src.domain.entities.refresh_token import RefreshTokenEntity
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.infrastructure.models.refresh_token import RefreshToken as RefreshTokenModel
 

@@ -9,12 +9,12 @@ from redis.asyncio import Redis
 from src.app.routers.jira_router import router as jira_router
 from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
 from src.app.routers.util_router import router as util_router
-from src.app.services.user_event_service import UserEventService
-from src.configs.database import init_db
+from src.app.services.nats_event_service import NATSEventService
+from src.configs.database import get_db, init_db
 from src.configs.logger import log
 from src.configs.settings import settings
-from src.domain.entities.user_events import UserEventType
-from src.infrastructure.messaging.user_event_handler import UserEventHandler
+from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
+from src.infrastructure.repositories.sqlalchemy_user_repository import SQLAlchemyUserRepository
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.redis_service import RedisService
 
@@ -52,10 +52,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await nats_service.connect()
     app.state.nats = nats_service
 
+    # Initialize repositories
+    db_generator = get_db()
+    db = await anext(db_generator)  # Get the actual session from the generator
+
+    user_repository = SQLAlchemyUserRepository(db, redis_service)
+    refresh_token_repository = SQLAlchemyRefreshTokenRepository(db)
+
     # Start subscribers
-    await start_nats_subscribers(nats_service, redis_service)
+    nats_event_service = NATSEventService(nats_service, redis_service, user_repository, refresh_token_repository)
+    await nats_event_service.start_nats_subscribers()
 
     yield
+
+    # Cleanup
+    try:
+        await db.close()  # Close the database session
+        await db_generator.aclose()  # Close the generator
+    except Exception as e:
+        log.error(f"Error closing database connection: {e}")
 
     # Shutdown
     log.info(f"Shutting down {settings.APP_NAME}")
@@ -93,26 +108,6 @@ app.include_router(util_router, prefix=settings.API_V1_STR +
                    "/utils", tags=["utils"])
 app.include_router(jira_router, prefix=settings.API_V1_STR + "/jira", tags=["jira"])
 app.include_router(microsoft_calendar_router, prefix=settings.API_V1_STR + "/microsoft", tags=["microsoft"])
-
-
-async def start_nats_subscribers(
-    nats_service: NATSService,
-    redis_service: RedisService
-) -> None:
-    """Start NATS subscribers"""
-    # Create services
-    user_event_service = UserEventService(redis_service)
-    user_event_handler = UserEventHandler(user_event_service)
-
-    # Subscribe to all user events
-    for event_type in UserEventType:
-        await nats_service.subscribe(
-            subject=event_type.value,
-            callback=user_event_handler.handle_message
-        )
-
-    log.info("NATS subscribers started")
-
 
 if __name__ == "__main__":
     import uvicorn

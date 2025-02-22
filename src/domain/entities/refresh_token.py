@@ -3,7 +3,7 @@ from typing import Optional, Union
 
 from pydantic import BaseModel, EmailStr, Field
 
-from src.domain.constants.auth import TokenType
+from src.domain.constants.refresh_tokens import TokenType
 
 
 class UserCredentials(BaseModel):

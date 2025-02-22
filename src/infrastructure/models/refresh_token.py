@@ -3,7 +3,7 @@ from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
-from domain.constants.refresh_tokens import TokenType
+from src.domain.constants.refresh_tokens import TokenType
 
 
 class RefreshToken(SQLModel, table=True):
@@ -11,7 +11,7 @@ class RefreshToken(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     token: str = Field(index=True, unique=True)
-    user_id: int = Field(foreign_key="users.id")
+    user_id: int = Field(foreign_key="users.user_id")
     token_type: TokenType = Field(...)
     expires_at: datetime
     is_revoked: bool = Field(default=False)
