@@ -15,9 +15,12 @@ class SQLAlchemyProjectRepository(IProjectRepository):
 
     async def create_project(self, project_data: ProjectCreate) -> ProjectEntity:
         project = Project(
+            project_id=project_data.project_id,
             name=project_data.name,
             key=project_data.key,
-            description=project_data.description
+            jira_project_id=project_data.jira_project_id,
+            avatar_url=project_data.avatar_url,
+            is_linked=project_data.is_linked
         )
         self.session.add(project)
         await self.session.commit()
@@ -63,10 +66,20 @@ class SQLAlchemyProjectRepository(IProjectRepository):
             await self.session.delete(project)
             await self.session.commit()
 
+    async def get_by_jira_project_id(self, jira_project_id: str) -> Optional[ProjectEntity]:
+        """Get project by Jira project ID"""
+        result = await self.session.exec(
+            select(Project).where(Project.jira_project_id == jira_project_id)
+        )
+        project = result.first()
+        return self._to_domain(project) if project else None
+
     def _to_domain(self, project: Project) -> ProjectEntity:
         return ProjectEntity(
-            id=project.id,
+            project_id=project.project_id,
             name=project.name,
             key=project.key,
-            description=project.description,
+            jira_project_id=project.jira_project_id,
+            avatar_url=project.avatar_url,
+            is_linked=project.is_linked
         )

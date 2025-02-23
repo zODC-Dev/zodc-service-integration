@@ -9,7 +9,7 @@ class Project(BaseModelWithTimestamps, table=True):
     __tablename__ = "projects"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    project_id: str = Field(unique=True, index=True)
+    project_id: int = Field(unique=True, index=True)
     jira_project_id: str = Field(unique=True, index=True)
     name: str = Field(unique=True, index=True)
     key: str = Field(unique=True, index=True)

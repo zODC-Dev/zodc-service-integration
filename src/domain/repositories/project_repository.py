@@ -28,3 +28,8 @@ class IProjectRepository(ABC):
     @abstractmethod
     async def delete_project(self, project_id: int) -> None:
         pass
+
+    @abstractmethod
+    async def get_by_jira_project_id(self, jira_project_id: str) -> Optional[Project]:
+        """Get project by Jira project ID"""
+        pass

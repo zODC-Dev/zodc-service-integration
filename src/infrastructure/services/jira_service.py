@@ -15,6 +15,7 @@ from src.domain.entities.jira import (
     JiraIssueUpdate,
     JiraProject,
     JiraSprint,
+    JiraUser,
 )
 from src.domain.entities.jira_api import (
     JiraADFContent,
@@ -328,6 +329,7 @@ class JiraService(IJiraService):
                         key=data["key"],
                         summary=data["fields"]["summary"],
                         description=data["fields"].get("description"),
+                        status=JiraIssueStatus.from_str(data["fields"]["status"]["name"]),
                         assignee=JiraAssignee(
                             account_id=data["fields"].get("assignee", {}).get("accountId", ""),
                             email_address=data["fields"].get("assignee", {}).get("emailAddress", ""),
@@ -350,7 +352,6 @@ class JiraService(IJiraService):
                                            ) if data["fields"].get("customfield_10017") else None,
                         created=data["fields"]["created"],
                         updated=data["fields"]["updated"],
-                        status=JiraIssueStatus.from_str(data["fields"]["status"]["name"])
                     )
 
         except Exception as e:
@@ -576,3 +577,53 @@ class JiraService(IJiraService):
         except Exception as e:
             log.error(f"Failed to fetch sprints via REST API: {str(e)}")
             raise JiraRequestError(500, f"Failed to fetch sprints via REST API: {str(e)}") from e
+
+    async def get_project_users(
+        self,
+        user_id: int,
+        project_key: str
+    ) -> List[JiraUser]:
+        """Get all users from a specific Jira project"""
+        token = await self._get_token(user_id)
+
+        try:
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json"
+            }
+
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                async with session.get(
+                    f"{settings.JIRA_BASE_URL}/rest/api/3/user/assignable/search",
+                    params={
+                        "project": project_key,
+                        "maxResults": 1000  # Get maximum number of users
+                    },
+                    headers=headers
+                ) as response:
+                    if response.status != 200:
+                        raise JiraRequestError(
+                            response.status,
+                            "Failed to fetch project users"
+                        )
+
+                    users_data = await response.json()
+                    return [
+                        JiraUser(
+                            display_name=user.get("displayName", ""),
+                            account_id=user.get("accountId", ""),
+                            email_address=user.get("emailAddress", "")
+                        )
+                        for user in users_data
+                        # Filter out system and app accounts
+                        if not (
+                            user.get("accountType") == "app" or
+                            user.get("accountId", "").startswith("557058:") or
+                            "addon" in user.get("accountType", "").lower()
+                        )
+                    ]
+
+        except aiohttp.ClientConnectorError as e:
+            raise JiraConnectionError(f"Could not connect to Jira API: {str(e)}") from e
+        except Exception as e:
+            raise JiraRequestError(500, f"Failed to fetch project users: {str(e)}") from e

@@ -109,3 +109,9 @@ class JiraSprint(JiraBaseModel):
     id: int
     name: str
     state: JiraSprintState
+
+
+class JiraUser(JiraBaseModel):
+    display_name: str
+    email_address: str
+    account_id: str

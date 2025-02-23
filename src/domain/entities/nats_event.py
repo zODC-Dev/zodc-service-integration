@@ -1,27 +1,15 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from pydantic import BaseModel
 
+from src.domain.constants.nats_events import NATSSubscribeTopic
 from src.domain.constants.refresh_tokens import TokenType
 
 
-class NATSEventType(str, Enum):
-    ACCESS_TOKEN_UPDATED = "user.access_token.updated"
-    REFRESH_TOKEN_UPDATED = "user.refresh_token.updated"
-    USER_DEACTIVATED = "user.deactivated"
-    USER_ACTIVATED = "user.activated"
-    USER_UPDATED = "user.updated"
-    USER_DELETED = "user.deleted"
-    USER_CREATED = "user.created"
-    USER_LOGOUT = "user.logout"
-    MICROSOFT_TOKEN_UPDATED = "auth.token.microsoft"
-    JIRA_TOKEN_UPDATED = "auth.token.jira"
-
-
 class UserEvent(BaseModel):
-    event_type: NATSEventType
+    event_type: NATSSubscribeTopic
     user_id: int
     timestamp: datetime
     data: Optional[Dict[str, Any]] = None
@@ -35,3 +23,35 @@ class TokenEvent(BaseModel):
     created_at: datetime
     expires_at: datetime
     expires_in: int
+
+
+class ProjectLinkEvent(BaseModel):
+    project_id: int
+    jira_project_id: str
+    name: str
+    key: str
+    avatar_url: Optional[str] = None
+
+
+class ProjectUnlinkEvent(BaseModel):
+    project_id: str
+    jira_project_id: str
+
+
+class JiraUserInfo(BaseModel):
+    jira_account_id: str
+    email: str
+    name: str
+
+
+class JiraUsersRequestEvent(BaseModel):
+    admin_user_id: int
+    project_id: int
+    jira_project_id: str
+    key: str
+
+
+class JiraUsersResponseEvent(BaseModel):
+    project_id: int
+    jira_project_id: str
+    users: List[JiraUserInfo]
