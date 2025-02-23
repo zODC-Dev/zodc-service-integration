@@ -1,25 +1,29 @@
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 from src.configs.logger import log
 from src.domain.constants.nats_events import NATSPublishTopic, NATSSubscribeTopic
 from src.domain.constants.refresh_tokens import TokenType
 from src.domain.entities.nats_event import (
+    JiraLoginEvent,
     JiraUserInfo,
     JiraUsersRequestEvent,
     JiraUsersResponseEvent,
+    MicrosoftLoginEvent,
     ProjectLinkEvent,
     ProjectUnlinkEvent,
-    TokenEvent,
     UserEvent,
 )
 from src.domain.entities.project import ProjectCreate, ProjectUpdate
 from src.domain.entities.refresh_token import RefreshTokenEntity
+from src.domain.entities.user import UserCreate, UserUpdate
 from src.domain.repositories.project_repository import IProjectRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.domain.repositories.user_repository import IUserRepository
 from src.domain.services.jira_service import IJiraService
 from src.domain.services.nats_service import INATSService
 from src.domain.services.redis_service import IRedisService
+from src.utils.jwt_utils import get_jwt_expiry
 
 
 class NATSEventService:
@@ -47,10 +51,15 @@ class NATSEventService:
                     subject=event_type.value,
                     callback=self.handle_user_event
                 )
-            elif event_type.startswith("auth"):
+            elif event_type == NATSSubscribeTopic.USER_MICROSOFT_LOGIN:
                 await self.nats_service.subscribe(
                     subject=event_type.value,
-                    callback=self.handle_token_event
+                    callback=self.handle_microsoft_login_event
+                )
+            elif event_type == NATSSubscribeTopic.USER_JIRA_LOGIN:
+                await self.nats_service.subscribe(
+                    subject=event_type.value,
+                    callback=self.handle_jira_login_event
                 )
             elif event_type == NATSSubscribeTopic.PROJECT_LINKED:
                 await self.nats_service.subscribe(
@@ -82,37 +91,6 @@ class NATSEventService:
         await self.redis_service.delete(f"microsoft_token:{event.user_id}")
 
         log.info(f"Cleared cache for user {event.user_id}")
-
-    async def handle_token_event(self, subject: str, message: Dict[str, Any]) -> None:
-        """Handle token events and clear related caches"""
-        log.info(f"Handling token event: {subject} for user {message['user_id']}")
-
-        # Parse the event
-        event = TokenEvent.model_validate(message)
-
-        # Cache access token
-        if event.token_type == TokenType.MICROSOFT:
-            await self.redis_service.cache_microsoft_token(
-                user_id=event.user_id,
-                access_token=event.access_token,
-                expiry=event.expires_in
-            )
-        else:
-            await self.redis_service.cache_jira_token(
-                user_id=event.user_id,
-                access_token=event.access_token,
-                expiry=event.expires_in
-            )
-
-        # Store refresh token
-        await self.refresh_token_repository.create_refresh_token(
-            RefreshTokenEntity(
-                token=event.refresh_token,
-                user_id=event.user_id,
-                token_type=event.token_type,
-                expires_at=event.expires_at
-            )
-        )
 
     async def handle_project_link_event(self, subject: str, message: Dict[str, Any]) -> None:
         """Handle project link events"""
@@ -197,3 +175,93 @@ class NATSEventService:
 
         except Exception as e:
             log.error(f"Error handling project users request: {str(e)}")
+
+    async def handle_microsoft_login_event(self, subject: str, message: Dict[str, Any]) -> None:
+        """Handle Microsoft login event - create user and store tokens"""
+        try:
+            # Parse the event data
+            event = MicrosoftLoginEvent.model_validate(message)
+
+            # Check if user exists
+            user = await self.user_repository.get_user_by_email(event.email)
+
+            if not user:
+                # Create new user
+                new_user = UserCreate(
+                    email=event.email,
+                    user_id=event.user_id,
+                )
+                await self.user_repository.create_user(new_user)
+                log.info(f"Created new user from Microsoft login for user {event.user_id}")
+
+            # Store refresh token
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=event.expires_in * 2)
+            refresh_token = RefreshTokenEntity(
+                token=event.refresh_token,
+                user_id=event.user_id,
+                token_type=TokenType.MICROSOFT,
+                expires_at=expires_at
+            )
+            await self.refresh_token_repository.create_refresh_token(refresh_token)
+
+            # Cache access token
+            await self.redis_service.cache_microsoft_token(
+                user_id=event.user_id,
+                access_token=event.access_token,
+                expiry=event.expires_in
+            )
+
+            log.info(f"Successfully processed Microsoft login for user {event.user_id}")
+
+        except Exception as e:
+            log.error(f"Error handling Microsoft login event: {str(e)}")
+
+    async def handle_jira_login_event(self, subject: str, message: Dict[str, Any]) -> None:
+        """Handle Jira login event - create/update user and store tokens"""
+        try:
+            # Parse the event data
+            event = JiraLoginEvent.model_validate(message)
+
+            # Check if user exists
+            user = await self.user_repository.get_user_by_email(event.email)
+
+            if user:
+                # Update Jira info if user exists
+                user_update = UserUpdate(
+                    email=event.email,
+                    jira_account_id=event.jira_account_id,
+                )
+                await self.user_repository.update_user(user_update)
+                log.info(f"Updated Jira link for existing user {user.id}")
+            else:
+                # Create new user with Jira info
+                new_user = UserCreate(
+                    email=event.email,
+                    user_id=event.user_id,
+                    jira_account_id=event.jira_account_id,
+                )
+                await self.user_repository.create_user(new_user)
+                log.info(f"Created new user with Jira link for user {event.user_id}")
+
+            # Store refresh token
+            expires_at = get_jwt_expiry(event.refresh_token) or datetime.now(
+                timezone.utc) + timedelta(seconds=event.expires_in * 2)
+            refresh_token = RefreshTokenEntity(
+                token=event.refresh_token,
+                user_id=event.user_id,
+                token_type=TokenType.JIRA,
+                expires_at=expires_at
+            )
+            await self.refresh_token_repository.create_refresh_token(refresh_token)
+
+            # Cache access token
+            await self.redis_service.cache_jira_token(
+                user_id=event.user_id,
+                access_token=event.access_token,
+                expiry=event.expires_in
+            )
+
+            log.info(f"Successfully processed Jira login for user {event.user_id}")
+
+        except Exception as e:
+            log.error(f"Error handling Jira login event: {str(e)}")

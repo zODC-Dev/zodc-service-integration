@@ -54,3 +54,20 @@ class JiraUsersResponseEvent(BaseModel):
     project_id: int
     jira_project_id: str
     users: List[JiraUserInfo]
+
+
+class MicrosoftLoginEvent(BaseModel):
+    user_id: int
+    email: str
+    access_token: str
+    refresh_token: str
+    expires_in: int
+
+
+class JiraLoginEvent(BaseModel):
+    user_id: int
+    email: str
+    jira_account_id: str
+    access_token: str
+    refresh_token: str
+    expires_in: int

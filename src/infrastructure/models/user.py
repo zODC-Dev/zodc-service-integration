@@ -12,4 +12,3 @@ class User(BaseModelWithTimestamps, table=True):
     email: str = Field(unique=True, index=True)
     user_id: int = Field(unique=True, index=True)
     jira_account_id: Optional[str] = Field(default=None)
-    is_jira_linked: bool = Field(default=False)

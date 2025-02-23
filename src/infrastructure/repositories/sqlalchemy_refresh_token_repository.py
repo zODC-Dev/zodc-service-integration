@@ -4,6 +4,7 @@ from typing import Optional
 from sqlmodel import and_, col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
 from src.domain.entities.refresh_token import RefreshTokenEntity
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
@@ -15,23 +16,47 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
         self.session = session
 
     async def create_refresh_token(self, refresh_token: RefreshTokenEntity) -> RefreshTokenEntity:
-        # Convert to UTC then remove timezone info for database
-        expires_at_utc = refresh_token.expires_at.astimezone(timezone.utc).replace(tzinfo=None)
-        created_at_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        """Create new refresh token and revoke old ones"""
+        try:
+            # Convert to UTC then remove timezone info for database
+            expires_at_utc = refresh_token.expires_at.astimezone(timezone.utc).replace(tzinfo=None)
+            created_at_utc = datetime.now(timezone.utc).replace(tzinfo=None)
 
-        db_token = RefreshTokenModel(
-            token=refresh_token.token,
-            user_id=refresh_token.user_id,
-            expires_at=expires_at_utc,  # Timezone-naive UTC
-            is_revoked=refresh_token.is_revoked,
-            token_type=refresh_token.token_type,
-            created_at=created_at_utc  # Timezone-naive UTC
-        )
+            # Revoke all existing non-revoked tokens for this user and type
+            revoke_stmt = (
+                update(RefreshTokenModel)
+                .where(
+                    and_(
+                        RefreshTokenModel.user_id == refresh_token.user_id,
+                        RefreshTokenModel.token_type == refresh_token.token_type,
+                        RefreshTokenModel.is_revoked == False  # noqa: E712
+                    )
+                )
+                .values(is_revoked=True)
+            )
+            await self.session.exec(revoke_stmt)  # type: ignore
 
-        self.session.add(db_token)
-        await self.session.commit()
-        await self.session.refresh(db_token)
-        return self._to_domain(db_token)
+            # Create new token
+            db_token = RefreshTokenModel(
+                token=refresh_token.token,
+                user_id=refresh_token.user_id,
+                expires_at=expires_at_utc,
+                is_revoked=refresh_token.is_revoked,
+                token_type=refresh_token.token_type,
+                created_at=created_at_utc
+            )
+            self.session.add(db_token)
+
+            # Commit changes
+            await self.session.commit()
+            await self.session.refresh(db_token)
+
+            return self._to_domain(db_token)
+
+        except Exception as e:
+            await self.session.rollback()
+            log.error(f"Error creating refresh token: {str(e)}")
+            raise
 
     async def get_by_token(self, token: str) -> Optional[RefreshTokenEntity]:
         result = await self.session.exec(

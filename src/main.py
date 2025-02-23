@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -19,6 +21,8 @@ from src.infrastructure.repositories.sqlalchemy_user_repository import SQLAlchem
 from src.infrastructure.services.jira_service import JiraService
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.redis_service import RedisService
+from src.infrastructure.services.token_refresh_service import TokenRefreshService
+from src.infrastructure.services.token_scheduler_service import TokenSchedulerService
 
 # Define Prometheus instrumentator first
 instrumentator = Instrumentator(
@@ -61,7 +65,69 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     user_repository = SQLAlchemyUserRepository(db, redis_service)
     refresh_token_repository = SQLAlchemyRefreshTokenRepository(db)
     project_repository = SQLAlchemyProjectRepository(db)
-    jira_service = JiraService(redis_service)
+
+    # Initialize services
+    token_refresh_service = TokenRefreshService(redis_service, user_repository, refresh_token_repository)
+    token_scheduler_service = TokenSchedulerService(token_refresh_service, refresh_token_repository)
+
+    # Initialize Jira service with token scheduler
+    jira_service = JiraService(redis_service, token_scheduler_service)
+
+    # Initialize and start APScheduler
+    scheduler = AsyncIOScheduler()
+
+    # Add token cleanup job
+    async def cleanup_expired_tokens():
+        try:
+            # Get new db session using get_db
+            db_generator = get_db()
+            db = await anext(db_generator)
+
+            repository = SQLAlchemyRefreshTokenRepository(db)
+            await repository.cleanup_expired_tokens()
+            log.info("Completed expired tokens cleanup")
+        except Exception as e:
+            log.error(f"Error cleaning up expired tokens: {str(e)}")
+
+    scheduler.add_job(
+        cleanup_expired_tokens,
+        IntervalTrigger(hours=1),  # For testing
+        id='token_cleanup',
+        replace_existing=True,
+        misfire_grace_time=None
+    )
+
+    # Add token refresh check job
+    async def check_tokens_for_refresh():
+        try:
+            # Get new db session using get_db
+            db_generator = get_db()
+            db = await anext(db_generator)
+
+            user_repository = SQLAlchemyUserRepository(db, redis_service)
+            refresh_token_repository = SQLAlchemyRefreshTokenRepository(db)
+            token_refresh_service = TokenRefreshService(redis_service, user_repository, refresh_token_repository)
+            token_scheduler_service = TokenSchedulerService(token_refresh_service, refresh_token_repository)
+
+            users = await user_repository.get_all_users()
+            for user in users:
+                await token_scheduler_service.schedule_token_refresh(user.user_id)
+            log.info("Completed token refresh check")
+        except Exception as e:
+            log.error(f"Error checking tokens for refresh: {str(e)}")
+
+    scheduler.add_job(
+        check_tokens_for_refresh,
+        IntervalTrigger(hours=24),  # For testing
+        id='token_refresh_check',
+        replace_existing=True,
+        misfire_grace_time=60
+    )
+
+    # Start the scheduler
+    scheduler.start()
+    app.state.scheduler = scheduler
+
     # Start subscribers
     nats_event_service = NATSEventService(
         nats_service,
@@ -77,6 +143,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Shutdown
     log.info(f"Shutting down {settings.APP_NAME}")
+
+    # Shutdown scheduler
+    if hasattr(app.state, "scheduler"):
+        app.state.scheduler.shutdown()
+
+    # Close other connections
     if hasattr(app.state, "redis"):
         await app.state.redis.close()
     if hasattr(app.state, "nats"):

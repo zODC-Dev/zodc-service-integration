@@ -11,6 +11,7 @@ from src.domain.repositories.refresh_token_repository import IRefreshTokenReposi
 from src.domain.repositories.user_repository import IUserRepository
 from src.domain.services.redis_service import IRedisService
 from src.domain.services.token_refresh_service import ITokenRefreshService
+from src.utils.jwt_utils import get_jwt_expiry
 
 
 class TokenRefreshService(ITokenRefreshService):
@@ -27,6 +28,7 @@ class TokenRefreshService(ITokenRefreshService):
     async def refresh_microsoft_token(self, user_id: int) -> Optional[str]:
         """Refresh Microsoft access token"""
         try:
+            log.info(f"Refreshing Microsoft token for user {user_id}")
             # Get refresh token from refresh_tokens table
             refresh_token = await self.refresh_token_repository.get_by_user_id_and_type(
                 user_id=user_id,
@@ -53,7 +55,7 @@ class TokenRefreshService(ITokenRefreshService):
                     return None
 
                 # Update tokens
-                await self._update_microsoft_tokens(user_id, data)
+                await self._save_new_microsoft_tokens(user_id, data)
                 return data.get("access_token")
 
         except Exception as e:
@@ -63,6 +65,7 @@ class TokenRefreshService(ITokenRefreshService):
     async def refresh_jira_token(self, user_id: int) -> Optional[str]:
         """Refresh Jira access token"""
         try:
+            log.info(f"Refreshing Jira token for user {user_id}")
             # Get refresh token from refresh_tokens table
             refresh_token = await self.refresh_token_repository.get_by_user_id_and_type(
                 user_id=user_id,
@@ -89,74 +92,56 @@ class TokenRefreshService(ITokenRefreshService):
                     return None
 
                 # Update tokens
-                await self._update_jira_tokens(user_id, data)
+                await self._save_new_jira_tokens(user_id, data)
                 return data.get("access_token")
 
         except Exception as e:
             log.error(f"Error refreshing Jira token: {str(e)}")
             return None
 
-    async def schedule_token_refresh(self, user_id: int) -> None:
-        """Schedule token refresh for a user"""
-        user = await self.user_repository.get_user_by_id(user_id)
-        if not user:
-            return
-
-        now = datetime.now(timezone.utc)
-        refresh_threshold = timedelta(minutes=5)
-
-        # Check Microsoft token
-        microsoft_token = await self.refresh_token_repository.get_by_user_id_and_type(
-            user_id=user_id,
-            token_type=TokenType.MICROSOFT
-        )
-        if microsoft_token and microsoft_token.expires_at - now <= refresh_threshold:
-            await self.refresh_microsoft_token(user_id)
-
-        # Check Jira token
-        jira_token = await self.refresh_token_repository.get_by_user_id_and_type(
-            user_id=user_id,
-            token_type=TokenType.JIRA
-        )
-        if jira_token and jira_token.expires_at - now <= refresh_threshold:
-            await self.refresh_jira_token(user_id)
-
-    async def _update_microsoft_tokens(self, user_id: int, token_data: Dict[str, Any]) -> None:
+    async def _save_new_microsoft_tokens(self, user_id: int, token_data: Dict[str, Any]) -> None:
         """Update Microsoft tokens in database and cache"""
-        # Store refresh token in refresh_tokens table
         if "refresh_token" in token_data:
+            # For Microsoft, use expires_in or default value
+            refresh_token_expires_in = token_data.get("refresh_token_expires_in",
+                                                      token_data.get("expires_in", 3600) * 2)
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=refresh_token_expires_in)
+
             refresh_token = RefreshTokenEntity(
                 token=token_data["refresh_token"],
                 user_id=user_id,
                 token_type=TokenType.MICROSOFT,
-                expires_at=(datetime.now() + timedelta(days=30)).astimezone(timezone.utc)  # Adjust expiry as needed
+                expires_at=expires_at
             )
             await self.refresh_token_repository.create_refresh_token(refresh_token)
 
         # Cache access token
-        await self.redis_service.cache_token(
+        await self.redis_service.cache_microsoft_token(
             user_id=user_id,
             access_token=token_data["access_token"],
             expiry=token_data["expires_in"],
-            token_type=TokenType.MICROSOFT
         )
 
-    async def _update_jira_tokens(self, user_id: int, token_data: Dict[str, Any]) -> None:
+    async def _save_new_jira_tokens(self, user_id: int, token_data: Dict[str, Any]) -> None:
         """Update Jira tokens in database and cache"""
-        # Store refresh token in refresh_tokens table
         if "refresh_token" in token_data:
+            # Try to get expiry from JWT for Jira
+            expires_at = get_jwt_expiry(token_data["refresh_token"])
+            if not expires_at:
+                # Fallback to default if JWT decode fails
+                expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600) * 2)
+
             refresh_token = RefreshTokenEntity(
                 token=token_data["refresh_token"],
                 user_id=user_id,
                 token_type=TokenType.JIRA,
-                expires_at=(datetime.now() + timedelta(days=30)).astimezone(timezone.utc)  # Adjust expiry as needed
+                expires_at=expires_at
             )
             await self.refresh_token_repository.create_refresh_token(refresh_token)
 
         # Cache access token
-        await self.redis_service.cache_token(
+        await self.redis_service.cache_jira_token(
             user_id=user_id,
             access_token=token_data["access_token"],
             expiry=token_data["expires_in"],
-            token_type=TokenType.JIRA
         )

@@ -6,6 +6,7 @@ from aiohttp import ClientTimeout
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType, JiraSprintState
+from src.domain.constants.refresh_tokens import TokenType
 from src.domain.entities.jira import (
     JiraAssignee,
     JiraIssue,
@@ -31,33 +32,38 @@ from src.domain.entities.jira_api import (
 )
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 from src.domain.services.jira_service import IJiraService
-from src.infrastructure.services.redis_service import RedisService
+from src.domain.services.redis_service import IRedisService
+from src.domain.services.token_scheduler_service import ITokenSchedulerService
 
 
 class JiraService(IJiraService):
-    def __init__(self, redis_service: RedisService):
+    def __init__(
+        self,
+        redis_service: IRedisService,
+        token_scheduler_service: ITokenSchedulerService
+    ):
         self.redis_service = redis_service
+        self.token_scheduler_service = token_scheduler_service
         self.timeout = ClientTimeout(total=30)
 
     async def _get_token(self, user_id: int) -> str:
+        # Schedule token refresh check
+        await self.token_scheduler_service.schedule_token_refresh(user_id)
+
         # Try to get token from cache first
         token = await self.redis_service.get_cached_jira_token(user_id)
         if token:
             return token
 
-        # If not in cache, request new token from auth service
-        async with aiohttp.ClientSession(timeout=self.timeout) as session:
-            async with session.get(
-                f"{settings.AUTH_SERVICE_URL}/api/v1/internal/jira/token/{user_id}",
-            ) as response:
-                if response.status != 200:
-                    raise JiraAuthenticationError("Failed to obtain Jira token")
+        # If not in cache, using refresh token to get new access token
+        await self.token_scheduler_service.refresh_token_chain(user_id, TokenType.JIRA)
 
-                data = await response.json()
-                token = data.get("access_token")
-                # Cache the token
-                await self.redis_service.cache_jira_token(user_id, token)
-                return token
+        # Try to get token from cache again
+        token = await self.redis_service.get_cached_jira_token(user_id)
+        if token:
+            return token
+
+        raise JiraAuthenticationError("Failed to get Jira token")
 
     async def get_project_issues(
         self,

@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     # Jira settings
     JIRA_BASE_URL: str = "https://api.atlassian.com/ex/jira/cloud-id"
     AUTH_SERVICE_URL: str = "http://localhost:8081"
+    JIRA_CLIENT_ID: str = ""
+    JIRA_CLIENT_SECRET: str = ""
 
     class Config:
         """Configuration settings."""
