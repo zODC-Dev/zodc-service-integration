@@ -28,7 +28,6 @@ class ProjectCreate(BaseModel):
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
-    name: Optional[str] = None
     key: Optional[str] = None
     description: Optional[str] = None
     is_linked: Optional[bool] = None

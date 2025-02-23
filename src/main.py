@@ -6,10 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
 
-from src.infrastructure.services.jira_service import JiraService
-from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
-from src.infrastructure.repositories.sqlalchemy_user_repository import SQLAlchemyUserRepository
-from src.infrastructure.repositories.sqlalchemy_project_repository import SQLAlchemyProjectRepository
 from src.app.routers.jira_router import router as jira_router
 from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
 from src.app.routers.util_router import router as util_router
@@ -17,6 +13,10 @@ from src.app.services.nats_event_service import NATSEventService
 from src.configs.database import get_db, init_db
 from src.configs.logger import log
 from src.configs.settings import settings
+from src.infrastructure.repositories.sqlalchemy_project_repository import SQLAlchemyProjectRepository
+from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
+from src.infrastructure.repositories.sqlalchemy_user_repository import SQLAlchemyUserRepository
+from src.infrastructure.services.jira_service import JiraService
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.redis_service import RedisService
 

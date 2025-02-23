@@ -1,18 +1,25 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-from src.domain.constants.nats_events import NATSPublishTopic, NATSSubscribeTopic
 from src.configs.logger import log
+from src.domain.constants.nats_events import NATSPublishTopic, NATSSubscribeTopic
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.entities.nats_event import TokenEvent, UserEvent, ProjectLinkEvent, ProjectUnlinkEvent, JiraUsersRequestEvent, JiraUsersResponseEvent, JiraUserInfo
-from src.domain.entities.refresh_token import RefreshTokenEntity
+from src.domain.entities.nats_event import (
+    JiraUserInfo,
+    JiraUsersRequestEvent,
+    JiraUsersResponseEvent,
+    ProjectLinkEvent,
+    ProjectUnlinkEvent,
+    TokenEvent,
+    UserEvent,
+)
 from src.domain.entities.project import ProjectCreate, ProjectUpdate
+from src.domain.entities.refresh_token import RefreshTokenEntity
+from src.domain.repositories.project_repository import IProjectRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.domain.repositories.user_repository import IUserRepository
-from src.domain.repositories.project_repository import IProjectRepository
+from src.domain.services.jira_service import IJiraService
 from src.domain.services.nats_service import INATSService
 from src.domain.services.redis_service import IRedisService
-from src.domain.services.jira_service import IJiraService
-from src.domain.entities.user import User as UserEntity
 
 
 class NATSEventService:
@@ -139,7 +146,7 @@ class NATSEventService:
             # Find the project by jira_project_id
             project = await self.project_repository.get_by_jira_project_id(event.jira_project_id)
 
-            if project:
+            if project and project.id:
                 # Update project to set is_linked = False
                 await self.project_repository.update_project(
                     project.id,

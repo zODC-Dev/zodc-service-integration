@@ -1,11 +1,10 @@
 from typing import Optional
 
-from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
-from src.domain.entities.user import User as UserEntity, UserWithPassword
+from src.domain.entities.user import User as UserEntity
 from src.domain.repositories.user_repository import IUserRepository
 from src.domain.services.redis_service import IRedisService
 from src.infrastructure.models.user import User as UserModel
