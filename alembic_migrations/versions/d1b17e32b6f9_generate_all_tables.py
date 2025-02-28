@@ -29,7 +29,7 @@ def upgrade() -> None:
                     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
                     sa.Column('key', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
                     sa.Column('avatar_url', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-                    sa.Column('is_linked', sa.Boolean(), nullable=False),
+                    sa.Column('is_jira_linked', sa.Boolean(), nullable=False),
                     sa.PrimaryKeyConstraint('id')
                     )
     op.create_index(op.f('ix_projects_jira_project_id'), 'projects', ['jira_project_id'], unique=True)

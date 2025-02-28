@@ -14,4 +14,3 @@ class Project(BaseModelWithTimestamps, table=True):
     name: str = Field(unique=True, index=True)
     key: str = Field(unique=True, index=True)
     avatar_url: Optional[str] = None
-    is_linked: bool = Field(default=False)

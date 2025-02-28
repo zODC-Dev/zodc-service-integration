@@ -85,6 +85,7 @@ class JiraProject(JiraBaseModel):
     lead: Optional[str] = None
     url: Optional[str] = None
     avatar_url: Optional[str] = None
+    is_jira_linked: bool = False
 
 
 class JiraIssueCreate(JiraBaseModel):

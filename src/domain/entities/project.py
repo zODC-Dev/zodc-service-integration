@@ -11,7 +11,6 @@ class Project(BaseEntity):
     key: str
     jira_project_id: str
     avatar_url: Optional[str] = None
-    is_linked: bool
 
     class Config:
         from_attributes = True
@@ -23,11 +22,9 @@ class ProjectCreate(BaseModel):
     key: str
     jira_project_id: str
     avatar_url: Optional[str] = None
-    is_linked: bool = True
 
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     key: Optional[str] = None
     description: Optional[str] = None
-    is_linked: Optional[bool] = None

@@ -20,7 +20,6 @@ class SQLAlchemyProjectRepository(IProjectRepository):
             key=project_data.key,
             jira_project_id=project_data.jira_project_id,
             avatar_url=project_data.avatar_url,
-            is_linked=project_data.is_linked
         )
         self.session.add(project)
         await self.session.commit()
@@ -81,5 +80,4 @@ class SQLAlchemyProjectRepository(IProjectRepository):
             key=project.key,
             jira_project_id=project.jira_project_id,
             avatar_url=project.avatar_url,
-            is_linked=project.is_linked
         )

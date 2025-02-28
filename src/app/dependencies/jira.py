@@ -2,9 +2,11 @@ from fastapi import Depends
 
 from src.app.controllers.jira_controller import JiraController
 from src.app.dependencies.common import get_redis_service
+from src.app.dependencies.project import get_project_repository
 from src.app.dependencies.user import get_user_repository
 from src.app.services.jira_service import JiraApplicationService
 from src.configs.database import get_db
+from src.domain.repositories.project_repository import IProjectRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.domain.repositories.user_repository import IUserRepository
 from src.domain.services.redis_service import IRedisService
@@ -55,7 +57,11 @@ def get_jira_application_service(
 
 
 def get_jira_controller(
-    jira_service: JiraApplicationService = Depends(get_jira_application_service)
+    jira_service: JiraApplicationService = Depends(get_jira_service),
+    project_repository: IProjectRepository = Depends(get_project_repository)
 ) -> JiraController:
     """Get the Jira controller."""
-    return JiraController(jira_service=jira_service)
+    return JiraController(
+        jira_service=jira_service,
+        project_repository=project_repository
+    )

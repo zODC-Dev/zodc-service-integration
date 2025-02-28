@@ -125,10 +125,10 @@ class NATSEventService:
             project = await self.project_repository.get_by_jira_project_id(event.jira_project_id)
 
             if project and project.id:
-                # Update project to set is_linked = False
+                # Update project to set is_jira_linked = False
                 await self.project_repository.update_project(
                     project.id,
-                    ProjectUpdate(is_linked=False)
+                    ProjectUpdate(is_jira_linked=False)
                 )
 
                 log.info(f"Project {project.name} unlinked successfully")
