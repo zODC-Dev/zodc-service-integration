@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic.alias_generators import to_camel
@@ -88,20 +88,20 @@ class JiraProject(JiraBaseModel):
     is_jira_linked: bool = False
 
 
-class JiraIssueCreate(JiraBaseModel):
+class JiraIssueCreate(BaseModel):
     project_key: str
     summary: str
     description: Optional[str] = None
-    issue_type: JiraIssueType
-    priority: Optional[str] = None
+    issue_type: str
     assignee: Optional[str] = None
-    labels: Optional[List[str]] = None
-    epic_link: Optional[str] = None  # For linking to an epic
+    estimate_points: Optional[float] = None
 
 
-class JiraIssueUpdate(JiraBaseModel):
+class JiraIssueUpdate(BaseModel):
+    summary: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
     assignee: Optional[str] = None
-    status: Optional[JiraIssueStatus] = None
     estimate_points: Optional[float] = None
     actual_points: Optional[float] = None
 
@@ -116,3 +116,9 @@ class JiraUser(JiraBaseModel):
     display_name: str
     email_address: str
     account_id: str
+
+
+class JiraIssueResponse(BaseModel):
+    issue_id: str
+    key: str
+    self_url: str

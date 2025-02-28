@@ -1,10 +1,13 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from src.configs.logger import log
 from src.domain.constants.nats_events import NATSPublishTopic, NATSSubscribeTopic
 from src.domain.constants.refresh_tokens import TokenType
+from src.domain.constants.jira import JiraActionType
 from src.domain.entities.nats_event import (
+    JiraIssueSyncPayload,
+    JiraIssueSyncResultPayload,
     JiraLoginEvent,
     JiraUserInfo,
     JiraUsersRequestEvent,
@@ -75,6 +78,11 @@ class NATSEventService:
                 await self.nats_service.subscribe(
                     subject=event_type.value,
                     callback=self.handle_project_users_request
+                )
+            elif event_type == NATSSubscribeTopic.JIRA_ISSUES_SYNC:
+                await self.nats_service.subscribe(
+                    subject=event_type.value,
+                    callback=self.handle_jira_issues_sync
                 )
 
     async def handle_user_event(self, subject: str, message: Dict[str, Any]) -> None:
@@ -265,3 +273,107 @@ class NATSEventService:
 
         except Exception as e:
             log.error(f"Error handling Jira login event: {str(e)}")
+
+    async def handle_jira_issues_sync(self, subject: str, message: List[Dict[str, Any]]) -> None:
+        """Handle Jira issues sync events"""
+        results = []
+
+        try:
+            # Parse each issue in the batch
+            issues = [JiraIssueSyncPayload.model_validate(item) for item in message]
+
+            # Process each issue
+            for issue in issues:
+                result = JiraIssueSyncResultPayload(
+                    success=False,
+                    action_type=issue.action_type,
+                    issue_id=issue.issue_id
+                )
+
+                try:
+                    if issue.action_type == JiraActionType.CREATE:
+                        # Validate required fields for creation
+                        if not issue.project_key or not issue.summary or not issue.issue_type:
+                            error_msg = "Missing required fields for issue creation"
+                            log.error(f"{error_msg}: {issue}")
+                            result.error_message = error_msg
+                            results.append(result.model_dump())
+                            continue
+
+                        # Create new issue
+                        from src.domain.entities.jira import JiraIssueCreate
+                        create_payload = JiraIssueCreate(
+                            project_key=issue.project_key,
+                            summary=issue.summary,
+                            description=issue.description,
+                            issue_type=issue.issue_type,
+                            assignee=issue.assignee,
+                            estimate_points=issue.estimate_points
+                        )
+
+                        created_issue = await self.jira_service.create_issue(
+                            user_id=issue.user_id,
+                            issue=create_payload
+                        )
+
+                        log.info(f"Successfully created issue {created_issue.issue_id}")
+                        result.success = True
+                        result.issue_id = created_issue.issue_id
+
+                    elif issue.action_type == JiraActionType.UPDATE:
+                        # Validate required fields for update
+                        if not issue.issue_id:
+                            error_msg = "Missing issue_id for issue update"
+                            log.error(f"{error_msg}: {issue}")
+                            result.error_message = error_msg
+                            results.append(result.model_dump())
+                            continue
+
+                        # Update existing issue
+                        from src.domain.entities.jira import JiraIssueUpdate
+                        update_payload = JiraIssueUpdate(
+                            summary=issue.summary,
+                            description=issue.description,
+                            status=issue.status,
+                            assignee=issue.assignee,
+                            estimate_points=issue.estimate_points,
+                            actual_points=issue.actual_points
+                        )
+
+                        await self.jira_service.update_issue(
+                            user_id=issue.user_id,
+                            issue_id=issue.issue_id,
+                            update=update_payload
+                        )
+
+                        log.info(f"Successfully updated issue {issue.issue_id}")
+                        result.success = True
+
+                except Exception as e:
+                    error_msg = str(e)
+                    log.error(f"Error processing issue {issue.issue_id if issue.issue_id else 'new'}: {error_msg}")
+                    result.error_message = error_msg
+
+                results.append(result.model_dump())
+
+            log.info(f"Completed processing {len(issues)} issues")
+
+            # Publish results
+            await self.nats_service.publish(
+                NATSPublishTopic.JIRA_ISSUES_SYNC_RESULT.value,
+                results
+            )
+
+        except Exception as e:
+            log.error(f"Error handling Jira issues sync event: {str(e)}")
+
+            # Publish error result if we couldn't process the batch
+            error_result = JiraIssueSyncResultPayload(
+                success=False,
+                action_type=JiraActionType.CREATE,  # Default
+                error_message=f"Batch processing error: {str(e)}"
+            )
+            await self.nats_service.publish(
+                NATSPublishTopic.JIRA_ISSUES_SYNC_RESULT.value,
+                [error_result.model_dump()]
+            )

@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.domain.constants.nats_events import NATSSubscribeTopic
 from src.domain.constants.refresh_tokens import TokenType
+from src.domain.constants.jira import JiraActionType
 
 
 class UserEvent(BaseModel):
@@ -71,3 +72,25 @@ class JiraLoginEvent(BaseModel):
     access_token: str
     refresh_token: str
     expires_in: int
+
+
+class JiraIssueSyncPayload(BaseModel):
+    action_type: JiraActionType
+    issue_id: Optional[str] = None  # Required for updates
+    project_key: Optional[str] = None  # Required for creates
+    summary: Optional[str] = None
+    description: Optional[str] = None
+    issue_type: Optional[str] = None  # Required for creates
+    status: Optional[str] = None
+    assignee: Optional[str] = None
+    estimate_points: Optional[float] = None
+    actual_points: Optional[float] = None
+    user_id: int  # User ID for authentication
+
+
+class JiraIssueSyncResultPayload(BaseModel):
+    success: bool
+    issue_id: Optional[str] = None
+    action_type: JiraActionType
+    error_message: Optional[str] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

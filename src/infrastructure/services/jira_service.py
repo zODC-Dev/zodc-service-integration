@@ -17,6 +17,7 @@ from src.domain.entities.jira import (
     JiraProject,
     JiraSprint,
     JiraUser,
+    JiraIssueResponse,
 )
 from src.domain.entities.jira_api import (
     JiraADFContent,
@@ -27,8 +28,7 @@ from src.domain.entities.jira_api import (
     JiraCreateIssueResponse,
     JiraIssuePriorityReference,
     JiraIssueTypeReference,
-    JiraProjectReference,
-    JiraUserReference,
+    JiraProjectReference, JiraUserReference,
 )
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 from src.domain.services.jira_service import IJiraService
@@ -45,6 +45,7 @@ class JiraService(IJiraService):
         self.redis_service = redis_service
         self.token_scheduler_service = token_scheduler_service
         self.timeout = ClientTimeout(total=30)
+        self.base_url = settings.JIRA_API_URL
 
     async def _get_token(self, user_id: int) -> str:
         # Schedule token refresh check
@@ -246,68 +247,54 @@ class JiraService(IJiraService):
         except Exception as e:
             raise JiraRequestError(500, f"Unexpected error: {str(e)}") from e
 
-    async def create_issue(self, user_id: int, issue: JiraIssueCreate) -> JiraCreateIssueResponse:
+    async def create_issue(self, user_id: int, issue: JiraIssueCreate) -> JiraIssueResponse:
+        """Create a new issue in Jira"""
         token = await self._get_token(user_id)
 
-        # Create type-safe request using Pydantic models
-        issue_request = JiraCreateIssueRequest(
-            fields=JiraCreateIssueFields(
-                project=JiraProjectReference(
-                    key=issue.project_key
-                ),
-                summary=issue.summary,
-                issuetype=JiraIssueTypeReference(
-                    name=issue.issue_type.value
-                ),
-                description=JiraADFDocument(
-                    content=[
-                        JiraADFParagraph(
-                            content=[
-                                JiraADFContent(
-                                    text=issue.description or ""
-                                )
-                            ]
-                        )
-                    ]
-                ),
-                priority=JiraIssuePriorityReference(name=issue.priority) if issue.priority else None,
-                assignee=JiraUserReference(id=issue.assignee) if issue.assignee else None,
-                labels=issue.labels
-            )
-        )
-
-        try:
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/json",
-                "Content-Type": "application/json"
+        # Prepare the request payload
+        payload = {
+            "fields": {
+                "project": {
+                    "key": issue.project_key
+                },
+                "summary": issue.summary,
+                "issuetype": {
+                    "name": issue.issue_type.value
+                }
             }
+        }
 
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.post(
-                    f"{settings.JIRA_BASE_URL}/rest/api/3/issue",
-                    json=issue_request.model_dump(exclude_none=True),
-                    headers=headers
-                ) as response:
-                    response_data = await response.json()
+        # Add optional fields if provided
+        if issue.description:
+            payload["fields"]["description"] = issue.description
 
-                    if response.status != 201:
-                        raise JiraRequestError(
-                            response.status,
-                            f"Failed to create Jira issue: {response_data}"
-                        )
+        if issue.assignee:
+            payload["fields"]["assignee"] = {"accountId": issue.assignee}
 
-                    # Parse the create response
-                    create_response = JiraCreateIssueResponse.model_validate(response_data)
+        if issue.estimate_points is not None:
+            # Assuming story points field is customfield_10002
+            # This might need to be adjusted based on your Jira configuration
+            payload["fields"]["customfield_10002"] = issue.estimate_points
 
-                    # Get the full issue details
-                    return create_response
+        # Make the API request
+        url = f"{self.base_url}/rest/api/3/issue"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
 
-        except aiohttp.ClientConnectorError as e:
-            raise JiraConnectionError(f"Could not connect to Jira API: {str(e)}") from e
-        except Exception as e:
-            log.error(f"Error creating issue: {str(e)}")
-            raise JiraRequestError(500, f"Unexpected error: {str(e)}") from e
+        async with aiohttp.ClientSession(timeout=self.timeout) as session:
+            async with session.post(url, json=payload, headers=headers) as response:
+                if response.status != 201:
+                    log.error(f"Failed to create Jira issue: {await response.text()}")
+                    raise Exception(f"Failed to create Jira issue: {response.status} - {await response.text()}")
+
+                data = await response.json()
+                return JiraIssueResponse(
+                    issue_id=data["id"],
+                    key=data["key"],
+                    self_url=data["self"]
+                )
 
     async def get_issue(self, user_id: int, issue_id: str) -> JiraIssue:
         token = await self._get_token(user_id)
@@ -363,85 +350,70 @@ class JiraService(IJiraService):
         except Exception as e:
             raise JiraRequestError(500, f"Failed to fetch issue details: {str(e)}") from e
 
-    async def update_issue(
-        self,
-        user_id: int,
-        issue_id: str,
-        update: JiraIssueUpdate
-    ) -> JiraIssue:
+    async def update_issue(self, user_id: int, issue_id: str, update: JiraIssueUpdate) -> None:
+        """Update an existing issue in Jira"""
         token = await self._get_token(user_id)
 
-        try:
-            # Prepare update fields
-            update_fields: Dict[str, Any] = {}
+        # Prepare the request payload
+        payload = {
+            "fields": {}
+        }
 
-            if update.assignee is not None:
-                update_fields["assignee"] = {"id": update.assignee} if update.assignee else None
+        # Add fields that need to be updated
+        if update.summary:
+            payload["fields"]["summary"] = update.summary
 
-            if update.status is not None:
-                # First, get available transitions
-                async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                    async with session.get(
-                        f"{settings.JIRA_BASE_URL}/rest/api/3/issue/{issue_id}/transitions",
-                        headers={
-                            "Authorization": f"Bearer {token}",
-                            "Accept": "application/json"
-                        }
-                    ) as response:
-                        if response.status != 200:
-                            raise JiraRequestError(
-                                response.status,
-                                "Failed to get issue transitions"
-                            )
-                        transitions = await response.json()
+        if update.description:
+            payload["fields"]["description"] = update.description
 
-                        # Find the transition ID for the desired status
-                        transition_id = None
-                        for transition in transitions["transitions"]:
-                            if transition["to"]["name"].lower() == update.status.value.lower():
-                                transition_id = transition["id"]
-                                break
+        if update.assignee:
+            payload["fields"]["assignee"] = {"accountId": update.assignee}
 
-                        if transition_id:
-                            # Perform the transition
-                            await session.post(
-                                f"{settings.JIRA_BASE_URL}/rest/api/3/issue/{issue_id}/transitions",
-                                headers={
-                                    "Authorization": f"Bearer {token}",
-                                    "Accept": "application/json",
-                                    "Content-Type": "application/json"
-                                },
-                                json={
-                                    "transition": {"id": transition_id}
-                                }
-                            )
+        if update.estimate_points is not None:
+            # Assuming story points field is customfield_10002
+            payload["fields"]["customfield_10002"] = update.estimate_points
 
-            if update.estimate_points is not None:
-                update_fields["customfield_10016"] = update.estimate_points
+        if update.actual_points is not None:
+            # Assuming actual points field is customfield_10003
+            payload["fields"]["customfield_10003"] = update.actual_points
 
-            if update.actual_points is not None:
-                update_fields["customfield_10017"] = update.actual_points
+        if update.status:
+            # Status updates typically require a transition ID
+            # This is a simplified approach - in practice, you might need to
+            # get available transitions first and then apply the correct one
+            transition_payload = {
+                "transition": {
+                    "name": update.status.value
+                }
+            }
 
-            # Update the issue if there are fields to update
-            if update_fields:
-                async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                    await session.put(
-                        f"{settings.JIRA_BASE_URL}/rest/api/3/issue/{issue_id}",
-                        headers={
-                            "Authorization": f"Bearer {token}",
-                            "Accept": "application/json",
-                            "Content-Type": "application/json"
-                        },
-                        json={"fields": update_fields}
-                    )
+            # Make the transition API request
+            transition_url = f"{self.base_url}/rest/api/3/issue/{issue_id}/transitions"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
 
-            # Get and return the updated issue
-            return await self.get_issue(user_id, issue_id)
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                async with session.post(transition_url, json=transition_payload, headers=headers) as response:
+                    if response.status_code not in (200, 204):
+                        log.warning(f"Failed to transition issue status: {await response.text()}")
 
-        except aiohttp.ClientConnectorError as e:
-            raise JiraConnectionError(f"Could not connect to Jira API: {str(e)}") from e
-        except Exception as e:
-            raise JiraRequestError(500, f"Failed to update issue: {str(e)}") from e
+        # Only make the update request if there are fields to update
+        if payload["fields"]:
+            url = f"{self.base_url}/rest/api/3/issue/{issue_id}"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                async with session.put(url, json=payload, headers=headers) as response:
+                    if response.status_code not in (200, 204):
+                        log.error(f"Failed to update Jira issue: {await response.text()}")
+                        raise Exception(f"Failed to update Jira issue: {response.status_code} - {await response.text()}")
+
+                    log.info(f"Successfully updated issue {issue_id}")
 
     async def get_project_sprints(
         self,
@@ -589,7 +561,7 @@ class JiraService(IJiraService):
         user_id: int,
         project_key: str
     ) -> List[JiraUser]:
-        """Get all users from a specific Jira project"""
+        """Get users for a Jira project"""
         token = await self._get_token(user_id)
 
         try:

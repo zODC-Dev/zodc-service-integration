@@ -4,6 +4,7 @@ from typing import List, Optional
 from src.domain.constants.jira import JiraIssueType
 from src.domain.entities.jira import JiraIssue, JiraIssueCreate, JiraIssueUpdate, JiraProject, JiraSprint, JiraUser
 from src.domain.entities.jira_api import JiraCreateIssueResponse
+from src.domain.entities.jira import JiraIssueResponse
 
 
 class IJiraService(ABC):
@@ -31,7 +32,7 @@ class IJiraService(ABC):
         self,
         user_id: int,
         issue: JiraIssueCreate
-    ) -> JiraCreateIssueResponse:
+    ) -> JiraIssueResponse:
         """Create a new Jira issue"""
         pass
 
@@ -41,7 +42,7 @@ class IJiraService(ABC):
         user_id: int,
         issue_id: str,
         update: JiraIssueUpdate
-    ) -> JiraIssue:
+    ) -> None:
         """Update an existing Jira issue"""
         pass
 
