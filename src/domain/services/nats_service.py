@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any, Awaitable, Callable, Dict
+from typing import Any, Callable, Coroutine, Dict, List
 
-MessageCallback = Callable[[str, Dict[str, Any]], Awaitable[None]]
+# MessageCallback = Callable[[str, Dict[str, Any] | List[Dict[str, Any]]], Awaitable[None]]
+MessageCallback = Callable[[str, Dict[str, Any]], Coroutine[Any, Any, None]
+                           ] | Callable[[str, List[Dict[str, Any]]], Coroutine[Any, Any, None]]
 
 
 class INATSService(ABC):
@@ -18,7 +20,7 @@ class INATSService(ABC):
         pass
 
     @abstractmethod
-    async def publish(self, subject: str, message: Dict[str, Any]) -> None:
+    async def publish(self, subject: str, message: Dict[str, Any] | List[Dict[str, Any]]) -> None:
         """Publish message to a subject"""
         pass
 

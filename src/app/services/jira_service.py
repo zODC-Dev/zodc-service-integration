@@ -1,8 +1,14 @@
 from typing import List, Optional
 
 from src.domain.constants.jira import JiraIssueType
-from src.domain.entities.jira import JiraIssue, JiraIssueCreate, JiraIssueUpdate, JiraProject, JiraSprint
-from src.domain.entities.jira_api import JiraCreateIssueResponse
+from src.domain.entities.jira import (
+    JiraIssue,
+    JiraIssueCreate,
+    JiraIssueResponse,
+    JiraIssueUpdate,
+    JiraProject,
+    JiraSprint,
+)
 from src.domain.services.jira_service import IJiraService
 
 
@@ -33,7 +39,7 @@ class JiraApplicationService:
     async def get_accessible_projects(self, user_id: int) -> List[JiraProject]:
         return await self.jira_service.get_accessible_projects(user_id)
 
-    async def create_issue(self, user_id: int, issue: JiraIssueCreate) -> JiraCreateIssueResponse:
+    async def create_issue(self, user_id: int, issue: JiraIssueCreate) -> JiraIssueResponse:
         return await self.jira_service.create_issue(user_id, issue)
 
     async def update_issue(
@@ -41,7 +47,7 @@ class JiraApplicationService:
         user_id: int,
         issue_id: str,
         update: JiraIssueUpdate
-    ) -> JiraIssue:
+    ) -> JiraIssueResponse:
         """Update a Jira issue"""
         return await self.jira_service.update_issue(
             user_id=user_id,

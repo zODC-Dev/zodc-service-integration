@@ -3,6 +3,7 @@ from typing import Any, Dict
 
 from redis.asyncio import Redis
 
+from src.configs.logger import log
 from src.domain.services.redis_service import IRedisService
 
 
@@ -27,24 +28,6 @@ class RedisService(IRedisService):
         """Delete a key from Redis."""
         await self.redis.delete(key)
 
-    async def cache_token(self, user_id: int, access_token: str, expiry: int) -> None:
-        """Cache microsoft access token with expiry."""
-        key = f"msft_token:{user_id}"
-        token_data = {"access_token": access_token, "expiry": expiry}
-        await self.set(key, token_data, expiry)
-
-    async def get_cached_token(self, user_id: int) -> str:
-        """Get microsoft access token from cache if exists and valid."""
-        key = f"msft_token:{user_id}"
-        token_data = await self.get(key)
-
-        if token_data:
-            # expiry = datetime.fromisoformat(cast(str, token_data["expiry"]))
-            # if expiry > datetime.now():
-            access_token: str = token_data.get("access_token", "")
-            return access_token
-        return ""
-
     async def cache_jira_token(self, user_id: int, access_token: str, expiry: int = 3600) -> None:
         """Cache Jira access token with expiry."""
         key = f"jira_token:{user_id}"
@@ -53,12 +36,14 @@ class RedisService(IRedisService):
 
     async def get_cached_jira_token(self, user_id: int) -> str:
         """Get Jira access token from cache if exists."""
+        log.info(f"Getting cached Jira token for user {user_id}")
         key = f"jira_token:{user_id}"
         token_data = await self.get(key)
         return token_data.get("access_token", "") if token_data else ""
 
     async def cache_microsoft_token(self, user_id: int, access_token: str, expiry: int = 3600) -> None:
         """Cache Microsoft access token with expiry."""
+        log.info(f"Caching Microsoft token for user {user_id}")
         key = f"microsoft_token:{user_id}"
         token_data = {"access_token": access_token}
         await self.set(key, token_data, expiry)

@@ -2,8 +2,15 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from src.domain.constants.jira import JiraIssueType
-from src.domain.entities.jira import JiraIssue, JiraIssueCreate, JiraIssueUpdate, JiraProject, JiraSprint
-from src.domain.entities.jira_api import JiraCreateIssueResponse
+from src.domain.entities.jira import (
+    JiraIssue,
+    JiraIssueCreate,
+    JiraIssueResponse,
+    JiraIssueUpdate,
+    JiraProject,
+    JiraSprint,
+    JiraUser,
+)
 
 
 class IJiraService(ABC):
@@ -31,7 +38,7 @@ class IJiraService(ABC):
         self,
         user_id: int,
         issue: JiraIssueCreate
-    ) -> JiraCreateIssueResponse:
+    ) -> JiraIssueResponse:
         """Create a new Jira issue"""
         pass
 
@@ -41,7 +48,7 @@ class IJiraService(ABC):
         user_id: int,
         issue_id: str,
         update: JiraIssueUpdate
-    ) -> JiraIssue:
+    ) -> JiraIssueResponse:
         """Update an existing Jira issue"""
         pass
 
@@ -52,4 +59,13 @@ class IJiraService(ABC):
         project_id: str,
     ) -> List[JiraSprint]:
         """Get all sprints from a specific Jira project"""
+        pass
+
+    @abstractmethod
+    async def get_project_users(
+        self,
+        user_id: int,
+        project_key: str
+    ) -> List[JiraUser]:
+        """Get all users from a specific Jira project"""
         pass

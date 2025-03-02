@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from nats.aio.client import Client
 from nats.aio.msg import Msg
@@ -40,7 +40,7 @@ class NATSService(INATSService):
             self._is_connected = False
             log.info("Disconnected from NATS server")
 
-    async def publish(self, subject: str, message: Dict[str, Any]) -> None:
+    async def publish(self, subject: str, message: Dict[str, Any] | List[Dict[str, Any]]) -> None:
         """Publish message to a subject"""
         try:
             if not self._is_connected:

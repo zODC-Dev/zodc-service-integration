@@ -20,7 +20,17 @@ logger.add(
     level="DEBUG",
 )
 
-logging.getLogger("sqlalchemy.engine").setLevel(logging.ERROR)
+# Disable all SQLAlchemy logging except ERROR
+for name in logging.root.manager.loggerDict.keys():
+    if name.startswith("sqlalchemy"):
+        sql_logger = logging.getLogger(name)
+        sql_logger.setLevel(logging.ERROR)
+        sql_logger.handlers.clear()  # Xóa toàn bộ handlers để ngăn log bị in ra
+
+# Optional: Chặn SQLAlchemy log lan truyền
+logging.getLogger("sqlalchemy").propagate = False
+logging.disable(logging.WARNING)
+
 
 # Export the logger
 log = logger
