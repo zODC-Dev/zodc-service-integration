@@ -2,9 +2,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from src.configs.logger import log
+from src.domain.constants.jira import JiraActionType
 from src.domain.constants.nats_events import NATSPublishTopic, NATSSubscribeTopic
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.constants.jira import JiraActionType
 from src.domain.entities.nats_event import (
     JiraIssueSyncPayload,
     JiraIssueSyncResultPayload,

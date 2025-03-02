@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Dict
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic.alias_generators import to_camel
@@ -15,10 +15,10 @@ class JiraBaseModel(BaseModel):
 
 
 class JiraAssignee(JiraBaseModel):
-    account_id: str
-    email_address: str
+    user_id: str
+    email: str
     avatar_url: str
-    display_name: str
+    name: str
 
 
 class JiraIssuePriority(JiraBaseModel):

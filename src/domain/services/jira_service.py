@@ -2,9 +2,15 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from src.domain.constants.jira import JiraIssueType
-from src.domain.entities.jira import JiraIssue, JiraIssueCreate, JiraIssueUpdate, JiraProject, JiraSprint, JiraUser
-from src.domain.entities.jira_api import JiraCreateIssueResponse
-from src.domain.entities.jira import JiraIssueResponse
+from src.domain.entities.jira import (
+    JiraIssue,
+    JiraIssueCreate,
+    JiraIssueResponse,
+    JiraIssueUpdate,
+    JiraProject,
+    JiraSprint,
+    JiraUser,
+)
 
 
 class IJiraService(ABC):
@@ -42,7 +48,7 @@ class IJiraService(ABC):
         user_id: int,
         issue_id: str,
         update: JiraIssueUpdate
-    ) -> None:
+    ) -> JiraIssueResponse:
         """Update an existing Jira issue"""
         pass
 

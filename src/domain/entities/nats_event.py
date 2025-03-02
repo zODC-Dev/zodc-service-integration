@@ -3,9 +3,9 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from src.domain.constants.jira import JiraActionType
 from src.domain.constants.nats_events import NATSSubscribeTopic
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.constants.jira import JiraActionType
 
 
 class UserEvent(BaseModel):

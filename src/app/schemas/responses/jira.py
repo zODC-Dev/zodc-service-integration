@@ -4,10 +4,10 @@ from src.app.schemas.responses.base import BaseResponse
 
 
 class JiraAssigneeResponse(BaseResponse):
-    account_id: str
-    email_address: str
+    user_id: str
+    email: str
     avatar_url: str
-    display_name: str
+    name: str
 
 
 class JiraIssuePriorityResponse(BaseResponse):

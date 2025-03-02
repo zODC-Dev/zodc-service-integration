@@ -12,23 +12,12 @@ from src.domain.entities.jira import (
     JiraIssue,
     JiraIssueCreate,
     JiraIssuePriority,
+    JiraIssueResponse,
     JiraIssueSprint,
     JiraIssueUpdate,
     JiraProject,
     JiraSprint,
     JiraUser,
-    JiraIssueResponse,
-)
-from src.domain.entities.jira_api import (
-    JiraADFContent,
-    JiraADFDocument,
-    JiraADFParagraph,
-    JiraCreateIssueFields,
-    JiraCreateIssueRequest,
-    JiraCreateIssueResponse,
-    JiraIssuePriorityReference,
-    JiraIssueTypeReference,
-    JiraProjectReference, JiraUserReference,
 )
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 from src.domain.services.jira_service import IJiraService
@@ -45,7 +34,7 @@ class JiraService(IJiraService):
         self.redis_service = redis_service
         self.token_scheduler_service = token_scheduler_service
         self.timeout = ClientTimeout(total=30)
-        self.base_url = settings.JIRA_API_URL
+        self.base_url = settings.JIRA_BASE_URL
 
     async def _get_token(self, user_id: int) -> str:
         # Schedule token refresh check
@@ -152,11 +141,11 @@ class JiraService(IJiraService):
                                 issue.get("fields", {}).get("status", {}).get("name", "Unknown")
                             ),
                             assignee=JiraAssignee(
-                                account_id=issue.get("fields", {}).get("assignee", {}).get("accountId", ""),
-                                email_address=issue.get("fields", {}).get("assignee", {}).get("emailAddress", ""),
+                                user_id=issue.get("fields", {}).get("assignee", {}).get("accountId", ""),
+                                email=issue.get("fields", {}).get("assignee", {}).get("emailAddress", ""),
                                 avatar_url=issue.get("fields", {}).get(
                                     "assignee", {}).get("avatarUrls", {}).get("48x48", ""),
-                                display_name=issue.get("fields", {}).get("assignee", {}).get("displayName", "")
+                                name=issue.get("fields", {}).get("assignee", {}).get("displayName", "")
                             ) if issue.get("fields", {}).get("assignee") else None,
                             priority=JiraIssuePriority(
                                 id=issue.get("fields", {}).get("priority", {}).get("id", ""),
@@ -252,14 +241,14 @@ class JiraService(IJiraService):
         token = await self._get_token(user_id)
 
         # Prepare the request payload
-        payload = {
+        payload: Dict[str, Any] = {
             "fields": {
                 "project": {
                     "key": issue.project_key
                 },
                 "summary": issue.summary,
                 "issuetype": {
-                    "name": issue.issue_type.value
+                    "name": issue.issue_type
                 }
             }
         }
@@ -324,10 +313,10 @@ class JiraService(IJiraService):
                         description=data["fields"].get("description"),
                         status=JiraIssueStatus.from_str(data["fields"]["status"]["name"]),
                         assignee=JiraAssignee(
-                            account_id=data["fields"].get("assignee", {}).get("accountId", ""),
-                            email_address=data["fields"].get("assignee", {}).get("emailAddress", ""),
+                            user_id=data["fields"].get("assignee", {}).get("accountId", ""),
+                            email=data["fields"].get("assignee", {}).get("emailAddress", ""),
                             avatar_url=data["fields"].get("assignee", {}).get("avatarUrls", {}).get("48x48", ""),
-                            display_name=data["fields"].get("assignee", {}).get("displayName", "")
+                            name=data["fields"].get("assignee", {}).get("displayName", "")
                         ) if data["fields"].get("assignee") else None,
                         priority=JiraIssuePriority(
                             id=data["fields"].get("priority", {}).get("id", ""),
@@ -350,12 +339,12 @@ class JiraService(IJiraService):
         except Exception as e:
             raise JiraRequestError(500, f"Failed to fetch issue details: {str(e)}") from e
 
-    async def update_issue(self, user_id: int, issue_id: str, update: JiraIssueUpdate) -> None:
+    async def update_issue(self, user_id: int, issue_id: str, update: JiraIssueUpdate) -> JiraIssueResponse:
         """Update an existing issue in Jira"""
         token = await self._get_token(user_id)
 
         # Prepare the request payload
-        payload = {
+        payload: Dict[str, Any] = {
             "fields": {}
         }
 
@@ -383,7 +372,7 @@ class JiraService(IJiraService):
             # get available transitions first and then apply the correct one
             transition_payload = {
                 "transition": {
-                    "name": update.status.value
+                    "name": update.status
                 }
             }
 
@@ -396,7 +385,7 @@ class JiraService(IJiraService):
 
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
                 async with session.post(transition_url, json=transition_payload, headers=headers) as response:
-                    if response.status_code not in (200, 204):
+                    if response.status not in (200, 204):
                         log.warning(f"Failed to transition issue status: {await response.text()}")
 
         # Only make the update request if there are fields to update
@@ -409,11 +398,17 @@ class JiraService(IJiraService):
 
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
                 async with session.put(url, json=payload, headers=headers) as response:
-                    if response.status_code not in (200, 204):
+                    if response.status not in (200, 204):
                         log.error(f"Failed to update Jira issue: {await response.text()}")
-                        raise Exception(f"Failed to update Jira issue: {response.status_code} - {await response.text()}")
+                        raise Exception(f"Failed to update Jira issue: {response.status} - {await response.text()}")
 
                     log.info(f"Successfully updated issue {issue_id}")
+
+        return JiraIssueResponse(
+            issue_id=issue_id,
+            key=issue_id,
+            self_url=f"{self.base_url}/rest/api/3/issue/{issue_id}"
+        )
 
     async def get_project_sprints(
         self,
