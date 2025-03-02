@@ -48,3 +48,8 @@ class JiraSprintState(Enum):
             if member.value.lower() == state.lower():
                 return member
         raise ValueError(f"Invalid state: {state}")
+
+
+class JiraActionType(str, Enum):
+    CREATE = "create"
+    UPDATE = "update"

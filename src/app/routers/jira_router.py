@@ -7,6 +7,7 @@ from src.app.dependencies.auth import get_jwt_claims
 from src.app.dependencies.jira import get_jira_controller
 from src.app.schemas.requests.auth import JWTClaims
 from src.app.schemas.requests.jira import JiraIssueCreateRequest, JiraIssueUpdateRequest
+from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.jira import (
     JiraCreateIssueResponse,
     JiraIssueResponse,
@@ -18,7 +19,7 @@ from src.domain.constants.jira import JiraIssueType
 router = APIRouter()
 
 
-@router.get("/projects/{project_key}/issues", response_model=List[JiraIssueResponse])
+@router.get("/projects/{project_key}/issues", response_model=StandardResponse[List[JiraIssueResponse]])
 async def get_project_issues(
     project_key: str,
     claims: JWTClaims = Depends(get_jwt_claims),
@@ -29,7 +30,7 @@ async def get_project_issues(
     search: Optional[str] = Query(None, alias="search", description="Search in issue summary and description"),
     limit: int = Query(50, ge=1, le=100),
     controller: JiraController = Depends(get_jira_controller),
-) -> List[JiraIssueResponse]:
+) -> StandardResponse[List[JiraIssueResponse]]:
     """Get issues from a specific Jira project"""
     is_backlog = None
     if sprint_id == "backlog":
@@ -51,42 +52,41 @@ async def get_project_issues(
 async def get_accessible_projects(
     claims: JWTClaims = Depends(get_jwt_claims),
     controller: JiraController = Depends(get_jira_controller)
-) -> List[JiraProjectResponse]:
+) -> StandardResponse[List[JiraProjectResponse]]:
     """Get all Jira projects that the user has access to"""
     user_id = int(claims.sub)
-    projects = await controller.get_accessible_projects(user_id)
-    return projects
+    return await controller.get_accessible_projects(user_id)
 
 
-@router.post("/issues", response_model=JiraCreateIssueResponse)
+@router.post("/issues", response_model=StandardResponse[JiraCreateIssueResponse])
 async def create_issue(
     issue: JiraIssueCreateRequest,
     claims: JWTClaims = Depends(get_jwt_claims),
     controller: JiraController = Depends(get_jira_controller),
-) -> JiraCreateIssueResponse:
+) -> StandardResponse[JiraCreateIssueResponse]:
     """Create a new Jira issue"""
     user_id = int(claims.sub)
     return await controller.create_issue(user_id, issue)
 
 
-@router.patch("/issues/{issue_id}", response_model=JiraIssueResponse)
+@router.patch("/issues/{issue_id}", response_model=StandardResponse[JiraIssueResponse])
 async def update_issue(
     issue_id: str,
     update: JiraIssueUpdateRequest,
     claims: JWTClaims = Depends(get_jwt_claims),
     controller: JiraController = Depends(get_jira_controller),
-) -> JiraIssueResponse:
+) -> StandardResponse[JiraIssueResponse]:
     """Update a Jira issue"""
     user_id = int(claims.sub)
     return await controller.update_issue(user_id, issue_id, update)
 
 
-@router.get("/projects/{project_key}/sprints", response_model=List[JiraSprintResponse])
+@router.get("/projects/{project_key}/sprints", response_model=StandardResponse[List[JiraSprintResponse]])
 async def get_project_sprints(
     project_key: str,
     claims: JWTClaims = Depends(get_jwt_claims),
     controller: JiraController = Depends(get_jira_controller),
-) -> List[JiraSprintResponse]:
+) -> StandardResponse[List[JiraSprintResponse]]:
     """Get all sprints from a specific Jira project"""
     user_id = int(claims.sub)
 

@@ -3,6 +3,7 @@ from typing import List, Optional
 from fastapi import HTTPException
 
 from src.app.schemas.requests.jira import JiraIssueCreateRequest, JiraIssueUpdateRequest
+from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.jira import (
     JiraCreateIssueResponse,
     JiraIssueResponse,
@@ -14,11 +15,17 @@ from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueType
 from src.domain.entities.jira import JiraIssueCreate, JiraIssueUpdate
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
+from src.domain.repositories.project_repository import IProjectRepository
 
 
 class JiraController:
-    def __init__(self, jira_service: JiraApplicationService):
+    def __init__(
+        self,
+        jira_service: JiraApplicationService,
+        project_repository: IProjectRepository
+    ):
         self.jira_service = jira_service
+        self.project_repository = project_repository
 
     async def get_project_issues(
         self,
@@ -29,7 +36,7 @@ class JiraController:
         issue_type: Optional[JiraIssueType] = None,
         search: Optional[str] = None,
         limit: int = 50
-    ) -> List[JiraIssueResponse]:
+    ) -> StandardResponse[List[JiraIssueResponse]]:
         try:
             log.info(f"User {user_id} is fetching issues for project {project_key}")
             issues = await self.jira_service.get_project_issues(
@@ -41,7 +48,10 @@ class JiraController:
                 search=search,
                 limit=limit
             )
-            return [JiraIssueResponse(**issue.model_dump()) for issue in issues]
+            return StandardResponse(
+                message="Issues fetched successfully",
+                data=[JiraIssueResponse(**issue.model_dump()) for issue in issues]
+            )
         except JiraAuthenticationError as e:
             log.error(f"Jira authentication failed: {str(e)}")
             raise HTTPException(
@@ -67,10 +77,29 @@ class JiraController:
                 detail="An unexpected error occurred"
             ) from e
 
-    async def get_accessible_projects(self, user_id: int) -> List[JiraProjectResponse]:
+    async def get_accessible_projects(self, user_id: int) -> StandardResponse[List[JiraProjectResponse]]:
         try:
-            projects = await self.jira_service.get_accessible_projects(user_id)
-            return [JiraProjectResponse(**project.model_dump()) for project in projects]
+            # Get projects from Jira API
+            jira_projects = await self.jira_service.get_accessible_projects(user_id)
+
+            # Get all linked projects from database
+            db_projects = await self.project_repository.get_all_projects()
+
+            # Create a set of linked project keys for faster lookup
+            linked_project_keys = {project.key for project in db_projects}
+
+            # Combine the data
+            response_projects = []
+            for project in jira_projects:
+                project_dict = project.model_dump()
+                project_dict['is_jira_linked'] = project.key in linked_project_keys
+                response_projects.append(JiraProjectResponse(**project_dict))
+
+            return StandardResponse(
+                message="Projects fetched successfully",
+                data=response_projects
+            )
+
         except JiraAuthenticationError as e:
             log.error(f"Jira authentication failed: {str(e)}")
             raise HTTPException(
@@ -96,7 +125,7 @@ class JiraController:
                 detail="An unexpected error occurred"
             ) from e
 
-    async def create_issue(self, user_id: int, issue: JiraIssueCreateRequest) -> JiraCreateIssueResponse:
+    async def create_issue(self, user_id: int, issue: JiraIssueCreateRequest) -> StandardResponse[JiraCreateIssueResponse]:
         try:
             # Convert request model to domain model
             domain_issue = JiraIssueCreate(
@@ -109,7 +138,10 @@ class JiraController:
                 labels=issue.labels
             )
             issue_response = await self.jira_service.create_issue(user_id, domain_issue)
-            return JiraCreateIssueResponse(**issue_response.model_dump())
+            return StandardResponse(
+                message="Issue created successfully",
+                data=JiraCreateIssueResponse(**issue_response.model_dump())
+            )
         except JiraAuthenticationError as e:
             log.error(f"Jira authentication failed: {str(e)}")
             raise HTTPException(
@@ -140,7 +172,7 @@ class JiraController:
         user_id: int,
         issue_id: str,
         update: JiraIssueUpdateRequest
-    ) -> JiraIssueResponse:
+    ) -> StandardResponse[JiraIssueResponse]:
         try:
             # Convert request model to domain model
             domain_update = JiraIssueUpdate(
@@ -155,7 +187,10 @@ class JiraController:
                 issue_id=issue_id,
                 update=domain_update
             )
-            return JiraIssueResponse(**updated_task.model_dump())
+            return StandardResponse(
+                message="Issue updated successfully",
+                data=JiraIssueResponse(**updated_task.model_dump())
+            )
         except JiraAuthenticationError as e:
             log.error(f"Jira authentication failed: {str(e)}")
             raise HTTPException(
@@ -185,13 +220,16 @@ class JiraController:
         self,
         user_id: int,
         project_id: str,
-    ) -> List[JiraSprintResponse]:
+    ) -> StandardResponse[List[JiraSprintResponse]]:
         try:
             sprints = await self.jira_service.get_project_sprints(
                 user_id=user_id,
                 project_id=project_id
             )
-            return [JiraSprintResponse(**sprint.model_dump()) for sprint in sprints]
+            return StandardResponse(
+                message="Sprints fetched successfully",
+                data=[JiraSprintResponse(**sprint.model_dump()) for sprint in sprints]
+            )
         except JiraAuthenticationError as e:
             log.error(f"Jira authentication failed: {str(e)}")
             raise HTTPException(

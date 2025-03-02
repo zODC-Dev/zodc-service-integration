@@ -1,12 +1,19 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from src.configs.settings import settings
+
+# Add these imports
+from src.configs.settings import settings
+from sqlmodel import SQLModel
+
+from src.infrastructure.models.project import Project
+from src.infrastructure.models.user import User
+from src.infrastructure.models.refresh_token import RefreshToken
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -20,8 +27,8 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = None
+# Set target_metadata to SQLModel's metadata
+target_metadata = SQLModel.metadata  # Use SQLModel's metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
