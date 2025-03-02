@@ -24,7 +24,11 @@ jobs:
       - name: Login to Docker Registry
         run: |
           echo ${{ secrets.REGISTRY_PASSWORD }} | docker login ${{ secrets.REGISTRY_HOST }} -u ${{ secrets.REGISTRY_USER }} --password-stdin
-
+      
+      - name: Tag Image as Latest
+        run: |
+          docker tag ${{ secrets.REGISTRY_HOST }}/${{ env.REGISTRY_PROJECT }}/${{ env.SERVICE_NAME }}:${{ env.VERSION }} ${{ secrets.REGISTRY_HOST }}/${{ env.REGISTRY_PROJECT }}/${{ env.SERVICE_NAME }}:latest
+      
       - name: Push Versioned Image
         run: |
           docker push ${{ secrets.REGISTRY_HOST }}/${{ env.REGISTRY_PROJECT }}/${{ env.SERVICE_NAME }}:${{ env.VERSION }}
