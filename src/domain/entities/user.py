@@ -10,17 +10,20 @@ class User(BaseEntity):
     email: EmailStr
     user_id: int
     jira_account_id: Optional[str] = None
+    is_system_user: bool = False
 
 
 class UserCreate(BaseModel):
     email: EmailStr
     user_id: int
     jira_account_id: Optional[str] = None
+    is_system_user: bool = False
 
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     jira_account_id: Optional[str] = None
+    is_system_user: Optional[bool] = None
 
 
 class UserWithPassword(User):

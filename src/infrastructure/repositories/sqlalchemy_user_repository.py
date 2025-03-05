@@ -72,6 +72,17 @@ class SQLAlchemyUserRepository(IUserRepository):
             log.error(f"Error updating user: {str(e)}")
             raise e
 
+    async def get_user_by_jira_account_id(self, jira_account_id: str) -> Optional[UserEntity]:
+        try:
+            result = await self.session.exec(
+                select(UserModel).where(UserModel.jira_account_id == jira_account_id)
+            )
+            user = result.first()
+            return self._to_domain(user) if user else None
+        except Exception as e:
+            log.error(f"Error getting user by Jira account ID: {str(e)}")
+            return None
+
     def _to_domain(self, db_user: UserModel) -> UserEntity:
         """Convert DB model to domain entity"""
         return UserEntity(
@@ -79,6 +90,7 @@ class SQLAlchemyUserRepository(IUserRepository):
             email=db_user.email,
             user_id=db_user.user_id,
             jira_account_id=db_user.jira_account_id,
+            is_system_user=db_user.is_system_user,
             created_at=db_user.created_at,
             updated_at=db_user.updated_at
         )

@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     token_scheduler_service = TokenSchedulerService(token_refresh_service, refresh_token_repository)
 
     # Initialize Jira service with token scheduler
-    jira_service = JiraService(redis_service, token_scheduler_service)
+    jira_service = JiraService(redis_service, token_scheduler_service, user_repository)
 
     # Initialize and start APScheduler
     scheduler = AsyncIOScheduler()

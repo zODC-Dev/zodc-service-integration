@@ -247,6 +247,7 @@ class NATSEventService:
                     email=event.email,
                     user_id=event.user_id,
                     jira_account_id=event.jira_account_id,
+                    is_system_user=event.is_system_user
                 )
                 await self.user_repository.create_user(new_user)
                 log.info(f"Created new user with Jira link for user {event.user_id}")
