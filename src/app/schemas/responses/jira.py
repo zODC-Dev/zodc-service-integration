@@ -4,10 +4,11 @@ from src.app.schemas.responses.base import BaseResponse
 
 
 class JiraAssigneeResponse(BaseResponse):
-    user_id: str
+    id: int
     email: str
     avatar_url: str
     name: str
+    is_system_user: bool
 
 
 class JiraIssuePriorityResponse(BaseResponse):
@@ -43,10 +44,6 @@ class JiraProjectResponse(BaseResponse):
     key: str
     name: str
     description: Optional[str] = None
-    project_type: Optional[str] = None
-    project_category: Optional[str] = None
-    lead: Optional[str] = None
-    url: Optional[str] = None
     avatar_url: Optional[str] = None
     is_jira_linked: bool = False
 
