@@ -15,10 +15,12 @@ class JiraBaseModel(BaseModel):
 
 
 class JiraAssignee(JiraBaseModel):
-    user_id: str
+    id: Optional[int] = None  # user_id từ bảng user
+    jira_account_id: str      # Jira account ID
     email: str
     avatar_url: str
     name: str
+    is_system_user: bool
 
 
 class JiraIssuePriority(JiraBaseModel):

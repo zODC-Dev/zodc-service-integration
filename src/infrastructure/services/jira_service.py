@@ -20,6 +20,7 @@ from src.domain.entities.jira import (
     JiraUser,
 )
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
+from src.domain.repositories.user_repository import IUserRepository
 from src.domain.services.jira_service import IJiraService
 from src.domain.services.redis_service import IRedisService
 from src.domain.services.token_scheduler_service import ITokenSchedulerService
@@ -29,10 +30,12 @@ class JiraService(IJiraService):
     def __init__(
         self,
         redis_service: IRedisService,
-        token_scheduler_service: ITokenSchedulerService
+        token_scheduler_service: ITokenSchedulerService,
+        user_repository: IUserRepository
     ):
         self.redis_service = redis_service
         self.token_scheduler_service = token_scheduler_service
+        self.user_repository = user_repository
         self.timeout = ClientTimeout(total=30)
         self.base_url = settings.JIRA_BASE_URL
 
@@ -131,6 +134,32 @@ class JiraService(IJiraService):
                             f"Invalid JSON response from Jira API: {str(e)}"
                         ) from e
 
+                    # Create a dictionary to store assignee account IDs and their information
+                    assignee_info: Dict[str, Dict[str, Any]] = {}
+
+                    # Collect all assignee account IDs from the issues
+                    assignee_account_ids: List[str] = []
+                    for issue in data.get("issues", []):
+                        assignee = issue.get("fields", {}).get("assignee", {})
+                        if assignee:
+                            account_id: str | None = assignee.get("accountId")
+                            if account_id:
+                                assignee_account_ids.append(account_id)
+
+                    # Batch query the database for all assignees at once
+                    for account_id in assignee_account_ids:
+                        user = await self.user_repository.get_user_by_jira_account_id(account_id)
+                        if user:
+                            assignee_info[account_id] = {
+                                "user_id": user.user_id,
+                                "is_system_user": user.is_system_user
+                            }
+                        else:
+                            assignee_info[account_id] = {
+                                "user_id": None,
+                                "is_system_user": False
+                            }
+
                     return [
                         JiraIssue(
                             id=issue.get("id", ""),
@@ -141,11 +170,19 @@ class JiraService(IJiraService):
                                 issue.get("fields", {}).get("status", {}).get("name", "Unknown")
                             ),
                             assignee=JiraAssignee(
-                                user_id=issue.get("fields", {}).get("assignee", {}).get("accountId", ""),
+                                id=assignee_info.get(
+                                    issue.get("fields", {}).get("assignee", {}).get("accountId", ""),
+                                    {"user_id": None}
+                                ).get("user_id"),
+                                jira_account_id=issue.get("fields", {}).get("assignee", {}).get("accountId", ""),
                                 email=issue.get("fields", {}).get("assignee", {}).get("emailAddress", ""),
                                 avatar_url=issue.get("fields", {}).get(
                                     "assignee", {}).get("avatarUrls", {}).get("48x48", ""),
-                                name=issue.get("fields", {}).get("assignee", {}).get("displayName", "")
+                                name=issue.get("fields", {}).get("assignee", {}).get("displayName", ""),
+                                is_system_user=assignee_info.get(
+                                    issue.get("fields", {}).get("assignee", {}).get("accountId", ""),
+                                    {"is_system_user": False}
+                                ).get("is_system_user")
                             ) if issue.get("fields", {}).get("assignee") else None,
                             priority=JiraIssuePriority(
                                 id=issue.get("fields", {}).get("priority", {}).get("id", ""),
@@ -306,6 +343,16 @@ class JiraService(IJiraService):
                         )
 
                     data = await response.json()
+                    # Get the assignee account ID
+                    assignee_account_id = data["fields"].get("assignee", {}).get("accountId", "")
+                    is_system_user = False
+
+                    # Check if this is a system user
+                    if assignee_account_id:
+                        user = await self.user_repository.get_user_by_jira_account_id(assignee_account_id)
+                        if user:
+                            is_system_user = user.is_system_user
+
                     return JiraIssue(
                         id=data["id"],
                         key=data["key"],
@@ -313,10 +360,12 @@ class JiraService(IJiraService):
                         description=data["fields"].get("description"),
                         status=JiraIssueStatus.from_str(data["fields"]["status"]["name"]),
                         assignee=JiraAssignee(
-                            user_id=data["fields"].get("assignee", {}).get("accountId", ""),
+                            id=assignee_account_id,
+                            jira_account_id=assignee_account_id,
                             email=data["fields"].get("assignee", {}).get("emailAddress", ""),
                             avatar_url=data["fields"].get("assignee", {}).get("avatarUrls", {}).get("48x48", ""),
-                            name=data["fields"].get("assignee", {}).get("displayName", "")
+                            name=data["fields"].get("assignee", {}).get("displayName", ""),
+                            is_system_user=is_system_user
                         ) if data["fields"].get("assignee") else None,
                         priority=JiraIssuePriority(
                             id=data["fields"].get("priority", {}).get("id", ""),

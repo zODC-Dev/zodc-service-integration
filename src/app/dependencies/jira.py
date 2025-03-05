@@ -43,10 +43,11 @@ def get_token_scheduler_service(
 
 def get_jira_service(
     redis_service: IRedisService = Depends(get_redis_service),
-    token_scheduler_service: TokenSchedulerService = Depends(get_token_scheduler_service)
+    token_scheduler_service: TokenSchedulerService = Depends(get_token_scheduler_service),
+    user_repository: IUserRepository = Depends(get_user_repository)
 ) -> JiraService:
     """Get the Jira service."""
-    return JiraService(redis_service=redis_service, token_scheduler_service=token_scheduler_service)
+    return JiraService(redis_service=redis_service, token_scheduler_service=token_scheduler_service, user_repository=user_repository)
 
 
 def get_jira_application_service(

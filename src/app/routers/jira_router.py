@@ -48,7 +48,7 @@ async def get_project_issues(
     )
 
 
-@router.get("/projects", response_model=List[JiraProjectResponse])
+@router.get("/projects", response_model=StandardResponse[List[JiraProjectResponse]])
 async def get_accessible_projects(
     claims: JWTClaims = Depends(get_jwt_claims),
     controller: JiraController = Depends(get_jira_controller)
