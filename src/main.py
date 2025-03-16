@@ -9,6 +9,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
 
 from src.app.routers.jira_router import router as jira_router
+from src.app.routers.jira_webhook_router import router as jira_webhook_router
 from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
 from src.app.routers.util_router import router as util_router
 from src.app.services.nats_event_service import NATSEventService
@@ -183,6 +184,7 @@ app.include_router(util_router, prefix=settings.API_V1_STR +
                    "/utils", tags=["utils"])
 app.include_router(jira_router, prefix=settings.API_V1_STR + "/jira", tags=["jira"])
 app.include_router(microsoft_calendar_router, prefix=settings.API_V1_STR + "/microsoft", tags=["microsoft"])
+app.include_router(jira_webhook_router, prefix=settings.API_V1_STR + "/jira-webhook", tags=["jira_webhook"])
 
 if __name__ == "__main__":
     import uvicorn
