@@ -1,479 +1,483 @@
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, Mapping
 
 from src.configs.logger import log
-from src.domain.constants.jira import JiraActionType
-from src.domain.constants.nats_events import NATSPublishTopic, NATSSubscribeTopic
-from src.domain.constants.refresh_tokens import TokenType
-from src.domain.entities.nats_event import (
-    JiraIssueSyncPayload,
-    JiraIssueSyncResultPayload,
-    JiraLoginEvent,
-    JiraUserInfo,
-    JiraUsersRequestEvent,
-    JiraUsersResponseEvent,
-    MicrosoftLoginEvent,
-    ProjectLinkEvent,
-    ProjectUnlinkEvent,
-    UserEvent,
-)
-from src.domain.entities.project import ProjectCreate, ProjectUpdate
-from src.domain.entities.refresh_token import RefreshTokenEntity
-from src.domain.entities.user import UserCreate, UserUpdate
-from src.domain.repositories.project_repository import IProjectRepository
-from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
-from src.domain.repositories.user_repository import IUserRepository
-from src.domain.services.jira_service import IJiraService
+from src.domain.services.nats_event_service import INATSEventService
+from src.domain.services.nats_message_handler import INATSMessageHandler
 from src.domain.services.nats_service import INATSService
-from src.domain.services.redis_service import IRedisService
-from src.utils.jwt_utils import get_jwt_expiry
 
 
-class NATSEventService:
+class NATSEventService(INATSEventService):
     def __init__(
         self,
         nats_service: INATSService,
-        redis_service: IRedisService,
-        user_repository: IUserRepository,
-        refresh_token_repository: IRefreshTokenRepository,
-        project_repository: IProjectRepository,
-        jira_service: IJiraService
+        message_handlers: Mapping[str, INATSMessageHandler],
+        request_handlers: Mapping[str, INATSMessageHandler]
     ):
         self.nats_service = nats_service
-        self.redis_service = redis_service
-        self.user_repository = user_repository
-        self.refresh_token_repository = refresh_token_repository
-        self.project_repository = project_repository
-        self.jira_service = jira_service
+        self.message_handlers = message_handlers
+        self.request_handlers = request_handlers
 
-    async def start_nats_subscribers(self) -> None:
-        """Start NATS subscribers"""
-        for event_type in NATSSubscribeTopic:
-            if event_type.startswith("user"):
-                await self.nats_service.subscribe(
-                    subject=event_type.value,
-                    callback=self.handle_user_event
-                )
-            elif event_type == NATSSubscribeTopic.USER_MICROSOFT_LOGIN:
-                await self.nats_service.subscribe(
-                    subject=event_type.value,
-                    callback=self.handle_microsoft_login_event
-                )
-            elif event_type == NATSSubscribeTopic.USER_JIRA_LOGIN:
-                await self.nats_service.subscribe(
-                    subject=event_type.value,
-                    callback=self.handle_jira_login_event
-                )
-            elif event_type == NATSSubscribeTopic.PROJECT_LINKED:
-                await self.nats_service.subscribe(
-                    subject=event_type.value,
-                    callback=self.handle_project_link_event
-                )
-            elif event_type == NATSSubscribeTopic.PROJECT_UNLINKED:
-                await self.nats_service.subscribe(
-                    subject=event_type.value,
-                    callback=self.handle_project_unlink_event
-                )
-            elif event_type == NATSSubscribeTopic.PROJECT_USERS_REQUEST:
-                await self.nats_service.subscribe(
-                    subject=event_type.value,
-                    callback=self.handle_project_users_request
-                )
-        # Set up the reply handler for Jira issues sync
-        await self.nats_service.subscribe(
-            subject="jira.issues.sync.request",  # New request topic
-            callback=self.handle_jira_issues_sync_request
-        )
+    async def start(self) -> None:
+        """Start all message and request handlers"""
+        for subject, handler in self.message_handlers.items():
+            await self.register_message_handler(subject, handler)
 
-    async def handle_user_event(self, subject: str, message: Dict[str, Any]) -> None:
-        # Parse the event
-        event = UserEvent.model_validate(message)
+        for subject, handler in self.request_handlers.items():
+            await self.register_request_handler(subject, handler)
 
-        """Handle user events and clear related caches"""
-        log.info(f"Handling user event: {event.event_type} for user {event.user_id}")
+    async def register_message_handler(
+        self,
+        subject: str,
+        handler: INATSMessageHandler
+    ) -> None:
+        """Register a message handler for a subject"""
+        async def message_callback(subject: str, data: Dict[str, Any]) -> None:
+            try:
+                await handler.handle(subject, data)
+            except Exception as e:
+                log.error(f"Error handling message for {subject}: {str(e)}")
 
-        # Clear Jira token cache for the user
-        await self.redis_service.delete(f"jira_token:{event.user_id}")
+        await self.nats_service.subscribe(subject, message_callback)
+        log.info(f"Registered message handler for {subject}")
 
-        # Clear Microsoft token cache for the user
-        await self.redis_service.delete(f"microsoft_token:{event.user_id}")
+    async def register_request_handler(
+        self,
+        subject: str,
+        handler: INATSMessageHandler
+    ) -> None:
+        """Register a request handler for a subject"""
+        async def request_callback(subject: str, data: Dict[str, Any]) -> Dict[str, Any]:
+            try:
+                result = await handler.handle(subject, data)
+                return {
+                    "success": True,
+                    "data": result
+                }
+            except Exception as e:
+                log.error(f"Error handling request for {subject}: {str(e)}")
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
 
-        log.info(f"Cleared cache for user {event.user_id}")
+        await self.nats_service.subscribe_request(subject, request_callback)
+        log.info(f"Registered request handler for {subject}")
 
-    async def handle_project_link_event(self, subject: str, message: Dict[str, Any]) -> None:
-        """Handle project link events"""
-        try:
-            # Parse the event
-            event = ProjectLinkEvent.model_validate(message)
+    # async def handle_user_event(self, subject: str, message: Dict[str, Any]) -> None:
+    #     # Parse the event
+    #     event = UserEvent.model_validate(message)
 
-            # Create new project record
-            project = ProjectCreate(
-                project_id=event.project_id,
-                jira_project_id=event.jira_project_id,
-                name=event.name,
-                key=event.key,
-                avatar_url=event.avatar_url,
-            )
+    #     """Handle user events and clear related caches"""
+    #     log.info(f"Handling user event: {event.event_type} for user {event.user_id}")
 
-            # Save to database
-            await self.project_repository.create_project(project)
+    #     # Clear Jira token cache for the user
+    #     await self.redis_service.delete(f"jira_token:{event.user_id}")
 
-            log.info(f"Project {event.name} ({event.key}) linked successfully")
+    #     # Clear Microsoft token cache for the user
+    #     await self.redis_service.delete(f"microsoft_token:{event.user_id}")
 
-        except Exception as e:
-            log.error(f"Error handling project link event: {str(e)}")
+    #     log.info(f"Cleared cache for user {event.user_id}")
 
-    async def handle_project_unlink_event(self, subject: str, message: Dict[str, Any]) -> None:
-        """Handle project unlink events"""
-        try:
-            # Parse the event
-            event = ProjectUnlinkEvent.model_validate(message)
+    # async def handle_project_link_event(self, subject: str, message: Dict[str, Any]) -> None:
+    #     """Handle project link events"""
+    #     try:
+    #         # Parse the event
+    #         event = ProjectLinkEvent.model_validate(message)
 
-            # Find the project by jira_project_id
-            project = await self.project_repository.get_by_jira_project_id(event.jira_project_id)
+    #         # Create new project record
+    #         project = JiraProjectCreateDTO(
+    #             project_id=event.project_id,
+    #             jira_project_id=event.jira_project_id,
+    #             name=event.name,
+    #             key=event.key,
+    #             avatar_url=event.avatar_url,
+    #         )
 
-            if project and project.id:
-                # Update project to set is_jira_linked = False
-                await self.project_repository.update_project(
-                    project.id,
-                    ProjectUpdate(is_jira_linked=False)
-                )
+    #         # Save to database
+    #         await self.project_repository.create_project(project)
 
-                log.info(f"Project {project.name} unlinked successfully")
-            else:
-                log.warning(f"Project with Jira ID {event.jira_project_id} not found for unlinking")
+    #         log.info(f"Project {event.name} ({event.key}) linked successfully")
 
-        except Exception as e:
-            log.error(f"Error handling project unlink event: {str(e)}")
+    #     except Exception as e:
+    #         log.error(f"Error handling project link event: {str(e)}")
 
-    async def handle_project_users_request(self, subject: str, message: Dict[str, Any]) -> None:
-        """Handle project users request events"""
-        try:
-            # Parse the event
-            event = JiraUsersRequestEvent.model_validate(message)
+    # async def handle_project_unlink_event(self, subject: str, message: Dict[str, Any]) -> None:
+    #     """Handle project unlink events"""
+    #     try:
+    #         # Parse the event
+    #         event = ProjectUnlinkEvent.model_validate(message)
 
-            # Get project users from Jira
-            users = await self.jira_service.get_project_users(
-                user_id=event.admin_user_id,
-                project_key=event.key
-            )
+    #         # Find the project by jira_project_id
+    #         project = await self.project_repository.get_by_jira_project_id(event.jira_project_id)
 
-            # Transform to response format
-            jira_users = [
-                JiraUserInfo(
-                    jira_account_id=user.account_id,
-                    email=user.email_address,
-                    name=user.display_name
-                )
-                for user in users
-            ]
+    #         if project and project.id:
+    #             # Update project to set is_jira_linked = False
+    #             await self.project_repository.update_project(
+    #                 project.id,
+    #                 JiraProjectUpdateDTO(is_jira_linked=False)
+    #             )
 
-            # Prepare response
-            response = JiraUsersResponseEvent(
-                project_id=event.project_id,
-                jira_project_id=event.jira_project_id,
-                users=jira_users
-            )
+    #             log.info(f"Project {project.name} unlinked successfully")
+    #         else:
+    #             log.warning(f"Project with Jira ID {event.jira_project_id} not found for unlinking")
 
-            # Publish response
-            await self.nats_service.publish(
-                NATSPublishTopic.PROJECT_USERS_RESPONSE.value,
-                response.model_dump()
-            )
+    #     except Exception as e:
+    #         log.error(f"Error handling project unlink event: {str(e)}")
 
-        except Exception as e:
-            log.error(f"Error handling project users request: {str(e)}")
+    # async def handle_project_users_request(self, subject: str, message: Dict[str, Any]) -> None:
+    #     """Handle project users request events"""
+    #     try:
+    #         # Parse the event
+    #         event = JiraUsersRequestEvent.model_validate(message)
 
-    async def handle_microsoft_login_event(self, subject: str, message: Dict[str, Any]) -> None:
-        """Handle Microsoft login event - create user and store tokens"""
-        try:
-            # Parse the event data
-            event = MicrosoftLoginEvent.model_validate(message)
+    #         # Get project users from Jira
+    #         users = await self.jira_service.get_project_users(
+    #             user_id=event.admin_user_id,
+    #             project_key=event.key
+    #         )
 
-            # Check if user exists
-            user = await self.user_repository.get_user_by_email(event.email)
+    #         # Transform to response format
+    #         jira_users = [
+    #             JiraUserInfo(
+    #                 jira_account_id=user.account_id,
+    #                 email=user.email_address,
+    #                 name=user.display_name
+    #             )
+    #             for user in users
+    #         ]
 
-            if not user:
-                # Create new user
-                new_user = UserCreate(
-                    email=event.email,
-                    user_id=event.user_id,
-                )
-                await self.user_repository.create_user(new_user)
-                log.info(f"Created new user from Microsoft login for user {event.user_id}")
+    #         # Prepare response
+    #         response = JiraUsersResponseEvent(
+    #             project_id=event.project_id,
+    #             jira_project_id=event.jira_project_id,
+    #             users=jira_users
+    #         )
 
-            # Store refresh token
-            expires_at = datetime.now(timezone.utc) + timedelta(seconds=event.expires_in * 2)
-            refresh_token = RefreshTokenEntity(
-                token=event.refresh_token,
-                user_id=event.user_id,
-                token_type=TokenType.MICROSOFT,
-                expires_at=expires_at
-            )
-            await self.refresh_token_repository.create_refresh_token(refresh_token)
+    #         # Publish response
+    #         await self.nats_service.publish(
+    #             NATSPublishTopic.PROJECT_USERS_RESPONSE.value,
+    #             response.model_dump()
+    #         )
 
-            # Cache access token
-            await self.redis_service.cache_microsoft_token(
-                user_id=event.user_id,
-                access_token=event.access_token,
-                expiry=event.expires_in
-            )
+    #     except Exception as e:
+    #         log.error(f"Error handling project users request: {str(e)}")
 
-            log.info(f"Successfully processed Microsoft login for user {event.user_id}")
+    # async def handle_microsoft_login_event(self, subject: str, message: Dict[str, Any]) -> None:
+    #     """Handle Microsoft login event - create user and store tokens"""
+    #     try:
+    #         # Parse the event data
+    #         event = MicrosoftLoginEvent.model_validate(message)
 
-        except Exception as e:
-            log.error(f"Error handling Microsoft login event: {str(e)}")
+    #         # Check if user exists
+    #         user = await self.user_repository.get_user_by_email(event.email)
 
-    async def handle_jira_login_event(self, subject: str, message: Dict[str, Any]) -> None:
-        """Handle Jira login event - create/update user and store tokens"""
-        try:
-            # Parse the event data
-            event = JiraLoginEvent.model_validate(message)
+    #         if not user:
+    #             # Create new user
+    #             new_user = JiraUserCreateDTO(
+    #                 email=event.email,
+    #                 user_id=event.user_id,
+    #             )
+    #             await self.user_repository.create_user(new_user)
+    #             log.info(f"Created new user from Microsoft login for user {event.user_id}")
 
-            # Check if user exists
-            user = await self.user_repository.get_user_by_email(event.email)
+    #         # Store refresh token
+    #         expires_at = datetime.now(timezone.utc) + timedelta(seconds=event.expires_in * 2)
+    #         refresh_token = RefreshTokenEntity(
+    #             token=event.refresh_token,
+    #             user_id=event.user_id,
+    #             token_type=TokenType.MICROSOFT,
+    #             expires_at=expires_at
+    #         )
+    #         await self.refresh_token_repository.create_refresh_token(refresh_token)
 
-            if user:
-                # Update Jira info if user exists
-                user_update = UserUpdate(
-                    email=event.email,
-                    jira_account_id=event.jira_account_id,
-                )
-                await self.user_repository.update_user(user_update)
-                log.info(f"Updated Jira link for existing user {user.id}")
-            else:
-                # Create new user with Jira info
-                new_user = UserCreate(
-                    email=event.email,
-                    user_id=event.user_id,
-                    jira_account_id=event.jira_account_id,
-                    is_system_user=event.is_system_user
-                )
-                await self.user_repository.create_user(new_user)
-                log.info(f"Created new user with Jira link for user {event.user_id}")
+    #         # Cache access token
+    #         await self.redis_service.cache_microsoft_token(
+    #             user_id=event.user_id,
+    #             access_token=event.access_token,
+    #             expiry=event.expires_in
+    #         )
 
-            # Store refresh token
-            expires_at = get_jwt_expiry(event.refresh_token) or datetime.now(
-                timezone.utc) + timedelta(seconds=event.expires_in * 2)
-            refresh_token = RefreshTokenEntity(
-                token=event.refresh_token,
-                user_id=event.user_id,
-                token_type=TokenType.JIRA,
-                expires_at=expires_at
-            )
-            await self.refresh_token_repository.create_refresh_token(refresh_token)
+    #         log.info(f"Successfully processed Microsoft login for user {event.user_id}")
 
-            # Cache access token
-            await self.redis_service.cache_jira_token(
-                user_id=event.user_id,
-                access_token=event.access_token,
-                expiry=event.expires_in
-            )
+    #     except Exception as e:
+    #         log.error(f"Error handling Microsoft login event: {str(e)}")
 
-            log.info(f"Successfully processed Jira login for user {event.user_id}")
+    # async def handle_jira_login_event(self, subject: str, message: Dict[str, Any]) -> None:
+    #     """Handle Jira login event - create/update user and store tokens"""
+    #     try:
+    #         # Parse the event data
+    #         event = JiraLoginEvent.model_validate(message)
 
-        except Exception as e:
-            log.error(f"Error handling Jira login event: {str(e)}")
+    #         # Check if user exists
+    #         user = await self.user_repository.get_user_by_email(event.email)
 
-    async def handle_jira_issues_sync_request(self, subject: str, message: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Handle Jira issues sync requests and return results directly"""
-        results = []
+    #         if user:
+    #             # Update Jira info if user exists
+    #             user_update = JiraUserUpdateDTO(
+    #                 email=event.email,
+    #                 jira_account_id=event.jira_account_id,
+    #             )
+    #             await self.user_repository.update_user(user_update)
+    #             log.info(f"Updated Jira link for existing user {user.id}")
+    #         else:
+    #             # Create new user with Jira info
+    #             new_user = JiraUserCreateDTO(
+    #                 email=event.email,
+    #                 user_id=event.user_id,
+    #                 jira_account_id=event.jira_account_id,
+    #                 is_system_user=event.is_system_user
+    #             )
+    #             await self.user_repository.create_user(new_user)
+    #             log.info(f"Created new user with Jira link for user {event.user_id}")
 
-        try:
-            # Parse each issue in the batch
-            issues = [JiraIssueSyncPayload.model_validate(item) for item in message]
+    #         # Store refresh token
+    #         expires_at = get_jwt_expiry(event.refresh_token) or datetime.now(
+    #             timezone.utc) + timedelta(seconds=event.expires_in * 2)
+    #         refresh_token = RefreshTokenEntity(
+    #             token=event.refresh_token,
+    #             user_id=event.user_id,
+    #             token_type=TokenType.JIRA,
+    #             expires_at=expires_at
+    #         )
+    #         await self.refresh_token_repository.create_refresh_token(refresh_token)
 
-            # Process each issue
-            for issue in issues:
-                result = JiraIssueSyncResultPayload(
-                    success=False,
-                    action_type=issue.action_type,
-                    issue_id=issue.issue_id
-                )
+    #         # Cache access token
+    #         await self.redis_service.cache_jira_token(
+    #             user_id=event.user_id,
+    #             access_token=event.access_token,
+    #             expiry=event.expires_in
+    #         )
 
-                try:
-                    if issue.action_type == JiraActionType.CREATE:
-                        # Validate required fields for creation
-                        if not issue.project_key or not issue.summary or not issue.issue_type:
-                            error_msg = "Missing required fields for issue creation"
-                            log.error(f"{error_msg}: {issue}")
-                            result.error_message = error_msg
-                            results.append(result.model_dump())
-                            continue
+    #         log.info(f"Successfully processed Jira login for user {event.user_id}")
 
-                        # Create new issue
-                        from src.domain.entities.jira import JiraIssueCreate
-                        create_payload = JiraIssueCreate(
-                            project_key=issue.project_key,
-                            summary=issue.summary,
-                            description=issue.description,
-                            issue_type=issue.issue_type,
-                            assignee=issue.assignee,
-                            estimate_points=issue.estimate_points
-                        )
+    #     except Exception as e:
+    #         log.error(f"Error handling Jira login event: {str(e)}")
 
-                        created_issue = await self.jira_service.create_issue(
-                            user_id=issue.user_id,
-                            issue=create_payload
-                        )
+    # async def handle_jira_issues_sync_request(self, subject: str, message: List[Dict[str, Any]]) -> Dict[str, Any]:
+    #     """Handle Jira issues sync requests and return results directly"""
+    #     results = []
 
-                        log.info(f"Successfully created issue {created_issue.issue_id}")
-                        result.success = True
-                        result.issue_id = created_issue.issue_id
+    #     try:
+    #         # Parse each issue in the batch
+    #         issues = [JiraIssueSyncPayload.model_validate(item) for item in message]
 
-                    elif issue.action_type == JiraActionType.UPDATE:
-                        # Validate required fields for update
-                        if not issue.issue_id:
-                            error_msg = "Missing issue_id for issue update"
-                            log.error(f"{error_msg}: {issue}")
-                            result.error_message = error_msg
-                            results.append(result.model_dump())
-                            continue
+    #         # Process each issue
+    #         for issue in issues:
+        #         result = JiraIssueSyncResultPayload(
+        #             success=False,
+        #             action_type=issue.action_type,
+        #             issue_id=issue.issue_id
+        #         )
 
-                        # Update existing issue
-                        from src.domain.entities.jira import JiraIssueUpdate
-                        update_payload = JiraIssueUpdate(
-                            summary=issue.summary,
-                            description=issue.description,
-                            status=issue.status,
-                            assignee=issue.assignee,
-                            estimate_points=issue.estimate_points,
-                            actual_points=issue.actual_points
-                        )
+        #         try:
+        #             if issue.action_type == JiraActionType.CREATE:
+        #                 # Validate required fields for creation
+        #                 if not issue.project_key or not issue.summary or not issue.issue_type:
+        #                     error_msg = "Missing required fields for issue creation"
+        #                     log.error(f"{error_msg}: {issue}")
+        #                     result.error_message = error_msg
+        #                     results.append(result.model_dump())
+        #                     continue
 
-                        await self.jira_service.update_issue(
-                            user_id=issue.user_id,
-                            issue_id=issue.issue_id,
-                            update=update_payload
-                        )
+        #                 # Create new issue
+        #                 from src.domain.models.jira import JiraIssueCreate
+        #                 create_payload = JiraIssueCreate(
+        #                     project_key=issue.project_key,
+        #                     summary=issue.summary,
+        #                     description=issue.description,
+        #                     issue_type=issue.issue_type,
+        #                     assignee=issue.assignee,
+        #                     estimate_points=issue.estimate_points
+        #                 )
 
-                        log.info(f"Successfully updated issue {issue.issue_id}")
-                        result.success = True
+        #                 created_issue = await self.jira_service.create_issue(
+        #                     user_id=issue.user_id,
+        #                     issue=create_payload
+        #                 )
 
-                except Exception as e:
-                    error_msg = str(e)
-                    log.error(f"Error processing issue {issue.issue_id if issue.issue_id else 'new'}: {error_msg}")
-                    result.error_message = error_msg
+        #                 log.info(f"Successfully created issue {created_issue.issue_id}")
+        #                 result.success = True
+        #                 result.issue_id = created_issue.issue_id
 
-                results.append(result.model_dump())
+        #             elif issue.action_type == JiraActionType.UPDATE:
+        #                 # Validate required fields for update
+        #                 if not issue.issue_id:
+        #                     error_msg = "Missing issue_id for issue update"
+        #                     log.error(f"{error_msg}: {issue}")
+        #                     result.error_message = error_msg
+        #                     results.append(result.model_dump())
+        #                     continue
 
-            log.info(f"Completed processing {len(issues)} issues")
+        #                 # Update existing issue
+        #                 from src.domain.models.jira import JiraIssueUpdate
+        #                 update_payload = JiraIssueUpdate(
+        #                     summary=issue.summary,
+        #                     description=issue.description,
+        #                     status=issue.status,
+        #                     assignee=issue.assignee,
+        #                     estimate_points=issue.estimate_points,
+        #                     actual_points=issue.actual_points
+        #                 )
 
-            # Return results directly instead of publishing
-            return {"results": results}
+        #                 await self.jira_service.update_issue(
+        #                     user_id=issue.user_id,
+        #                     issue_id=issue.issue_id,
+        #                     update=update_payload
+        #                 )
 
-        except Exception as e:
-            log.error(f"Error handling Jira issues sync request: {str(e)}")
+        #                 log.info(f"Successfully updated issue {issue.issue_id}")
+        #                 result.success = True
 
-            # Return error result if we couldn't process the batch
-            error_result = JiraIssueSyncResultPayload(
-                success=False,
-                action_type=JiraActionType.CREATE,  # Default
-                error_message=f"Batch processing error: {str(e)}"
-            )
-            return {"results": [error_result.model_dump()]}
+        #         except Exception as e:
+        #             error_msg = str(e)
+        #             log.error(f"Error processing issue {issue.issue_id if issue.issue_id else 'new'}: {error_msg}")
+        #             result.error_message = error_msg
+
+        #         results.append(result.model_dump())
+
+        #     log.info(f"Completed processing {len(issues)} issues")
+
+        #     # Return results directly instead of publishing
+        #     return {"results": results}
+
+        # except Exception as e:
+        #     log.error(f"Error handling Jira issues sync request: {str(e)}")
+
+        #     # Return error result if we couldn't process the batch
+        #     error_result = JiraIssueSyncResultPayload(
+        #         success=False,
+        #         action_type=JiraActionType.CREATE,  # Default
+        #         error_message=f"Batch processing error: {str(e)}"
+        #     )
+        #     return {"results": [error_result.model_dump()]}
 
     # Keep the old method for backward compatibility if needed
-    async def handle_jira_issues_sync(self, subject: str, message: List[Dict[str, Any]]) -> None:
-        """Legacy handler for Jira issues sync events (publish-subscribe pattern)"""
-        results = []
+    # async def handle_jira_issues_sync(self, subject: str, message: List[Dict[str, Any]]) -> None:
+    #     """Legacy handler for Jira issues sync events (publish-subscribe pattern)"""
+    #     results = []
 
-        try:
-            # Parse each issue in the batch
-            issues = [JiraIssueSyncPayload.model_validate(item) for item in message]
+    #     try:
+    #         # Parse each issue in the batch
+    #         issues = [JiraIssueSyncPayload.model_validate(item) for item in message]
 
-            # Process each issue
-            for issue in issues:
-                result = JiraIssueSyncResultPayload(
-                    success=False,
-                    action_type=issue.action_type,
-                    issue_id=issue.issue_id
-                )
+    #         # Process each issue
+    #         for issue in issues:
+    #             result = JiraIssueSyncResultPayload(
+    #                 success=False,
+    #                 action_type=issue.action_type,
+    #                 issue_id=issue.issue_id
+    #             )
 
-                try:
-                    if issue.action_type == JiraActionType.CREATE:
-                        # Validate required fields for creation
-                        if not issue.project_key or not issue.summary or not issue.issue_type:
-                            error_msg = "Missing required fields for issue creation"
-                            log.error(f"{error_msg}: {issue}")
-                            result.error_message = error_msg
-                            results.append(result.model_dump())
-                            continue
+    #             try:
+    #                 if issue.action_type == JiraActionType.CREATE:
+    #                     # Validate required fields for creation
+    #                     if not issue.project_key or not issue.summary or not issue.issue_type:
+    #                         error_msg = "Missing required fields for issue creation"
+    #                         log.error(f"{error_msg}: {issue}")
+    #                         result.error_message = error_msg
+    #                         results.append(result.model_dump())
+    #                         continue
 
-                        # Create new issue
-                        from src.domain.entities.jira import JiraIssueCreate
-                        create_payload = JiraIssueCreate(
-                            project_key=issue.project_key,
-                            summary=issue.summary,
-                            description=issue.description,
-                            issue_type=issue.issue_type,
-                            assignee=issue.assignee,
-                            estimate_points=issue.estimate_points
-                        )
+    #                     # Create new issue
+    #                     from src.domain.models.jira import JiraIssueCreate
+    #                     create_payload = JiraIssueCreate(
+    #                         project_key=issue.project_key,
+    #                         summary=issue.summary,
+    #                         description=issue.description,
+    #                         issue_type=issue.issue_type,
+    #                         assignee=issue.assignee,
+    #                         estimate_points=issue.estimate_points
+    #                     )
 
-                        created_issue = await self.jira_service.create_issue(
-                            user_id=issue.user_id,
-                            issue=create_payload
-                        )
+    #                     created_issue = await self.jira_service.create_issue(
+    #                         user_id=issue.user_id,
+    #                         issue=create_payload
+    #                     )
 
-                        log.info(f"Successfully created issue {created_issue.issue_id}")
-                        result.success = True
-                        result.issue_id = created_issue.issue_id
+    #                     log.info(f"Successfully created issue {created_issue.issue_id}")
+    #                     result.success = True
+    #                     result.issue_id = created_issue.issue_id
 
-                    elif issue.action_type == JiraActionType.UPDATE:
-                        # Validate required fields for update
-                        if not issue.issue_id:
-                            error_msg = "Missing issue_id for issue update"
-                            log.error(f"{error_msg}: {issue}")
-                            result.error_message = error_msg
-                            results.append(result.model_dump())
-                            continue
+    #                 elif issue.action_type == JiraActionType.UPDATE:
+    #                     # Validate required fields for update
+    #                     if not issue.issue_id:
+    #                         error_msg = "Missing issue_id for issue update"
+    #                         log.error(f"{error_msg}: {issue}")
+    #                         result.error_message = error_msg
+    #                         results.append(result.model_dump())
+    #                         continue
 
-                        # Update existing issue
-                        from src.domain.entities.jira import JiraIssueUpdate
-                        update_payload = JiraIssueUpdate(
-                            summary=issue.summary,
-                            description=issue.description,
-                            status=issue.status,
-                            assignee=issue.assignee,
-                            estimate_points=issue.estimate_points,
-                            actual_points=issue.actual_points
-                        )
+    #                     # Update existing issue
+    #                     from src.domain.models.jira import JiraIssueUpdate
+    #                     update_payload = JiraIssueUpdate(
+    #                         summary=issue.summary,
+    #                         description=issue.description,
+    #                         status=issue.status,
+    #                         assignee=issue.assignee,
+    #                         estimate_points=issue.estimate_points,
+    #                         actual_points=issue.actual_points
+    #                     )
 
-                        await self.jira_service.update_issue(
-                            user_id=issue.user_id,
-                            issue_id=issue.issue_id,
-                            update=update_payload
-                        )
+    #                     await self.jira_service.update_issue(
+    #                         user_id=issue.user_id,
+    #                         issue_id=issue.issue_id,
+    #                         update=update_payload
+    #                     )
 
-                        log.info(f"Successfully updated issue {issue.issue_id}")
-                        result.success = True
+    #                     log.info(f"Successfully updated issue {issue.issue_id}")
+    #                     result.success = True
 
-                except Exception as e:
-                    error_msg = str(e)
-                    log.error(f"Error processing issue {issue.issue_id if issue.issue_id else 'new'}: {error_msg}")
-                    result.error_message = error_msg
+    #             except Exception as e:
+    #                 error_msg = str(e)
+    #                 log.error(f"Error processing issue {issue.issue_id if issue.issue_id else 'new'}: {error_msg}")
+    #                 result.error_message = error_msg
 
-                results.append(result.model_dump())
+    #             results.append(result.model_dump())
 
-            log.info(f"Completed processing {len(issues)} issues")
+    #         log.info(f"Completed processing {len(issues)} issues")
 
-            # Publish results
-            await self.nats_service.publish(
-                NATSPublishTopic.JIRA_ISSUES_SYNC_RESULT.value,
-                results
-            )
+    #         # Publish results
+    #         await self.nats_service.publish(
+    #             NATSPublishTopic.JIRA_ISSUES_SYNC_RESULT.value,
+    #             results
+    #         )
 
-        except Exception as e:
-            log.error(f"Error handling Jira issues sync event: {str(e)}")
+    #     except Exception as e:
+    #         log.error(f"Error handling Jira issues sync event: {str(e)}")
 
-            # Publish error result if we couldn't process the batch
-            error_result = JiraIssueSyncResultPayload(
-                success=False,
-                action_type=JiraActionType.CREATE,  # Default
-                error_message=f"Batch processing error: {str(e)}"
-            )
-            await self.nats_service.publish(
-                NATSPublishTopic.JIRA_ISSUES_SYNC_RESULT.value,
-                [error_result.model_dump()]
-            )
+    #         # Publish error result if we couldn't process the batch
+    #         error_result = JiraIssueSyncResultPayload(
+    #             success=False,
+    #             action_type=JiraActionType.CREATE,  # Default
+    #             error_message=f"Batch processing error: {str(e)}"
+    #         )
+    #         await self.nats_service.publish(
+    #             NATSPublishTopic.JIRA_ISSUES_SYNC_RESULT.value,
+    #             [error_result.model_dump()]
+    #         )
+
+    # async def handle_jira_sync_conflict(self, subject: str, message: Dict[str, Any]) -> None:
+    #     """Handle Jira sync conflict event"""
+    #     try:
+    #         issue_id = message.get("issue_id")
+    #         # jira_updated_at = message.get("jira_updated_at")
+    #         # local_updated_at = message.get("local_updated_at")
+
+    #         # Lưu conflict vào bảng riêng hoặc gửi notification
+    #         log.warning(f"Conflict detected for issue {issue_id}")
+
+    #         # TODO: Implement conflict resolution strategy
+    #         # 1. Merge changes
+    #         # 2. User selection UI
+    #         # 3. Force latest version
+
+    #     except Exception as e:
+    #         log.error(f"Error handling Jira sync conflict: {str(e)}")
+
+    # async def handle_jira_issue_update_request(
+    #     self,
+    #     subject: str,
+    #     message: Dict[str, Any]
+    # ) -> None:
+    #     """Delegate to JiraIssueService"""
+    #     await self.jira_issue_service.handle_update_request(message)

@@ -11,9 +11,10 @@ from src.configs.settings import settings
 from src.configs.settings import settings
 from sqlmodel import SQLModel
 
-from src.infrastructure.models.project import Project
-from src.infrastructure.models.user import User
-from src.infrastructure.models.refresh_token import RefreshToken
+from src.infrastructure.entities.jira_project import JiraProjectEntity
+from src.infrastructure.entities.jira_issue import JiraIssueEntity
+from src.infrastructure.entities.jira_user import JiraUserEntity
+from src.infrastructure.entities.refresh_token import RefreshTokenEntity
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

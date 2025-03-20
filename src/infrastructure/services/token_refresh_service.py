@@ -6,9 +6,9 @@ from aiohttp import ClientSession
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.entities.refresh_token import RefreshTokenEntity
+from src.domain.models.refresh_token import RefreshTokenModel
+from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
-from src.domain.repositories.user_repository import IUserRepository
 from src.domain.services.redis_service import IRedisService
 from src.domain.services.token_refresh_service import ITokenRefreshService
 from src.utils.jwt_utils import get_jwt_expiry
@@ -18,7 +18,7 @@ class TokenRefreshService(ITokenRefreshService):
     def __init__(
         self,
         redis_service: IRedisService,
-        user_repository: IUserRepository,
+        user_repository: IJiraUserRepository,
         refresh_token_repository: IRefreshTokenRepository
     ):
         self.redis_service = redis_service
@@ -107,7 +107,7 @@ class TokenRefreshService(ITokenRefreshService):
                                                       token_data.get("expires_in", 3600) * 2)
             expires_at = datetime.now(timezone.utc) + timedelta(seconds=refresh_token_expires_in)
 
-            refresh_token = RefreshTokenEntity(
+            refresh_token = RefreshTokenModel(
                 token=token_data["refresh_token"],
                 user_id=user_id,
                 token_type=TokenType.MICROSOFT,
@@ -131,7 +131,7 @@ class TokenRefreshService(ITokenRefreshService):
                 # Fallback to default if JWT decode fails
                 expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600) * 2)
 
-            refresh_token = RefreshTokenEntity(
+            refresh_token = RefreshTokenModel(
                 token=token_data["refresh_token"],
                 user_id=user_id,
                 token_type=TokenType.JIRA,

@@ -1,20 +1,20 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Optional
 
 
 class IRedisService(ABC):
     @abstractmethod
-    async def get(self, key: str) -> Dict[str, Any]:
+    async def get(self, key: str) -> Optional[str]:
         """Get a value from Redis by key."""
         pass
 
     @abstractmethod
-    async def set(self, key: str, value: Dict[str, Any], expiry: int):
+    async def set(self, key: str, value: str, expire: Optional[int] = None) -> None:
         """Set a value in Redis with an expiry time."""
         pass
 
     @abstractmethod
-    async def delete(self, key: str):
+    async def delete(self, key: str) -> None:
         """Delete a key from Redis."""
         pass
 

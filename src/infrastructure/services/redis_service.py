@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict
+from typing import Optional
 
 from redis.asyncio import Redis
 
@@ -13,16 +13,14 @@ class RedisService(IRedisService):
     def __init__(self, redis_client: Redis):
         self.redis = redis_client
 
-    async def get(self, key: str) -> Any:
+    async def get(self, key: str) -> Optional[str]:
         """Get a value from Redis by key."""
         value = await self.redis.get(key)
-        if value:
-            return json.loads(value)
-        return None
+        return value.decode('utf-8') if value else None
 
-    async def set(self, key: str, value: Dict[str, Any], expiry: int) -> None:
+    async def set(self, key: str, value: str, expire: Optional[int] = None) -> None:
         """Set a value in Redis with an expiry time."""
-        await self.redis.setex(key, expiry, json.dumps(value, default=str))
+        await self.redis.set(key, value.encode('utf-8'), ex=expire)
 
     async def delete(self, key: str) -> None:
         """Delete a key from Redis."""
@@ -32,7 +30,7 @@ class RedisService(IRedisService):
         """Cache Jira access token with expiry."""
         key = f"jira_token:{user_id}"
         token_data = {"access_token": access_token}
-        await self.set(key, token_data, expiry)
+        await self.set(key, json.dumps(token_data, default=str), expiry)
 
     async def get_cached_jira_token(self, user_id: int) -> str:
         """Get Jira access token from cache if exists."""
@@ -46,7 +44,7 @@ class RedisService(IRedisService):
         log.info(f"Caching Microsoft token for user {user_id}")
         key = f"microsoft_token:{user_id}"
         token_data = {"access_token": access_token}
-        await self.set(key, token_data, expiry)
+        await self.set(key, json.dumps(token_data, default=str), expiry)
 
     async def get_cached_microsoft_token(self, user_id: int) -> str:
         """Get Microsoft access token from cache if exists."""
