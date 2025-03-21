@@ -34,3 +34,8 @@ class IJiraUserRepository(ABC):
     async def get_user_by_jira_account_id(self, jira_account_id: str) -> Optional[JiraUserModel]:
         """Get user by Jira account ID"""
         pass
+
+    @abstractmethod
+    async def get_user_by_account_id(self, jira_account_id: str) -> Optional[JiraUserModel]:
+        """Get user by account ID"""
+        pass

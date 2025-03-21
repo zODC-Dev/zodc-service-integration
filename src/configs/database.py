@@ -1,4 +1,4 @@
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Callable
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
@@ -14,6 +14,18 @@ engine = create_async_engine(str(settings.DATABASE_URL), echo=settings.DEBUG)
 AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 Base = declarative_base()
+
+
+def sqlmodel_session_maker(engine) -> Callable[[], AsyncSession]:
+    """Returns a SQLModel session maker function.
+
+    Args:
+        engine (_type_): SQLModel engine.
+
+    Returns:
+        Callable[[], AsyncSession]: AsyncSession maker function.
+    """
+    return lambda: AsyncSession(bind=engine, autocommit=False, autoflush=False)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -34,3 +46,6 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
         log.info("Database tables created")
+
+
+session_maker = sqlmodel_session_maker(engine)

@@ -6,7 +6,7 @@ from src.domain.models.jira_issue import JiraIssueModel
 
 class IJiraIssueRepository(ABC):
     @abstractmethod
-    async def get_by_jira_id(self, jira_id: str) -> Optional[JiraIssueModel]:
+    async def get_by_jira_issue_id(self, jira_issue_id: str) -> Optional[JiraIssueModel]:
         pass
 
     @abstractmethod

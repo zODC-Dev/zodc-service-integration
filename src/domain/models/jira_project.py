@@ -2,39 +2,31 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from src.domain.constants.jira import JiraSprintState
 
-from .base import BaseDomainModel
-
-
-class JiraProjectModel(BaseDomainModel):
-    project_id: int
+class JiraProjectModel(BaseModel):
+    id: Optional[int] = None          # ID trong database của chúng ta
+    project_id: Optional[int] = None  # ID trong database (alias cho id)
+    jira_project_id: str             # ID từ Jira API (e.g. '10002')
+    key: str                         # Project key (e.g. 'STEM')
     name: str
-    key: str
-    jira_project_id: str
-    avatar_url: Optional[str] = None
-    description: Optional[str] = None
-    is_jira_linked: bool = False
+    description: str = ""
+    avatar_url: str = ""
 
     class Config:
         from_attributes = True
 
 
-class JiraSprintModel(BaseDomainModel):
-    id: int
-    name: str
-    state: JiraSprintState
-
-
 class JiraProjectCreateDTO(BaseModel):
-    project_id: int
-    name: str
+    jira_project_id: str             # ID từ Jira API
     key: str
-    jira_project_id: str
-    avatar_url: Optional[str] = None
+    name: str
+    description: str = ""
+    avatar_url: str = ""
 
 
 class JiraProjectUpdateDTO(BaseModel):
-    name: Optional[str] = None
+    project_id: Optional[int] = None
     key: Optional[str] = None
+    name: Optional[str] = None
+    avatar_url: Optional[str] = None
     description: Optional[str] = None

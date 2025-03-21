@@ -7,6 +7,7 @@ from aiohttp import ClientTimeout
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.refresh_tokens import TokenType
+from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraRequestError
 from src.domain.models.jira_issue import (
     JiraIssueCreateDTO,
@@ -14,26 +15,30 @@ from src.domain.models.jira_issue import (
     JiraIssueStatus,
     JiraIssueUpdateDTO,
 )
+from src.domain.models.sync_log import SyncLogCreateDTO
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
-from src.domain.services.jira_issue_service import IJiraIssueService
+from src.domain.repositories.sync_log_repository import ISyncLogRepository
+from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.redis_service import IRedisService
 from src.domain.services.token_scheduler_service import ITokenSchedulerService
 from src.infrastructure.dtos.jira.issue_responses import JiraAPIIssueResponse
 from src.infrastructure.mappers.jira_issue_mapper import JiraIssueMapper
 
 
-class JiraIssueService(IJiraIssueService):
+class JiraIssueService(IJiraIssueDatabaseService):
     def __init__(
         self,
         redis_service: IRedisService,
         token_scheduler_service: ITokenSchedulerService,
-        user_repository: IJiraUserRepository
+        user_repository: IJiraUserRepository,
+        sync_log_repository: ISyncLogRepository,
     ):
         self.redis_service = redis_service
         self.token_scheduler_service = token_scheduler_service
         self.user_repository = user_repository
         self.timeout = ClientTimeout(total=30)
         self.base_url = settings.JIRA_BASE_URL
+        self.sync_log_repository = sync_log_repository
 
     async def _get_token(self, user_id: int) -> str:
         # Schedule token refresh check
@@ -188,17 +193,29 @@ class JiraIssueService(IJiraIssueService):
 
         async with aiohttp.ClientSession(timeout=self.timeout) as session:
             async with session.post(url, json=payload, headers=headers) as response:
-                if response.status != 201:
-                    log.error(f"Failed to create Jira issue: {await response.text()}")
-                    raise Exception(f"Failed to create Jira issue: {response.status} - {await response.text()}")
+                response_body = await response.json()
 
-                data = await response.json()
-                response_data = data["fields"]
+                # Log the sync operation
+                await self.sync_log_repository.create_sync_log(
+                    SyncLogCreateDTO(
+                        entity_type=EntityType.ISSUE,
+                        entity_id=response_body.get("key", ""),
+                        operation=OperationType.CREATE,
+                        request_payload=payload,
+                        response_status=response.status,
+                        response_body=response_body,
+                        source=SourceType.MANUAL,
+                        sender=user_id,
+                        error_message=None if response.status == 201 else await response.text()
+                    )
+                )
+
+                if response.status != 201:
+                    raise Exception(f"Failed to create Jira issue: {response.status} - {await response.text()}")
 
                 # Create the issue model
                 return JiraIssueModel(
-                    jira_id=response_data["id"],
-                    key=response_data["key"],
+                    key=response_body["key"],
                     summary=issue.summary,
                     description=issue.description,
                     status=JiraIssueStatus.TO_DO,  # Default status for new issues
@@ -207,7 +224,7 @@ class JiraIssueService(IJiraIssueService):
                     actual_point=None,
                     created_at=datetime.now(timezone.utc),
                     updated_at=datetime.now(timezone.utc),
-                    jira_issue_id=response_data["id"],
+                    jira_issue_id=response_body["id"],
                     project_key=issue.project_key,
                     last_synced_at=datetime.now(timezone.utc),
                     reporter_id=user_id

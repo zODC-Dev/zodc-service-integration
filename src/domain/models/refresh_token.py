@@ -72,3 +72,11 @@ class CachedToken(BaseModel):
     class Config:
         """Pydantic config"""
         arbitrary_types_allowed = True
+
+
+class CreateRefreshTokenDTO(BaseModel):
+    """DTO for creating a new refresh token"""
+    token: str
+    user_id: int
+    expires_at: datetime
+    token_type: TokenType

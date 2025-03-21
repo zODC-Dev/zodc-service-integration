@@ -3,22 +3,10 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
+from src.infrastructure.dtos.jira.sprint_responses import JiraAPISprintResponse
+from src.infrastructure.dtos.jira.user_responses import JiraAPIUserResponse
+
 from .base import JiraAPIFieldsBase, JiraAPIResponseBase
-from .common import JiraAPISprintResponse, JiraAPIUserResponse
-
-
-class JiraAPIProjectResponse(JiraAPIResponseBase):
-    id: str
-    key: str
-    name: str
-    project_type_key: str = Field(alias="projectTypeKey")
-    simplified: bool
-    style: str
-    is_private: bool = Field(alias="isPrivate")
-    avatar_urls: dict = Field(alias="avatarUrls")
-    project_category: Optional[dict] = Field(alias="projectCategory")
-
-# Issue Related Responses
 
 
 class JiraAPIIssuePriorityResponse(JiraAPIResponseBase):

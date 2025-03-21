@@ -9,15 +9,17 @@ if TYPE_CHECKING:
 
 
 class JiraUserEntity(BaseEntityWithTimestamps, table=True):
-    __tablename__ = "users"
+    __tablename__ = "jira_users"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
-    user_id: int = Field(unique=True, index=True)
+    user_id: Optional[int] = Field(default=None, unique=True, index=True)
     jira_account_id: Optional[str] = Field(default=None, unique=True, index=True)
     is_system_user: bool = Field(default=False)
+    avatar_url: Optional[str] = Field(default=None)
+    name: Optional[str] = Field(default=None)
 
-    # Split into two separate relationships
+    # Relationships
     assigned_issues: List["JiraIssueEntity"] = Relationship(
         back_populates="assignee",
         sa_relationship_kwargs={"foreign_keys": "[JiraIssueEntity.assignee_id]"}

@@ -14,14 +14,14 @@ from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueType
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
-from src.domain.repositories.jira_project_repository import IProjectRepository
+from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 
 
 class JiraProjectController:
     def __init__(
         self,
         jira_project_service: JiraProjectApplicationService,
-        project_repository: IProjectRepository
+        project_repository: IJiraProjectRepository
     ):
         self.jira_project_service = jira_project_service
         self.project_repository = project_repository
@@ -100,6 +100,7 @@ class JiraProjectController:
         try:
             sprints = await self.jira_project_service.get_project_sprints(user_id, project_id)
             return StandardResponse(
+                message="Sprints fetched successfully",
                 data=[GetJiraSprintResponse.from_domain(s) for s in sprints]
             )
         except (JiraAuthenticationError, JiraConnectionError, JiraRequestError) as e:

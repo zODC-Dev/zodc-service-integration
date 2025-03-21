@@ -13,9 +13,9 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_by_jira_id(self, jira_id: str) -> Optional[JiraIssueModel]:
+    async def get_by_jira_issue_id(self, jira_issue_id: str) -> Optional[JiraIssueModel]:
         result = await self.session.exec(
-            select(JiraIssueEntity).where(JiraIssueEntity.jira_issue_id == jira_id)
+            select(JiraIssueEntity).where(JiraIssueEntity.jira_issue_id == jira_issue_id)
         )
         entity = result.first()
         return self._to_domain(entity) if entity else None
@@ -28,17 +28,17 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         return self._to_domain(entity)
 
     async def update(self, issue: JiraIssueModel) -> JiraIssueModel:
-        entity = await self.get_by_jira_id(issue.jira_id)
+        entity = await self.get_by_jira_issue_id(issue.jira_issue_id)
         if not entity:
-            raise ValueError(f"Issue with jira_id {issue.jira_id} not found")
+            raise ValueError(f"Issue with jira_issue_id {issue.jira_issue_id} not found")
 
         updated_entity = self._to_entity(issue)
-        for key, value in updated_entity.dict(exclude_unset=True).items():
+        for key, value in updated_entity.model_dump(exclude_unset=True).items():
             setattr(entity, key, value)
 
         await self.session.commit()
         await self.session.refresh(entity)
-        return self._to_domain(entity)
+        return self._to_domain(updated_entity)
 
     async def get_all(self) -> List[JiraIssueModel]:
         result = await self.session.exec(select(JiraIssueEntity))
@@ -47,7 +47,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
     def _to_entity(self, model: JiraIssueModel) -> JiraIssueEntity:
         return JiraIssueEntity(
-            jira_issue_id=model.jira_id,
+            jira_issue_id=model.jira_issue_id,
             key=model.key,
             summary=model.summary,
             description=model.description,
@@ -67,7 +67,6 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
     def _to_domain(self, entity: JiraIssueEntity) -> JiraIssueModel:
         return JiraIssueModel(
-            jira_id=entity.jira_issue_id,
             key=entity.key,
             summary=entity.summary,
             description=entity.description,

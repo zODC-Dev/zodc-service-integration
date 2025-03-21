@@ -5,7 +5,7 @@ from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
 from src.domain.models.jira_user import JiraUserCreateDTO, JiraUserUpdateDTO
 from src.domain.models.nats_event import JiraLoginEvent
-from src.domain.models.refresh_token import RefreshTokenEntity
+from src.domain.models.refresh_token import RefreshTokenModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.domain.services.nats_message_handler import INATSMessageHandler
@@ -53,7 +53,7 @@ class JiraLoginMessageHandler(INATSMessageHandler):
             # Store refresh token
             expires_at = get_jwt_expiry(event.refresh_token) or datetime.now(
                 timezone.utc) + timedelta(seconds=event.expires_in * 2)
-            refresh_token = RefreshTokenEntity(
+            refresh_token = RefreshTokenModel(
                 token=event.refresh_token,
                 user_id=event.user_id,
                 token_type=TokenType.JIRA,

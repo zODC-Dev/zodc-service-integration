@@ -4,19 +4,23 @@ from sqlmodel import Field, Relationship
 
 if TYPE_CHECKING:
     from src.infrastructure.entities.jira_issue import JiraIssueEntity
+    from src.infrastructure.entities.jira_sprint import JiraSprintEntity
 
 from .base import BaseEntityWithTimestamps
 
 
 class JiraProjectEntity(BaseEntityWithTimestamps, table=True):
-    __tablename__ = "projects"
+    __tablename__ = "jira_projects"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    project_id: int = Field(unique=True, index=True)
+    project_id: Optional[int] = Field(default=None, unique=True, index=True)
     jira_project_id: str = Field(unique=True, index=True)
     name: str = Field(unique=True, index=True)
     key: str = Field(unique=True, index=True)
     avatar_url: Optional[str] = None
     description: Optional[str] = None
     is_jira_linked: bool = Field(default=False)
+
+    # Relationships
     jira_issues: List["JiraIssueEntity"] = Relationship(back_populates="project")
+    sprints: List["JiraSprintEntity"] = Relationship(back_populates="project")

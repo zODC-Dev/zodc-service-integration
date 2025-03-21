@@ -11,7 +11,7 @@ from src.domain.services.redis_service import IRedisService
 from src.infrastructure.entities.jira_user import JiraUserEntity
 
 
-class SQLAlchemyUserRepository(IJiraUserRepository):
+class SQLAlchemyJiraUserRepository(IJiraUserRepository):
     def __init__(
         self,
         session: AsyncSession,
@@ -45,20 +45,12 @@ class SQLAlchemyUserRepository(IJiraUserRepository):
         users = result.all()
         return [self._to_domain(user) for user in users]
 
-    async def create_user(self, user: JiraUserCreateDTO) -> JiraUserModel:
-        try:
-            # Check if user already exists
-            existing_user = await self.get_user_by_email(user.email)
-            if existing_user:
-                raise ValueError("User already exists")
-
-            db_user = JiraUserEntity(**user.model_dump())
-            self.session.add(db_user)
-            await self.session.commit()
-            return self._to_domain(db_user)
-        except Exception as e:
-            log.error(f"Error creating user: {str(e)}")
-            raise e
+    async def create_user(self, user_data: JiraUserCreateDTO) -> JiraUserModel:
+        user = JiraUserEntity(**user_data.model_dump())
+        self.session.add(user)
+        await self.session.commit()
+        await self.session.refresh(user)
+        return self._to_domain(user)
 
     async def update_user(self, user: JiraUserUpdateDTO) -> None:
         try:
@@ -83,14 +75,25 @@ class SQLAlchemyUserRepository(IJiraUserRepository):
             log.error(f"Error getting user by Jira account ID: {str(e)}")
             return None
 
+    async def get_user_by_account_id(self, jira_account_id: str) -> Optional[JiraUserModel]:
+        try:
+            result = await self.session.exec(
+                select(JiraUserEntity).where(JiraUserEntity.jira_account_id == jira_account_id)
+            )
+            user = result.first()
+            return self._to_domain(user) if user else None
+        except Exception as e:
+            log.error(f"Error getting user by account ID: {str(e)}")
+            return None
+
     def _to_domain(self, db_user: JiraUserEntity) -> JiraUserModel:
-        """Convert DB model to domain entity"""
+        if not db_user:
+            return None
         return JiraUserModel(
             id=db_user.id,
-            email=db_user.email,
-            user_id=db_user.user_id,
             jira_account_id=db_user.jira_account_id,
-            is_system_user=db_user.is_system_user,
-            created_at=db_user.created_at,
-            updated_at=db_user.updated_at
+            email=db_user.email,
+            name=db_user.name,
+            avatar_url=db_user.avatar_url,
+            is_system_user=db_user.is_system_user
         )

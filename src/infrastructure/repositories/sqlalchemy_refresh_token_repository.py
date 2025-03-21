@@ -6,7 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.models.refresh_token import RefreshTokenModel
+from src.domain.models.refresh_token import CreateRefreshTokenDTO, RefreshTokenModel
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.infrastructure.entities.refresh_token import RefreshTokenEntity
 
@@ -15,11 +15,11 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_refresh_token(self, refresh_token: RefreshTokenModel) -> RefreshTokenModel:
+    async def create_refresh_token(self, refresh_token_dto: CreateRefreshTokenDTO) -> RefreshTokenModel:
         """Create new refresh token and revoke old ones"""
         try:
             # Convert to UTC then remove timezone info for database
-            expires_at_utc = refresh_token.expires_at.astimezone(timezone.utc).replace(tzinfo=None)
+            expires_at_utc = refresh_token_dto.expires_at.astimezone(timezone.utc).replace(tzinfo=None)
             created_at_utc = datetime.now(timezone.utc).replace(tzinfo=None)
 
             # Revoke all existing non-revoked tokens for this user and type
@@ -27,8 +27,8 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
                 update(RefreshTokenEntity)
                 .where(
                     and_(
-                        RefreshTokenEntity.user_id == refresh_token.user_id,
-                        RefreshTokenEntity.token_type == refresh_token.token_type,
+                        RefreshTokenEntity.user_id == refresh_token_dto.user_id,
+                        RefreshTokenEntity.token_type == refresh_token_dto.token_type,
                         RefreshTokenEntity.is_revoked == False  # noqa: E712
                     )
                 )
@@ -38,11 +38,10 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
 
             # Create new token
             db_token = RefreshTokenEntity(
-                token=refresh_token.token,
-                user_id=refresh_token.user_id,
+                token=refresh_token_dto.token,
+                user_id=refresh_token_dto.user_id,
+                token_type=refresh_token_dto.token_type,
                 expires_at=expires_at_utc,
-                is_revoked=refresh_token.is_revoked,
-                token_type=refresh_token.token_type,
                 created_at=created_at_utc
             )
             self.session.add(db_token)

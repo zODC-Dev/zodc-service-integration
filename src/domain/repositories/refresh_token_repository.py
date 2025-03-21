@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.models.refresh_token import RefreshTokenModel
+from src.domain.models.refresh_token import CreateRefreshTokenDTO, RefreshTokenModel
 
 
 class IRefreshTokenRepository(ABC):
     @abstractmethod
-    async def create_refresh_token(self, refresh_token: RefreshTokenModel) -> RefreshTokenModel:
+    async def create_refresh_token(self, refresh_token_dto: CreateRefreshTokenDTO) -> RefreshTokenModel:
         """Create new refresh token"""
         pass
 

@@ -2,12 +2,12 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from src.domain.models.jira_project import JiraProjectCreateDTO, JiraProjectModel, JiraProjectUpdateDTO
-from src.domain.repositories.jira_project_repository import IProjectRepository
+from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 from src.domain.services.jira_project_database_service import IJiraProjectDatabaseService
 
 
 class JiraProjectDatabaseService(IJiraProjectDatabaseService):
-    def __init__(self, project_repository: IProjectRepository):
+    def __init__(self, project_repository: IJiraProjectRepository):
         self.project_repository = project_repository
 
     async def get_project(self, project_id: int) -> Optional[JiraProjectModel]:

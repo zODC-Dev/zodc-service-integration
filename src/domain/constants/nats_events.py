@@ -18,6 +18,7 @@ class NATSSubscribeTopic(str, Enum):
     PROJECT_UNLINKED = "project.unlinked"
     PROJECT_USERS_REQUEST = "project.users.request"
     JIRA_ISSUES_SYNC = "jira.issues.sync"
+    JIRA_PROJECT_SYNC = "jira.project.sync"
 
 
 class NATSPublishTopic(str, Enum):

@@ -2,7 +2,7 @@ from typing import Any, Dict, Mapping
 
 from src.configs.logger import log
 from src.domain.services.nats_event_service import INATSEventService
-from src.domain.services.nats_message_handler import INATSMessageHandler
+from src.domain.services.nats_message_handler import INATSMessageHandler, INATSRequestHandler
 from src.domain.services.nats_service import INATSService
 
 
@@ -11,7 +11,7 @@ class NATSEventService(INATSEventService):
         self,
         nats_service: INATSService,
         message_handlers: Mapping[str, INATSMessageHandler],
-        request_handlers: Mapping[str, INATSMessageHandler]
+        request_handlers: Mapping[str, INATSRequestHandler]
     ):
         self.nats_service = nats_service
         self.message_handlers = message_handlers
@@ -43,7 +43,7 @@ class NATSEventService(INATSEventService):
     async def register_request_handler(
         self,
         subject: str,
-        handler: INATSMessageHandler
+        handler: INATSRequestHandler
     ) -> None:
         """Register a request handler for a subject"""
         async def request_callback(subject: str, data: Dict[str, Any]) -> Dict[str, Any]:

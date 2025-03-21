@@ -4,22 +4,33 @@ from src.app.controllers.jira_project_controller import JiraProjectController
 from src.app.dependencies.common import get_redis_service
 from src.app.dependencies.jira_user import get_jira_user_repository
 from src.app.dependencies.refresh_token import get_token_scheduler_service
+from src.app.dependencies.sync_log import get_sync_log_repository
 from src.app.services.jira_project_service import JiraProjectApplicationService
-from src.configs.database import get_db
-from src.domain.repositories.jira_project_repository import IProjectRepository
+from src.configs.database import get_db, session_maker
+from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
+from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
 from src.domain.services.jira_project_database_service import IJiraProjectDatabaseService
 from src.domain.services.redis_service import IRedisService
 from src.domain.services.token_scheduler_service import ITokenSchedulerService
-from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyProjectRepository
+from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
+from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
 from src.infrastructure.services.jira_project_api_service import JiraProjectAPIService
 from src.infrastructure.services.jira_project_database_service import JiraProjectDatabaseService
+from src.infrastructure.unit_of_works.sqlalchemy_jira_sync_session import SQLAlchemyJiraSyncSession
 
 
-def get_jira_project_repository(session=Depends(get_db)) -> IProjectRepository:
+def get_sqlalchemy_jira_sync_session(
+    redis_service: IRedisService = Depends(get_redis_service)
+) -> IJiraSyncSession:
+    """Get Jira sync session instance."""
+    return SQLAlchemyJiraSyncSession(session_maker, redis_service)
+
+
+def get_jira_project_repository(session=Depends(get_db)) -> IJiraProjectRepository:
     """Get a project repository instance."""
-    return SQLAlchemyProjectRepository(session)
+    return SQLAlchemyJiraProjectRepository(session)
 
 
 def get_jira_project_api_service(
@@ -32,7 +43,7 @@ def get_jira_project_api_service(
 
 
 def get_jira_project_db_service(
-    project_repository: IProjectRepository = Depends(get_jira_project_repository)
+    project_repository: IJiraProjectRepository = Depends(get_jira_project_repository)
 ) -> IJiraProjectDatabaseService:
     """Get Jira project database service instance."""
     return JiraProjectDatabaseService(project_repository)
@@ -40,15 +51,17 @@ def get_jira_project_db_service(
 
 def get_jira_project_application_service(
     api_service: IJiraProjectAPIService = Depends(get_jira_project_api_service),
-    db_service: IJiraProjectDatabaseService = Depends(get_jira_project_db_service)
+    db_service: IJiraProjectDatabaseService = Depends(get_jira_project_db_service),
+    sync_session: IJiraSyncSession = Depends(get_sqlalchemy_jira_sync_session),
+    sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository)
 ) -> JiraProjectApplicationService:
     """Get Jira project application service instance."""
-    return JiraProjectApplicationService(api_service, db_service)
+    return JiraProjectApplicationService(api_service, db_service, sync_session, sync_log_repository)
 
 
 def get_jira_project_controller(
     app_service: JiraProjectApplicationService = Depends(get_jira_project_application_service),
-    project_repository: IProjectRepository = Depends(get_jira_project_repository)
+    project_repository: IJiraProjectRepository = Depends(get_jira_project_repository)
 ) -> JiraProjectController:
     """Get Jira project controller instance."""
     return JiraProjectController(app_service, project_repository)

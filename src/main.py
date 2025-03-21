@@ -14,24 +14,31 @@ from src.app.routers.jira_webhook_router import router as jira_webhook_router
 from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
 from src.app.routers.util_router import router as util_router
 from src.app.services.jira_issue_service import JiraIssueApplicationService
+from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.nats_event_service import NATSEventService
 from src.app.services.nats_handlers.jira_issue_handler import JiraIssueMessageHandler, JiraIssueSyncRequestHandler
-from src.app.services.nats_handlers.login_message_handler import JiraLoginHandler, MicrosoftLoginHandler
+from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
+from src.app.services.nats_handlers.jira_project_sync_handler import JiraProjectSyncRequestHandler
+from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
 from src.app.services.nats_handlers.project_message_handler import ProjectMessageHandler
 from src.app.services.nats_handlers.user_message_handler import UserMessageHandler
-from src.configs.database import get_db, init_db
+from src.configs.database import get_db, init_db, session_maker
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.nats_events import NATSSubscribeTopic
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
-from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyProjectRepository
-from src.infrastructure.repositories.sqlalchemy_jira_user_repository import SQLAlchemyUserRepository
+from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
+from src.infrastructure.repositories.sqlalchemy_jira_user_repository import SQLAlchemyJiraUserRepository
 from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
+from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
 from src.infrastructure.services.jira_issue_service import JiraIssueService
+from src.infrastructure.services.jira_project_api_service import JiraProjectAPIService
+from src.infrastructure.services.jira_project_database_service import JiraProjectDatabaseService
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.redis_service import RedisService
 from src.infrastructure.services.token_refresh_service import TokenRefreshService
 from src.infrastructure.services.token_scheduler_service import TokenSchedulerService
+from src.infrastructure.unit_of_works.sqlalchemy_jira_sync_session import SQLAlchemyJiraSyncSession
 
 # Define Prometheus instrumentator first
 instrumentator = Instrumentator(
@@ -71,30 +78,38 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_generator = get_db()
     db = await anext(db_generator)
 
-    user_repository = SQLAlchemyUserRepository(db, redis_service)
+    user_repository = SQLAlchemyJiraUserRepository(db, redis_service)
     refresh_token_repository = SQLAlchemyRefreshTokenRepository(db)
-    project_repository = SQLAlchemyProjectRepository(db)
+    project_repository = SQLAlchemyJiraProjectRepository(db)
+    sync_log_repository = SQLAlchemySyncLogRepository(db)
 
     # Initialize token services
     token_refresh_service = TokenRefreshService(redis_service, user_repository, refresh_token_repository)
     token_scheduler_service = TokenSchedulerService(token_refresh_service, refresh_token_repository)
 
     # Initialize Jira services
-    jira_issue_service = JiraIssueService(redis_service, token_scheduler_service, user_repository)
+    jira_issue_service = JiraIssueService(redis_service, token_scheduler_service, user_repository, sync_log_repository)
 
     jira_issue_repository = SQLAlchemyJiraIssueRepository(db)
     jira_issue_application_service = JiraIssueApplicationService(
-        jira_issue_service, jira_issue_repository, nats_service)
+        jira_issue_service, jira_issue_repository, nats_service, sync_log_repository)
+
+    sync_session = SQLAlchemyJiraSyncSession(session_maker, redis_service)
+
+    jira_project_api_service = JiraProjectAPIService(redis_service, token_scheduler_service, user_repository)
+    jira_project_database_service = JiraProjectDatabaseService(project_repository)
+    jira_project_application_service = JiraProjectApplicationService(
+        jira_project_api_service, jira_project_database_service, sync_session, sync_log_repository)
 
     # Initialize NATS Message Handlers with correct dependencies
     message_handlers = {
         NATSSubscribeTopic.USER_EVENT.value: UserMessageHandler(redis_service),
-        NATSSubscribeTopic.MICROSOFT_LOGIN.value: MicrosoftLoginHandler(
+        NATSSubscribeTopic.MICROSOFT_LOGIN.value: MicrosoftLoginMessageHandler(
             redis_service=redis_service,
             user_repository=user_repository,
             refresh_token_repository=refresh_token_repository
         ),
-        NATSSubscribeTopic.JIRA_LOGIN.value: JiraLoginHandler(
+        NATSSubscribeTopic.JIRA_LOGIN.value: JiraLoginMessageHandler(
             redis_service=redis_service,
             user_repository=user_repository,
             refresh_token_repository=refresh_token_repository
@@ -105,7 +120,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize NATS Request Handlers
     request_handlers = {
-        NATSSubscribeTopic.JIRA_ISSUE_SYNC.value: JiraIssueSyncRequestHandler(jira_issue_application_service)
+        NATSSubscribeTopic.JIRA_ISSUE_SYNC.value: JiraIssueSyncRequestHandler(jira_issue_application_service),
+        NATSSubscribeTopic.JIRA_PROJECT_SYNC.value: JiraProjectSyncRequestHandler(
+            jira_project_application_service, sync_log_repository)
     }
 
     # Initialize and start NATS Event Service
@@ -142,7 +159,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             db_generator = get_db()
             db = await anext(db_generator)
             try:
-                user_repository = SQLAlchemyUserRepository(db, redis_service)
+                user_repository = SQLAlchemyJiraUserRepository(db, redis_service)
                 refresh_token_repository = SQLAlchemyRefreshTokenRepository(db)
                 token_refresh_service = TokenRefreshService(
                     redis_service,

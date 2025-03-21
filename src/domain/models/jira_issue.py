@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
-from src.domain.models.jira_project import JiraSprintModel
+from src.domain.models.jira_sprint import JiraSprintModel
 
 
 class JiraBaseModel(BaseModel):
@@ -32,7 +32,7 @@ class JiraIssuePriorityModel(JiraBaseModel):
 
 
 class JiraIssueModel(BaseModel):
-    jira_id: str
+    id: Optional[int] = None
     key: str
     summary: str
     description: Optional[str] = None
@@ -41,6 +41,7 @@ class JiraIssueModel(BaseModel):
     priority: Optional['JiraIssuePriorityModel'] = None
     type: JiraIssueType
     sprint: Optional['JiraSprintModel'] = None
+    sprint_id: Optional[int] = None
     estimate_point: float = Field(default=0)
     actual_point: Optional[float] = None
     created_at: datetime

@@ -4,7 +4,7 @@ from typing import List, Optional
 from src.domain.models.jira_project import JiraProjectCreateDTO, JiraProjectModel, JiraProjectUpdateDTO
 
 
-class IProjectRepository(ABC):
+class IJiraProjectRepository(ABC):
     @abstractmethod
     async def create_project(self, project_data: JiraProjectCreateDTO) -> JiraProjectModel:
         pass

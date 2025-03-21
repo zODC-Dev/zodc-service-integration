@@ -31,6 +31,7 @@ azure-storage-blob = "^12.24.0"
 nats-py = "^2.9.0"
 prometheus-fastapi-instrumentator = "^7.0.2"
 apscheduler = "^3.11.0"
+tenacity = "^9.0.0"
 
 
 [tool.poetry.group.dev.dependencies]

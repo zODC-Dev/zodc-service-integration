@@ -1,35 +1,24 @@
-from datetime import datetime
-from typing import Any, Dict, Optional
+# Remove duplicate JiraAPISprintResponse and JiraAPIProjectResponse
+# If this file is empty after removing duplicates, you can delete it
 
-from pydantic import BaseModel, Field
+from typing import Dict, Optional, Union
 
-from .base import JiraAPIResponseBase
-from .common import JiraAPIProjectBaseResponse, JiraAPIUserResponse
-
-
-class JiraAPIProjectResponse(JiraAPIProjectBaseResponse):
-    """Full project response with all fields"""
-    pass
+from pydantic import BaseModel
 
 
-class JiraAPIProjectIssueResponse(JiraAPIResponseBase):
+class JiraAPIProjectResponse(BaseModel):
     id: str
     key: str
-    fields: Dict[str, Any]
-
-
-class JiraAPIProjectSprintResponse(BaseModel):
-    id: int
     name: str
-    state: str
-    start_date: Optional[datetime] = Field(alias="startDate")
-    end_date: Optional[datetime] = Field(alias="endDate")
-    goal: Optional[str]
+    description: Optional[str] = None
+    avatarUrls: Union[Dict[str, str], str, None] = None  # Can be dict, string or None
+    projectTypeKey: str
+    simplified: bool = False
+    style: str = ""
+    isPrivate: bool = False
+    properties: Dict[str, str] = {}
+    entityId: Optional[str] = None
+    uuid: Optional[str] = None
 
     class Config:
-        populate_by_name = True
-
-
-class JiraAPIProjectUserResponse(JiraAPIUserResponse):
-    """Project-specific user response"""
-    pass
+        extra = "allow"  # Cho phép các trường khác trong response mà không cần định nghĩa

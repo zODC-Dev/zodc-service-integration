@@ -3,12 +3,12 @@ from typing import Any, Dict
 from src.configs.logger import log
 from src.domain.models.jira_project import JiraProjectCreateDTO, JiraProjectUpdateDTO
 from src.domain.models.nats_event import ProjectLinkEvent, ProjectUnlinkEvent
-from src.domain.repositories.jira_project_repository import IProjectRepository
+from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 from src.domain.services.nats_message_handler import INATSMessageHandler
 
 
 class ProjectMessageHandler(INATSMessageHandler):
-    def __init__(self, project_repository: IProjectRepository):
+    def __init__(self, project_repository: IJiraProjectRepository):
         self.project_repository = project_repository
 
     async def handle(self, subject: str, message: Dict[str, Any]) -> None:

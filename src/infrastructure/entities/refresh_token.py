@@ -11,7 +11,7 @@ class RefreshTokenEntity(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     token: str = Field(index=True, unique=True)
-    user_id: int = Field(foreign_key="users.user_id")
+    user_id: int = Field(foreign_key="jira_users.user_id")
     token_type: TokenType = Field(...)
     expires_at: datetime
     is_revoked: bool = Field(default=False)

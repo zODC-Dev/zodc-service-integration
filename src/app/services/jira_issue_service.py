@@ -5,23 +5,28 @@ from src.app.dtos.jira.jira_sync_dto import JiraBatchSyncRequestDTO, JiraIssueSy
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueType
 from src.domain.constants.nats_events import NATSPublishTopic
+from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.models.jira_issue import JiraIssueCreateDTO, JiraIssueUpdateDTO
 from src.domain.models.nats_event import JiraActionType
+from src.domain.models.sync_log import SyncLogCreateDTO
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
-from src.domain.services.jira_issue_service import IJiraIssueService
+from src.domain.repositories.sync_log_repository import ISyncLogRepository
+from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.nats_service import INATSService
 
 
 class JiraIssueApplicationService:
     def __init__(
         self,
-        jira_issue_service: IJiraIssueService,
+        jira_issue_service: IJiraIssueDatabaseService,
         jira_issue_repository: IJiraIssueRepository,
-        nats_service: INATSService
+        nats_service: INATSService,
+        sync_log_repository: ISyncLogRepository
     ):
         self.jira_issue_service = jira_issue_service
         self.jira_issue_repository = jira_issue_repository
         self.nats_service = nats_service
+        self.sync_log_repository = sync_log_repository
 
     async def handle_sync_request(
         self,
@@ -96,11 +101,26 @@ class JiraIssueApplicationService:
         """Handle Jira webhook update"""
         try:
             issue_id = webhook_data["issue"]["id"]
+
+            # Log the webhook sync
+            await self.sync_log_repository.create_sync_log(
+                SyncLogCreateDTO(
+                    entity_type=EntityType.ISSUE,
+                    entity_id=issue_id,
+                    operation=OperationType.SYNC,
+                    request_payload=webhook_data,
+                    response_status=200,  # Webhook processing status
+                    response_body={},
+                    source=SourceType.WEBHOOK,
+                    sender=None
+                )
+            )
+
             updated_at = datetime.fromisoformat(
                 webhook_data["issue"]["fields"]["updated"]
             )
 
-            issue = await self.jira_issue_repository.get_by_jira_id(issue_id)
+            issue = await self.jira_issue_repository.get_by_jira_issue_id(issue_id)
             if not issue:
                 return
 
@@ -112,6 +132,19 @@ class JiraIssueApplicationService:
             await self._update_sync_status(issue_id, updated_at)
 
         except Exception as e:
+            # Log error if sync fails
+            if 'issue_id' in locals():
+                await self.sync_log_repository.create_sync_log(
+                    entity_type=EntityType.ISSUE,
+                    entity_id=issue_id,
+                    operation=OperationType.SYNC,
+                    request_payload=webhook_data,
+                    response_status=500,
+                    response_body={},
+                    source=SourceType.WEBHOOK,
+                    sender=None,
+                    error_message=str(e)
+                )
             log.error(f"Error handling webhook update: {str(e)}")
 
     async def _validate_update_request(
@@ -120,7 +153,7 @@ class JiraIssueApplicationService:
         client_updated_at: str
     ) -> Dict[str, Any]:
         """Validate update request"""
-        current_issue = await self.jira_issue_repository.get_by_jira_id(issue_id)
+        current_issue = await self.jira_issue_repository.get_by_jira_issue_id(issue_id)
         if not current_issue:
             return {
                 "is_valid": False,
@@ -148,7 +181,7 @@ class JiraIssueApplicationService:
         await self.jira_issue_service.update_issue(user_id, issue_id, update)
 
         # Đánh dấu đã update locally
-        issue = await self.jira_issue_repository.get_by_jira_id(issue_id)
+        issue = await self.jira_issue_repository.get_by_jira_issue_id(issue_id)
         if issue:
             issue.updated_locally = True
             await self.jira_issue_repository.update(issue)
@@ -175,7 +208,7 @@ class JiraIssueApplicationService:
         updated_at: datetime
     ) -> None:
         """Update issue sync status"""
-        issue = await self.jira_issue_repository.get_by_jira_id(issue_id)
+        issue = await self.jira_issue_repository.get_by_jira_issue_id(issue_id)
         if issue:
             issue.updated_at = updated_at
             issue.last_synced_at = datetime.now(timezone.utc)
@@ -240,7 +273,7 @@ class JiraIssueApplicationService:
             return JiraIssueSyncResponseDTO(
                 success=True,
                 action_type=JiraActionType.CREATE,
-                issue_id=issue.jira_id
+                issue_id=issue.jira_issue_id
             )
         except Exception as e:
             return JiraIssueSyncResponseDTO(
@@ -269,7 +302,7 @@ class JiraIssueApplicationService:
             return JiraIssueSyncResponseDTO(
                 success=True,
                 action_type=JiraActionType.UPDATE,
-                issue_id=issue.jira_id
+                issue_id=issue.jira_issue_id
             )
         except Exception as e:
             return JiraIssueSyncResponseDTO(

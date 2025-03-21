@@ -1,26 +1,29 @@
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr
-
-from .base import BaseDomainModel
+from pydantic import BaseModel
 
 
-class JiraUserModel(BaseDomainModel):
+class JiraUserModel(BaseModel):
     id: Optional[int] = None
-    email: EmailStr
-    user_id: int
-    jira_account_id: Optional[str] = None
+    jira_account_id: str
+    email: str
+    avatar_url: Optional[str] = ""
     is_system_user: bool = False
+    name: Optional[str] = ""
+
+    class Config:
+        from_attributes = True
 
 
 class JiraUserCreateDTO(BaseModel):
-    email: EmailStr
-    user_id: int
-    jira_account_id: Optional[str] = None
+    jira_account_id: str
+    email: str
+    avatar_url: str = ""
     is_system_user: bool = False
 
 
 class JiraUserUpdateDTO(BaseModel):
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     jira_account_id: Optional[str] = None
     is_system_user: Optional[bool] = None
+    avatar_url: Optional[str] = None

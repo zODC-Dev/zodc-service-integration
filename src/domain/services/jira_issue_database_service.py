@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from src.domain.models.jira_issue import JiraIssueCreateDTO, JiraIssueModel, JiraIssueUpdateDTO
 
 
-class IJiraIssueService(ABC):
+class IJiraIssueDatabaseService(ABC):
     @abstractmethod
     async def get_issue(self, user_id: int, issue_id: str) -> JiraIssueModel:
         pass

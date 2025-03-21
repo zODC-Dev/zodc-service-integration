@@ -2,6 +2,7 @@ from typing import Optional
 
 from src.app.schemas.responses.base import BaseResponse
 from src.domain.models.jira_project import JiraProjectModel
+from src.domain.models.jira_sprint import JiraSprintModel
 
 
 class GetJiraProjectResponse(BaseResponse):
@@ -28,3 +29,11 @@ class GetJiraSprintResponse(BaseResponse):
     id: int
     name: str
     state: str  # active, closed, future
+
+    @classmethod
+    def from_domain(cls, sprint: JiraSprintModel) -> "GetJiraSprintResponse":
+        return cls(
+            id=sprint.id,
+            name=sprint.name,
+            state=sprint.state.value
+        )
