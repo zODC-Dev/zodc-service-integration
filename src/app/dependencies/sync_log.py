@@ -6,4 +6,5 @@ from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAl
 
 
 def get_sync_log_repository(session=Depends(get_db)) -> ISyncLogRepository:
+    """Get the sync log repository."""
     return SQLAlchemySyncLogRepository(session)

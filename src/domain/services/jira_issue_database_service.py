@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import List, Optional
 
+from src.domain.constants.jira import JiraIssueType
 from src.domain.models.jira_issue import JiraIssueCreateDTO, JiraIssueModel, JiraIssueUpdateDTO
 
 
@@ -27,15 +29,16 @@ class IJiraIssueDatabaseService(ABC):
         """Update an existing Jira issue"""
         pass
 
-    # @abstractmethod
-    # async def get_project_issues(
-    #     self,
-    #     user_id: int,
-    #     project_key: str,
-    #     sprint_id: Optional[str] = None,
-    #     is_backlog: Optional[bool] = None,
-    #     issue_type: Optional[JiraIssueType] = None,
-    #     search: Optional[str] = None,
-    #     limit: int = 50
-    # ) -> List[JiraIssueModel]:
-    #     pass
+    @abstractmethod
+    async def get_project_issues(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: Optional[str] = None,
+        is_backlog: Optional[bool] = None,
+        issue_type: Optional[JiraIssueType] = None,
+        search: Optional[str] = None,
+        limit: int = 50
+    ) -> List[JiraIssueModel]:
+        """Get project issues from database"""
+        pass

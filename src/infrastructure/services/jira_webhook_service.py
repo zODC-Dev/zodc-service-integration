@@ -14,5 +14,5 @@ class JiraWebhookService(IJiraWebhookService):
         self.jira_issue_service = jira_issue_service
 
     async def handle_webhook(self, payload: Dict[str, Any]) -> None:
-        """Delegate to JiraIssueService"""
+        """Delegate to JiraIssueDatabaseService"""
         await self.jira_issue_service.handle_webhook_update(payload)

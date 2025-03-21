@@ -56,7 +56,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             if not sprint:
                 return None
 
-            data = self._prepare_data(sprint_data.model_dump(exclude_unset=True))
+            data = self._prepare_data(sprint_data.model_dump())
             for key, value in data.items():
                 setattr(sprint, key, value)
 

@@ -77,3 +77,13 @@ class JiraProjectMapper:
                 avatar_url=avatar_url,
                 is_system_user=False
             )
+
+    @staticmethod
+    def to_domain_project(api_response: JiraAPIProjectResponse) -> JiraProjectModel:
+        return JiraProjectModel(
+            jira_project_id=api_response.id,
+            key=api_response.key,
+            name=api_response.name,
+            description=api_response.description or "",
+            avatar_url=api_response.avatarUrls.get("48x48", "")
+        )

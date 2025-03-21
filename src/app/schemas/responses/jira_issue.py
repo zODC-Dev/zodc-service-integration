@@ -5,6 +5,8 @@ from pydantic import BaseModel
 
 from src.app.schemas.responses.base import BaseResponse
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
+from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_sprint import JiraSprintModel
 
 
 class JiraAssigneeResponse(BaseModel):
@@ -23,16 +25,21 @@ class JiraIssuePriorityResponse(BaseModel):
 
 
 class JiraIssueSprintResponse(BaseModel):
-    id: int
+    id: Optional[int] = None
     name: str
     state: str
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    goal: Optional[str] = None
+
+    @classmethod
+    def from_domain(cls, sprint: JiraSprintModel) -> "JiraIssueSprintResponse":
+        return cls(
+            id=sprint.jira_sprint_id,
+            name=sprint.name,
+            state=sprint.state,
+        )
 
 
 class GetJiraIssueResponse(BaseResponse):
-    id: str
+    id: Optional[int] = None
     key: str
     summary: str
     assignee: Optional[JiraAssigneeResponse] = None
@@ -42,9 +49,36 @@ class GetJiraIssueResponse(BaseResponse):
     estimate_point: float = 0
     actual_point: Optional[float] = None
     description: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     status: JiraIssueStatus
+    is_system_linked: bool = False
+
+    @classmethod
+    def from_domain(cls, issue: JiraIssueModel, sprint_number: Optional[int] = None) -> "GetJiraIssueResponse":
+
+        current_sprint: Optional[JiraIssueSprintResponse] = None
+        if issue.sprints:
+            current_sprint = JiraIssueSprintResponse.from_domain(
+                next((sprint for sprint in issue.sprints if (
+                    sprint and sprint.jira_sprint_id == sprint_number)), None)
+            )
+
+        return cls(
+            id=issue.id,
+            key=issue.key,
+            summary=issue.summary,
+            assignee=issue.assignee,
+            priority=issue.priority,
+            type=issue.type,
+            sprint=current_sprint,
+            status=issue.status,
+            estimate_point=issue.estimate_point,
+            actual_point=issue.actual_point,
+            description=issue.description,
+            created_at=issue.created_at,
+            is_system_linked=issue.is_system_linked
+        )
 
 
 class JiraCreateIssueResponse(BaseResponse):

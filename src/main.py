@@ -31,7 +31,7 @@ from src.infrastructure.repositories.sqlalchemy_jira_project_repository import S
 from src.infrastructure.repositories.sqlalchemy_jira_user_repository import SQLAlchemyJiraUserRepository
 from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
-from src.infrastructure.services.jira_issue_service import JiraIssueService
+from src.infrastructure.services.jira_issue_database_service import JiraIssueDatabaseService
 from src.infrastructure.services.jira_project_api_service import JiraProjectAPIService
 from src.infrastructure.services.jira_project_database_service import JiraProjectDatabaseService
 from src.infrastructure.services.nats_service import NATSService
@@ -87,19 +87,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     token_refresh_service = TokenRefreshService(redis_service, user_repository, refresh_token_repository)
     token_scheduler_service = TokenSchedulerService(token_refresh_service, refresh_token_repository)
 
-    # Initialize Jira services
-    jira_issue_service = JiraIssueService(redis_service, token_scheduler_service, user_repository, sync_log_repository)
-
     jira_issue_repository = SQLAlchemyJiraIssueRepository(db)
+    # Initialize Jira services
+    jira_issue_database_service = JiraIssueDatabaseService(
+        jira_issue_repository
+    )
+
     jira_issue_application_service = JiraIssueApplicationService(
-        jira_issue_service, jira_issue_repository, nats_service, sync_log_repository)
+        jira_issue_database_service, jira_issue_repository, nats_service, sync_log_repository)
 
     sync_session = SQLAlchemyJiraSyncSession(session_maker, redis_service)
 
     jira_project_api_service = JiraProjectAPIService(redis_service, token_scheduler_service, user_repository)
     jira_project_database_service = JiraProjectDatabaseService(project_repository)
     jira_project_application_service = JiraProjectApplicationService(
-        jira_project_api_service, jira_project_database_service, sync_session, sync_log_repository)
+        jira_project_api_service,
+        jira_project_database_service,
+        jira_issue_database_service,
+        sync_session,
+        sync_log_repository
+    )
 
     # Initialize NATS Message Handlers with correct dependencies
     message_handlers = {

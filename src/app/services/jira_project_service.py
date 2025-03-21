@@ -17,6 +17,7 @@ from src.domain.models.jira_sprint import JiraSprintCreateDTO, JiraSprintModel, 
 from src.domain.models.jira_user import JiraUserCreateDTO, JiraUserModel, JiraUserUpdateDTO
 from src.domain.models.sync_log import SyncLogCreateDTO
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
+from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
 from src.domain.services.jira_project_database_service import IJiraProjectDatabaseService
 from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
@@ -29,11 +30,13 @@ class JiraProjectApplicationService:
         self,
         jira_project_api_service: IJiraProjectAPIService,
         jira_project_db_service: IJiraProjectDatabaseService,
+        jira_issue_db_service: IJiraIssueDatabaseService,
         sync_session: IJiraSyncSession,
         sync_log_repository: ISyncLogRepository
     ):
         self.jira_project_api_service = jira_project_api_service
         self.jira_project_db_service = jira_project_db_service
+        self.jira_issue_db_service = jira_issue_db_service
         self.sync_session = sync_session
         self.sync_log_repository = sync_log_repository
 
@@ -47,7 +50,8 @@ class JiraProjectApplicationService:
         search: Optional[str] = None,
         limit: int = 50
     ) -> List[JiraIssueModel]:
-        return await self.jira_project_api_service.get_project_issues(
+        # Thay vì gọi API service, gọi database service
+        return await self.jira_issue_db_service.get_project_issues(
             user_id=user_id,
             project_key=project_key,
             sprint_id=sprint_id,
@@ -75,10 +79,6 @@ class JiraProjectApplicationService:
                     jira_project_id=project.jira_project_id,
                     avatar_url=project.avatar_url,
                     description=project.description,
-                    project_type=project.project_type,
-                    is_private=project.is_private,
-                    entity_id=project.entity_id,
-                    last_synced_at=datetime.now(timezone.utc)
                 )
                 await self.jira_project_db_service.create_project(create_dto)
 
@@ -110,7 +110,7 @@ class JiraProjectApplicationService:
     async def sync_project(self, request: JiraProjectSyncRequestDTO) -> JiraProjectSyncResponseDTO:
         try:
             log.info(f"Starting sync for project {request.project_key}")
-
+            started_at = datetime.now(timezone.utc)
             async with self.sync_session as session:
                 # Sync project details
                 log.info("Syncing project details...")
@@ -132,8 +132,11 @@ class JiraProjectApplicationService:
                 log.info(f"Successfully completed sync for project {request.project_key}")
 
                 return JiraProjectSyncResponseDTO(
-                    project=project,
+                    success=True,
+                    project_key=request.project_key,
                     sync_summary=JiraProjectSyncSummaryDTO(
+                        started_at=started_at.isoformat(),
+                        completed_at=datetime.now(timezone.utc).isoformat(),
                         total_sprints=len(sprint_id_mapping),
                         total_issues=len(issues)
                     )
@@ -310,7 +313,6 @@ class JiraProjectApplicationService:
     ) -> List[JiraIssueModel]:
         """Sync all project issues from Jira API to database"""
         try:
-            # Get and sync issues directly without sprint mapping
             jira_issues = await self.jira_project_api_service.get_project_issues(
                 user_id=user_id,
                 project_key=project_key,
@@ -320,22 +322,27 @@ class JiraProjectApplicationService:
             synced_issues = []
             for jira_issue in jira_issues:
                 try:
-                    # Map the issue without sprint ID mapping
+                    # Map the issue to domain model
                     # mapped_issue = JiraIssueMapper.to_domain_issue(jira_issue)
 
                     # Check if issue exists
-                    existing_issue = await session.issue_repository.get_by_jira_issue_id(jira_issue.jira_issue_id)
+                    existing_issue = await session.issue_repository.get_by_jira_issue_id(
+                        jira_issue.jira_issue_id
+                    )
 
                     if existing_issue:
                         if jira_issue.updated_at > existing_issue.last_synced_at:
+                            # Update existing issue with new data
                             updated_issue = await session.issue_repository.update(jira_issue)
                             synced_issues.append(updated_issue)
                     else:
+                        # Create new issue
                         new_issue = await session.issue_repository.create(jira_issue)
                         synced_issues.append(new_issue)
 
                 except Exception as e:
                     log.error(f"Error syncing issue {jira_issue.key}: {str(e)}")
+                    await session.rollback()
                     continue
 
             return synced_issues

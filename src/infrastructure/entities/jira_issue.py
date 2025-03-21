@@ -1,9 +1,10 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlmodel import DateTime, Field, Relationship
 
 from src.infrastructure.entities.base import BaseEntityWithTimestamps
+from src.infrastructure.entities.jira_issue_sprint import JiraIssueSprintEntity
 
 if TYPE_CHECKING:
     from src.infrastructure.entities.jira_project import JiraProjectEntity
@@ -28,18 +29,22 @@ class JiraIssueEntity(BaseEntityWithTimestamps, table=True):
     reporter_id: Optional[str] = Field(default=None, foreign_key="jira_users.jira_account_id")
     last_synced_at: datetime = Field(sa_type=DateTime(timezone=True))
     updated_locally: bool = Field(default=False)
-    sprint_id: int = Field(default=None, foreign_key="jira_sprints.jira_sprint_id")
     assignee_id: Optional[str] = Field(default=None, foreign_key="jira_users.jira_account_id")
     created_at: datetime = Field(sa_type=DateTime(timezone=True))
     updated_at: datetime = Field(sa_type=DateTime(timezone=True))
+    is_system_linked: bool = Field(default=False)
 
     project: "JiraProjectEntity" = Relationship(back_populates="jira_issues")
-    sprint: Optional["JiraSprintEntity"] = Relationship(back_populates="issues")
+    sprints: List["JiraSprintEntity"] = Relationship(
+        back_populates="issues",
+        link_model=JiraIssueSprintEntity,
+        sa_relationship_kwargs={'lazy': 'selectin'}
+    )
     assignee: Optional["JiraUserEntity"] = Relationship(
         back_populates="assigned_issues",
-        sa_relationship_kwargs={"foreign_keys": "[JiraIssueEntity.assignee_id]"}
+        sa_relationship_kwargs={"foreign_keys": "[JiraIssueEntity.assignee_id]", "lazy": "selectin"}
     )
     reporter: Optional["JiraUserEntity"] = Relationship(
         back_populates="reported_issues",
-        sa_relationship_kwargs={"foreign_keys": "[JiraIssueEntity.reporter_id]"}
+        sa_relationship_kwargs={"foreign_keys": "[JiraIssueEntity.reporter_id]", "lazy": "selectin"}
     )

@@ -14,12 +14,6 @@ from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAl
 class SQLAlchemyJiraSyncSession(IJiraSyncSession):
     def __init__(self, session_maker: Callable[[], AsyncSession], redis_service: IRedisService):
         self._session_maker = session_maker
-        self.session: AsyncSession = None
-        self.project_repository = None
-        self.issue_repository = None
-        self.sprint_repository = None
-        self.user_repository = None
-        self.sync_log_repository = None
         self.redis_service = redis_service
 
     async def __aenter__(self):

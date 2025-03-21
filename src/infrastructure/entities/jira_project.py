@@ -19,7 +19,7 @@ class JiraProjectEntity(BaseEntityWithTimestamps, table=True):
     key: str = Field(unique=True, index=True)
     avatar_url: Optional[str] = None
     description: Optional[str] = None
-    is_jira_linked: bool = Field(default=False)
+    is_system_linked: bool = Field(default=False)
 
     # Relationships
     jira_issues: List["JiraIssueEntity"] = Relationship(back_populates="project")

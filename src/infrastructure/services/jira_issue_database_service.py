@@ -1,0 +1,98 @@
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from src.domain.constants.jira import JiraIssueType
+from src.domain.models.jira_issue import (
+    JiraIssueCreateDTO,
+    JiraIssueModel,
+    JiraIssueStatus,
+    JiraIssueUpdateDTO,
+)
+from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
+from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
+
+
+class JiraIssueDatabaseService(IJiraIssueDatabaseService):
+    def __init__(
+        self,
+        issue_repository: IJiraIssueRepository,
+    ):
+        self.issue_repository = issue_repository
+
+    async def get_issue(self, user_id: int, issue_id: str) -> Optional[JiraIssueModel]:
+        """Get issue from database by ID"""
+        return await self.issue_repository.get_by_jira_issue_id(issue_id)
+
+    async def create_issue(self, user_id: int, issue: JiraIssueCreateDTO) -> JiraIssueModel:
+        """Create a new issue in database"""
+        now = datetime.now(timezone.utc)
+
+        new_issue = JiraIssueModel(
+            jira_issue_id=issue.jira_issue_id,
+            key=issue.key,
+            summary=issue.summary,
+            description=issue.description,
+            status=JiraIssueStatus.TO_DO,  # Default status for new issues
+            type=issue.issue_type,
+            estimate_point=issue.estimate_points or 0,
+            actual_point=None,
+            created_at=now,
+            updated_at=now,
+            project_key=issue.project_key,
+            last_synced_at=None,
+            reporter_id=user_id,
+            assignee_id=issue.assignee,
+            needs_sync=True  # Mark as needing sync with Jira
+        )
+
+        return await self.issue_repository.create(new_issue)
+
+    async def update_issue(
+        self,
+        user_id: int,
+        issue_id: str,
+        update: JiraIssueUpdateDTO
+    ) -> JiraIssueModel:
+        """Update an existing issue in database"""
+        current_issue = await self.issue_repository.get_by_jira_issue_id(issue_id)
+        if not current_issue:
+            raise ValueError(f"Issue {issue_id} not found in database")
+
+        # Update fields
+        if update.summary:
+            current_issue.summary = update.summary
+        if update.description:
+            current_issue.description = update.description
+        if update.assignee:
+            current_issue.assignee_id = update.assignee
+        if update.estimate_points is not None:
+            current_issue.estimate_point = update.estimate_points
+        if update.actual_points is not None:
+            current_issue.actual_point = update.actual_points
+        if update.status:
+            current_issue.status = update.status
+
+        current_issue.updated_at = datetime.now(timezone.utc)
+        current_issue.needs_sync = True  # Mark as needing sync with Jira
+
+        return await self.issue_repository.update(current_issue)
+
+    async def get_project_issues(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: Optional[str] = None,
+        is_backlog: Optional[bool] = None,
+        issue_type: Optional[JiraIssueType] = None,
+        search: Optional[str] = None,
+        limit: int = 50
+    ) -> List[JiraIssueModel]:
+        """Get project issues from database with filters"""
+        return await self.issue_repository.get_project_issues(
+            project_key=project_key,
+            sprint_id=sprint_id,
+            is_backlog=is_backlog,
+            issue_type=issue_type,
+            search=search,
+            limit=limit
+        )

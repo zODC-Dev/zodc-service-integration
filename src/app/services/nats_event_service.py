@@ -479,5 +479,5 @@ class NATSEventService(INATSEventService):
     #     subject: str,
     #     message: Dict[str, Any]
     # ) -> None:
-    #     """Delegate to JiraIssueService"""
+    #     """Delegate to JiraIssueDatabaseService"""
     #     await self.jira_issue_service.handle_update_request(message)

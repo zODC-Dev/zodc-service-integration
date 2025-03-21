@@ -2,6 +2,7 @@ from fastapi import Depends
 
 from src.app.controllers.jira_project_controller import JiraProjectController
 from src.app.dependencies.common import get_redis_service
+from src.app.dependencies.jira_issue import get_jira_issue_database_service
 from src.app.dependencies.jira_user import get_jira_user_repository
 from src.app.dependencies.refresh_token import get_token_scheduler_service
 from src.app.dependencies.sync_log import get_sync_log_repository
@@ -10,6 +11,7 @@ from src.configs.database import get_db, session_maker
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
+from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
 from src.domain.services.jira_project_database_service import IJiraProjectDatabaseService
 from src.domain.services.redis_service import IRedisService
@@ -50,13 +52,20 @@ def get_jira_project_db_service(
 
 
 def get_jira_project_application_service(
-    api_service: IJiraProjectAPIService = Depends(get_jira_project_api_service),
-    db_service: IJiraProjectDatabaseService = Depends(get_jira_project_db_service),
+    jira_project_api_service: IJiraProjectAPIService = Depends(get_jira_project_api_service),
+    jira_project_db_service: IJiraProjectDatabaseService = Depends(get_jira_project_db_service),
+    jira_issue_db_service: IJiraIssueDatabaseService = Depends(get_jira_issue_database_service),
     sync_session: IJiraSyncSession = Depends(get_sqlalchemy_jira_sync_session),
     sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository)
 ) -> JiraProjectApplicationService:
     """Get Jira project application service instance."""
-    return JiraProjectApplicationService(api_service, db_service, sync_session, sync_log_repository)
+    return JiraProjectApplicationService(
+        jira_project_api_service,
+        jira_project_db_service,
+        jira_issue_db_service,
+        sync_session,
+        sync_log_repository
+    )
 
 
 def get_jira_project_controller(

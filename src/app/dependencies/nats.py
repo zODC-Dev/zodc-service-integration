@@ -37,7 +37,7 @@ def get_nats_event_service(
         NATSSubscribeTopic.MICROSOFT_LOGIN.value:
             MicrosoftLoginMessageHandler(redis_service, user_repository, refresh_token_repository),
         NATSSubscribeTopic.JIRA_LOGIN.value:
-            JiraLoginMessageHandler(redis_service, user_repository, refresh_token_repository),
+            JiraLoginMessageHandler(user_repository, refresh_token_repository, redis_service),
         NATSSubscribeTopic.JIRA_ISSUE_UPDATE.value:
             JiraIssueMessageHandler(jira_issue_application_service)
     }

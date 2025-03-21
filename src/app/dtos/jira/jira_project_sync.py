@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
@@ -20,8 +19,8 @@ class JiraProjectSyncSummaryDTO(BaseModel):
     synced_sprints: int = 0
     total_users: int = 0
     synced_users: int = 0
-    started_at: datetime
-    completed_at: Optional[datetime] = None
+    started_at: str
+    completed_at: Optional[str] = None
 
 
 class JiraProjectSyncResponseDTO(BaseModel):

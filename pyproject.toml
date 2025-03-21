@@ -79,6 +79,7 @@ ignore = [
     "D106",  # missing docstring in nested class
     "D107",  # missing docstring in __init__
     "B008",  # Do not perform function call in argument defaults;
+    "N815",  # Mixcase variable name
 ]
 
 [tool.ruff.lint.pydocstyle]

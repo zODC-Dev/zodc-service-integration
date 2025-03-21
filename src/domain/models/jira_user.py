@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class JiraUserModel(BaseModel):
     id: Optional[int] = None
+    user_id: Optional[int] = None
     jira_account_id: str
     email: str
     avatar_url: Optional[str] = ""

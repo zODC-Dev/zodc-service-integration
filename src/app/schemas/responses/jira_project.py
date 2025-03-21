@@ -11,7 +11,7 @@ class GetJiraProjectResponse(BaseResponse):
     name: str
     description: Optional[str] = None
     avatar_url: Optional[str] = None
-    is_jira_linked: bool = False
+    is_system_linked: bool = False
 
     @classmethod
     def from_domain(cls, project: JiraProjectModel) -> "GetJiraProjectResponse":
@@ -21,7 +21,7 @@ class GetJiraProjectResponse(BaseResponse):
             name=project.name,
             description=project.description,
             avatar_url=project.avatar_url,
-            is_jira_linked=project.is_jira_linked
+            is_system_linked=project.is_system_linked
         )
 
 

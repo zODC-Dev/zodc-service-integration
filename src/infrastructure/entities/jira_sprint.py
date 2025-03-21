@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, List, Optional
 from sqlmodel import DateTime, Field, Relationship
 
 from src.infrastructure.entities.base import BaseEntityWithTimestamps
+from src.infrastructure.entities.jira_issue_sprint import JiraIssueSprintEntity
 
 if TYPE_CHECKING:
     from src.infrastructure.entities.jira_issue import JiraIssueEntity
@@ -27,7 +28,11 @@ class JiraSprintEntity(BaseEntityWithTimestamps, table=True):
 
     # Relationships
     project: "JiraProjectEntity" = Relationship(back_populates="sprints")
-    issues: List["JiraIssueEntity"] = Relationship(back_populates="sprint")
+    issues: List["JiraIssueEntity"] = Relationship(
+        back_populates="sprints",
+        link_model=JiraIssueSprintEntity,
+        sa_relationship_kwargs={'lazy': 'selectin'}
+    )
 
     created_at: datetime = Field(sa_type=DateTime(timezone=True))
     updated_at: Optional[datetime] = Field(sa_type=DateTime(timezone=True))

@@ -38,7 +38,7 @@ class ProjectMessageHandler(INATSMessageHandler):
         if project and project.id:
             await self.project_repository.update_project(
                 project.id,
-                JiraProjectUpdateDTO(is_jira_linked=False)
+                JiraProjectUpdateDTO(is_system_linked=False)
             )
             log.info(f"Project {project.name} unlinked successfully")
         else:

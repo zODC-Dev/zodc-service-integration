@@ -283,5 +283,5 @@ class JiraProjectAPIService(IJiraProjectAPIService):
                     await response.text()
                 )
 
-            data: Dict[str, Any] = await response.json()
+            data: Dict[str, List[Dict[str, Any]]] = await response.json()
             return data.get("values", [])

@@ -37,7 +37,7 @@ class JiraProjectController:
         limit: int = 50
     ) -> StandardResponse[List[GetJiraIssueResponse]]:
         try:
-            log.info(f"User {user_id} is fetching issues for project {project_key}")
+            log.info(f"User {user_id} is fetching issues for project {project_key} from database")
             issues = await self.jira_project_service.get_project_issues(
                 user_id=user_id,
                 project_key=project_key,
@@ -48,32 +48,14 @@ class JiraProjectController:
                 limit=limit
             )
             return StandardResponse(
-                message="Issues fetched successfully",
-                data=[GetJiraIssueResponse(**issue.model_dump()) for issue in issues]
+                message="Issues fetched successfully from database",
+                data=[GetJiraIssueResponse.from_domain(issue, int(sprint_id)) for issue in issues]
             )
-        except JiraAuthenticationError as e:
-            log.error(f"Jira authentication failed: {str(e)}")
-            raise HTTPException(
-                status_code=401,
-                detail="Failed to authenticate with Jira"
-            ) from e
-        except JiraConnectionError as e:
-            log.error(f"Failed to connect to Jira: {str(e)}")
-            raise HTTPException(
-                status_code=503,
-                detail="Jira service is currently unavailable"
-            ) from e
-        except JiraRequestError as e:
-            log.error(f"Jira request failed: {str(e)}")
-            raise HTTPException(
-                status_code=e.status_code,
-                detail=e.message
-            ) from e
         except Exception as e:
-            log.error(f"Unexpected error while fetching Jira issues: {str(e)}")
+            log.error(f"Error fetching issues from database: {str(e)}")
             raise HTTPException(
                 status_code=500,
-                detail="An unexpected error occurred"
+                detail="Failed to fetch issues from database"
             ) from e
 
     async def get_projects(self, user_id: int) -> StandardResponse[List[GetJiraProjectResponse]]:

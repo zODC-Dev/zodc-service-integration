@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -38,10 +38,10 @@ class JiraIssueModel(BaseModel):
     description: Optional[str] = None
     status: JiraIssueStatus
     assignee: Optional['JiraAssigneeModel'] = None
+    assignee_id: Optional[str] = None  # Add assignee_id field
     priority: Optional['JiraIssuePriorityModel'] = None
     type: JiraIssueType
-    sprint: Optional['JiraSprintModel'] = None
-    sprint_id: Optional[int] = None
+    sprints: List['JiraSprintModel'] = Field(default_factory=list)
     estimate_point: float = Field(default=0)
     actual_point: Optional[float] = None
     created_at: datetime
@@ -51,12 +51,15 @@ class JiraIssueModel(BaseModel):
     reporter_id: Optional[str] = None
     last_synced_at: datetime
     updated_locally: bool = Field(default=False)
+    is_system_linked: bool = Field(default=False)
 
     class Config:
         from_attributes = True
 
 
 class JiraIssueCreateDTO(BaseModel):
+    jira_issue_id: str
+    key: str
     project_key: str
     summary: str
     description: Optional[str] = None
