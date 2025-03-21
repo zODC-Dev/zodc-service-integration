@@ -342,7 +342,7 @@ class JiraProjectApplicationService:
 
                 except Exception as e:
                     log.error(f"Error syncing issue {jira_issue.key}: {str(e)}")
-                    await session.rollback()
+                    await session.abort()
                     continue
 
             return synced_issues

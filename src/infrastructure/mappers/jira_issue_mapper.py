@@ -55,32 +55,27 @@ class JiraIssueMapper:
                     if sprint:
                         sprints.append(sprint)
 
-            # Get reporter_id and assignee_id safely
+            # Get reporter_id directly from accountId
             reporter_id = None
-            try:
-                if hasattr(fields, 'reporter') and fields.reporter:
-                    reporter_id = getattr(fields.reporter, 'accountId', None)
-            except AttributeError:
-                log.warning(f"No reporter found for issue {api_response.key}")
+            if hasattr(fields, 'reporter') and fields.reporter:
+                reporter_id = getattr(fields.reporter, 'accountId', None)
+                log.info(f"Found reporter_id: {reporter_id} for issue {api_response.key}")
 
-            # Get assignee safely
+            # Get assignee and assignee_id
             assignee = None
             assignee_id = None
-            try:
-                if hasattr(fields, 'assignee') and fields.assignee:
-                    assignee_id = getattr(fields.assignee, 'accountId', None)
-                    if assignee_id:
-                        assignee = JiraIssueMapper._map_user(fields.assignee)
-            except AttributeError:
-                log.warning(f"No assignee found for issue {api_response.key}")
+            if hasattr(fields, 'assignee') and fields.assignee:
+                assignee = JiraIssueMapper._map_user(fields.assignee)
+                if assignee:
+                    assignee_id = assignee.jira_account_id
 
             return JiraIssueModel(
                 key=api_response.key,
                 summary=fields.summary,
                 description=fields.description or "",
                 status=JiraIssueStatus(fields.status.name),
-                assignee=assignee,
-                assignee_id=assignee_id,
+                assignee=assignee,  # Use mapped assignee
+                assignee_id=assignee_id,  # Use assignee_id from mapped assignee
                 priority=JiraIssueMapper._map_priority(fields.priority) if fields.priority else None,
                 type=JiraIssueType(fields.issuetype.name),
                 sprints=sprints,
@@ -94,8 +89,8 @@ class JiraIssueMapper:
                 last_synced_at=now
             )
         except Exception as e:
-            log.error(f"Error mapping issue response to domain: {str(e)}")
-            # Return minimal valid model with None for user IDs
+            log.error(f"Error mapping issue response to domain for issue {api_response.key}: {str(e)}")
+            # Return minimal valid model
             now = datetime.now(timezone.utc)
             return JiraIssueModel(
                 key=api_response.key,
@@ -165,22 +160,6 @@ class JiraIssueMapper:
 
     @staticmethod
     def to_domain(entity: JiraIssueEntity) -> JiraIssueModel:
-        sprints = []
-        for issue_sprint in entity.sprints:
-            sprint = JiraSprintModel(
-                jira_sprint_id=issue_sprint.jira_sprint_id,
-                name=issue_sprint.name,
-                state=issue_sprint.state,
-                start_date=issue_sprint.start_date,
-                end_date=issue_sprint.end_date,
-                complete_date=issue_sprint.complete_date,
-                goal=issue_sprint.goal,
-                created_at=issue_sprint.created_at,
-                updated_at=issue_sprint.updated_at,
-                project_key=issue_sprint.project_key
-            )
-            sprints.append(sprint)
-
         return JiraIssueModel(
             id=entity.id,
             key=entity.key,
@@ -194,7 +173,20 @@ class JiraIssueMapper:
             project_key=entity.project_key,
             reporter_id=entity.reporter_id,
             assignee=None,  # Will be set by repository if needed
-            sprints=sprints,
+            sprints=[
+                JiraSprintModel(
+                    jira_sprint_id=sprint.jira_sprint_id,
+                    name=sprint.name,
+                    state=sprint.state,
+                    start_date=sprint.start_date,
+                    end_date=sprint.end_date,
+                    complete_date=sprint.complete_date,
+                    goal=sprint.goal,
+                    created_at=sprint.created_at,
+                    updated_at=sprint.updated_at,
+                    project_key=sprint.project_key
+                ) for sprint in entity.sprints
+            ],
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             last_synced_at=entity.last_synced_at,

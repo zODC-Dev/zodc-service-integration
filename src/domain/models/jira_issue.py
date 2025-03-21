@@ -6,6 +6,7 @@ from pydantic.alias_generators import to_camel
 
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.models.jira_sprint import JiraSprintModel
+from src.domain.models.jira_user import JiraUserModel
 
 
 class JiraBaseModel(BaseModel):
@@ -14,15 +15,6 @@ class JiraBaseModel(BaseModel):
         populate_by_name=True,  # Allow both snake_case and camelCase input fields
         from_attributes=True
     )
-
-
-class JiraAssigneeModel(JiraBaseModel):
-    id: Optional[str] = None  # user_id từ bảng user
-    jira_account_id: str      # Jira account ID
-    email: str
-    avatar_url: str
-    name: str
-    is_system_user: bool
 
 
 class JiraIssuePriorityModel(JiraBaseModel):
@@ -37,7 +29,7 @@ class JiraIssueModel(BaseModel):
     summary: str
     description: Optional[str] = None
     status: JiraIssueStatus
-    assignee: Optional['JiraAssigneeModel'] = None
+    assignee: Optional['JiraUserModel'] = None
     assignee_id: Optional[str] = None  # Add assignee_id field
     priority: Optional['JiraIssuePriorityModel'] = None
     type: JiraIssueType

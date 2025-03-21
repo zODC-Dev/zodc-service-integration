@@ -31,6 +31,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         try:
             # Create issue entity
             issue_entity = self._to_entity(issue)
+            log.info(f"Issue entity: {issue_entity}")
             self.session.add(issue_entity)
             await self.session.flush()  # Flush to get the issue ID
 
@@ -143,16 +144,17 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             description=model.description,
             status=model.status.value,
             type=model.type.value,
-            assignee_id=model.assignee.id if model.assignee else None,
             priority_id=model.priority.id if model.priority else None,
             estimate_point=model.estimate_point,
             actual_point=model.actual_point,
             project_key=model.project_key,
             reporter_id=model.reporter_id,
+            assignee_id=model.assignee_id,
             created_at=model.created_at,
             updated_at=model.updated_at,
             last_synced_at=model.last_synced_at,
-            updated_locally=model.updated_locally
+            updated_locally=model.updated_locally,
+            is_system_linked=model.is_system_linked
         )
 
     def _to_domain(self, entity: JiraIssueEntity) -> JiraIssueModel:
@@ -194,6 +196,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             actual_point=entity.actual_point,
             project_key=entity.project_key,
             reporter_id=entity.reporter_id,
+            assignee_id=entity.assignee_id,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             last_synced_at=entity.last_synced_at,
@@ -202,7 +205,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             sprints=sprints,
             id=entity.id,
             is_system_linked=entity.is_system_linked,
-            assignee=assignee  # Add assignee info
+            assignee=assignee
         )
 
     async def get_project_issues(
