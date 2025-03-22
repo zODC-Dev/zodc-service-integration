@@ -20,6 +20,7 @@ from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
 from src.domain.services.jira_project_database_service import IJiraProjectDatabaseService
+from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
 from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
 
 T = TypeVar('T')
@@ -31,12 +32,14 @@ class JiraProjectApplicationService:
         jira_project_api_service: IJiraProjectAPIService,
         jira_project_db_service: IJiraProjectDatabaseService,
         jira_issue_db_service: IJiraIssueDatabaseService,
+        jira_sprint_db_service: IJiraSprintDatabaseService,
         sync_session: IJiraSyncSession,
         sync_log_repository: ISyncLogRepository
     ):
         self.jira_project_api_service = jira_project_api_service
         self.jira_project_db_service = jira_project_db_service
         self.jira_issue_db_service = jira_issue_db_service
+        self.jira_sprint_db_service = jira_sprint_db_service
         self.sync_session = sync_session
         self.sync_log_repository = sync_log_repository
 
@@ -86,14 +89,14 @@ class JiraProjectApplicationService:
 
     async def get_project_sprints(
         self,
-        user_id: int,
-        project_id: str,
+        project_key: str,
     ) -> List[JiraSprintModel]:
         # Sprints are always fetched from API as they're dynamic
-        return await self.jira_project_api_service.get_project_sprints(
-            user_id=user_id,
-            project_id=project_id
+        sprints = await self.jira_sprint_db_service.get_project_sprints(
+            project_key=project_key
         )
+        log.info(f"Found {len(sprints)} sprints for project {project_key}")
+        return sprints
 
     async def get_project_by_key(self, key: str) -> Optional[JiraProjectModel]:
         """Get project from database by key"""

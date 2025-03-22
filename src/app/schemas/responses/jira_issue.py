@@ -7,15 +7,27 @@ from src.app.schemas.responses.base import BaseResponse
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.jira_sprint import JiraSprintModel
+from src.domain.models.jira_user import JiraUserModel
 
 
 class JiraAssigneeResponse(BaseModel):
     id: Optional[int] = None
     jira_account_id: str
     email: str
-    avatar_url: str
+    avatar_url: Optional[str] = None
     name: str
     is_system_user: bool
+
+    @classmethod
+    def from_domain(cls, assignee: JiraUserModel) -> "JiraAssigneeResponse":
+        return cls(
+            id=assignee.id,
+            jira_account_id=assignee.jira_account_id,
+            email=assignee.email,
+            avatar_url=assignee.avatar_url,
+            name=assignee.name,
+            is_system_user=assignee.is_system_user
+        )
 
 
 class JiraIssuePriorityResponse(BaseModel):
@@ -68,7 +80,7 @@ class GetJiraIssueResponse(BaseResponse):
             id=issue.id,
             key=issue.key,
             summary=issue.summary,
-            assignee=issue.assignee,
+            assignee=JiraAssigneeResponse.from_domain(issue.assignee) if issue.assignee else None,
             priority=issue.priority,
             type=issue.type,
             sprint=current_sprint,

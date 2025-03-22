@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import List, Optional
 
 from src.domain.models.jira_sprint import JiraSprintCreateDTO, JiraSprintModel, JiraSprintUpdateDTO
 
@@ -21,6 +21,7 @@ class IJiraSprintRepository(ABC):
     async def get_by_jira_sprint_id(self, jira_sprint_id: str) -> Optional[JiraSprintModel]:
         pass
 
-    # @abstractmethod
-    # async def get_project_sprints(self, project_key: str) -> List[JiraSprintModel]:
-    #     pass
+    @abstractmethod
+    async def get_project_sprints(self, project_key: str) -> List[JiraSprintModel]:
+        """Get all sprints for a specific project"""
+        pass

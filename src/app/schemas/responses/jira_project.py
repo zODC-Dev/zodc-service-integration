@@ -35,5 +35,5 @@ class GetJiraSprintResponse(BaseResponse):
         return cls(
             id=sprint.id,
             name=sprint.name,
-            state=sprint.state.value
+            state=sprint.state
         )

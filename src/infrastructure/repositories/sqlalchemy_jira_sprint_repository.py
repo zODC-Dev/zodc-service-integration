@@ -73,6 +73,18 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
         sprint = result.first()
         return self._to_domain(sprint) if sprint else None
 
+    async def get_project_sprints(self, project_key: str) -> List[JiraSprintModel]:
+        """Get all sprints for a specific project"""
+        log.info(f"Getting sprints for project {project_key}")
+        result = await self.session.exec(
+            select(JiraSprintEntity).where(
+                JiraSprintEntity.project_key == project_key
+            )
+        )
+        sprints = result.all()
+        log.info(f"Found {len(sprints)} sprints for project {project_key}")
+        return [self._to_domain(sprint) for sprint in sprints]
+
     def _to_domain(self, sprint: JiraSprintEntity) -> JiraSprintModel:
         return JiraSprintModel(
             jira_sprint_id=sprint.jira_sprint_id,
@@ -82,5 +94,6 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             end_date=sprint.end_date,
             complete_date=sprint.complete_date,
             created_at=sprint.created_at,
-            updated_at=sprint.updated_at
+            updated_at=sprint.updated_at,
+            id=sprint.id
         )

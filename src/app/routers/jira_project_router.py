@@ -65,9 +65,6 @@ async def get_project_sprints(
     controller: JiraProjectController = Depends(get_jira_project_controller),
 ) -> StandardResponse[List[GetJiraSprintResponse]]:
     """Get all sprints from a specific Jira project"""
-    user_id = int(claims.sub)
-
     return await controller.get_project_sprints(
-        user_id=user_id,
-        project_id=project_key
+        project_key=project_key
     )

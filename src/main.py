@@ -28,12 +28,14 @@ from src.configs.settings import settings
 from src.domain.constants.nats_events import NATSSubscribeTopic
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
 from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
+from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQLAlchemyJiraSprintRepository
 from src.infrastructure.repositories.sqlalchemy_jira_user_repository import SQLAlchemyJiraUserRepository
 from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
 from src.infrastructure.services.jira_issue_database_service import JiraIssueDatabaseService
 from src.infrastructure.services.jira_project_api_service import JiraProjectAPIService
 from src.infrastructure.services.jira_project_database_service import JiraProjectDatabaseService
+from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.redis_service import RedisService
 from src.infrastructure.services.token_refresh_service import TokenRefreshService
@@ -100,10 +102,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     jira_project_api_service = JiraProjectAPIService(redis_service, token_scheduler_service, user_repository)
     jira_project_database_service = JiraProjectDatabaseService(project_repository)
+    jira_sprint_repository = SQLAlchemyJiraSprintRepository(db)
+    jira_sprint_database_service = JiraSprintDatabaseService(jira_sprint_repository)
     jira_project_application_service = JiraProjectApplicationService(
         jira_project_api_service,
         jira_project_database_service,
         jira_issue_database_service,
+        jira_sprint_database_service,
         sync_session,
         sync_log_repository
     )

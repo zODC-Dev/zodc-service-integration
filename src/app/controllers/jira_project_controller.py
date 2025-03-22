@@ -75,19 +75,17 @@ class JiraProjectController:
 
     async def get_project_sprints(
         self,
-        user_id: int,
-        project_id: str
+        project_key: str
     ) -> StandardResponse[List[GetJiraSprintResponse]]:
         """Get all sprints in a project"""
         try:
-            sprints = await self.jira_project_service.get_project_sprints(user_id, project_id)
+            log.info(f"Getting sprints for project {project_key}")
+            sprints = await self.jira_project_service.get_project_sprints(project_key)
+            log.info(f"Found {len(sprints)} sprints for project {project_key}")
             return StandardResponse(
                 message="Sprints fetched successfully",
                 data=[GetJiraSprintResponse.from_domain(s) for s in sprints]
             )
-        except (JiraAuthenticationError, JiraConnectionError, JiraRequestError) as e:
-            log.error(f"Failed to get sprints: {str(e)}")
-            raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:
             log.error(f"Unexpected error getting sprints: {str(e)}")
             raise HTTPException(status_code=500, detail="Internal server error") from e

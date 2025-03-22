@@ -31,7 +31,6 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         try:
             # Create issue entity
             issue_entity = self._to_entity(issue)
-            log.info(f"Issue entity: {issue_entity}")
             self.session.add(issue_entity)
             await self.session.flush()  # Flush to get the issue ID
 
