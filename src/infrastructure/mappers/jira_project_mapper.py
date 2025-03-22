@@ -85,5 +85,6 @@ class JiraProjectMapper:
             key=api_response.key,
             name=api_response.name,
             description=api_response.description or "",
-            avatar_url=api_response.avatarUrls.get("48x48", "")
+            avatar_url=api_response.avatarUrls.get("48x48", ""),
+            user_id=None
         )

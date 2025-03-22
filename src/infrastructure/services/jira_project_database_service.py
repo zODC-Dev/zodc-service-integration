@@ -65,3 +65,7 @@ class JiraProjectDatabaseService(IJiraProjectDatabaseService):
             conditions=conditions,
             limit=limit
         )
+
+    async def get_user_projects(self, user_id: int) -> List[JiraProjectModel]:
+        """Get all projects for a specific user"""
+        return await self.project_repository.get_projects_by_user_id(user_id)

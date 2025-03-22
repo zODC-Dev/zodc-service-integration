@@ -84,3 +84,13 @@ class SQLAlchemyJiraProjectRepository(IJiraProjectRepository):
         )
         project = result.first()
         return self._to_domain(project) if project else None
+
+    async def get_projects_by_user_id(self, user_id: int) -> List[JiraProjectModel]:
+        """Get all projects for a specific user"""
+        result = await self.session.exec(
+            select(JiraProjectEntity).where(
+                JiraProjectEntity.user_id == user_id
+            )
+        )
+        projects = result.all()
+        return [self._to_domain(project) for project in projects]

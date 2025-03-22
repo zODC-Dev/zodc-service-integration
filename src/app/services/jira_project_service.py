@@ -11,6 +11,7 @@ from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueType
 from src.domain.constants.nats_events import NATSPublishTopic
 from src.domain.constants.sync import EntityType, OperationType, SourceType
+from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.jira_project import JiraProjectCreateDTO, JiraProjectModel, JiraProjectUpdateDTO
 from src.domain.models.jira_sprint import JiraSprintCreateDTO, JiraSprintModel, JiraSprintUpdateDTO
@@ -65,27 +66,34 @@ class JiraProjectApplicationService:
         )
 
     async def get_accessible_projects(self, user_id: int) -> List[JiraProjectModel]:
-        """Get projects from database, if not found fetch from API and save"""
-        # First try to get from database
-        projects = await self.jira_project_db_service.get_all_projects()
+        """Get projects from Jira API and merge with database data"""
+        try:
+            # Get projects from database first
+            db_projects = await self.jira_project_db_service.get_all_projects()
+            db_projects_dict = {project.key: project for project in db_projects}
 
-        if not projects:
-            # If no projects in database, fetch from API
-            projects = await self.jira_project_api_service.get_accessible_projects(user_id)
+            # Get projects from Jira API
+            jira_projects = await self.jira_project_api_service.get_accessible_projects(user_id)
 
-            # Save to database
-            for project in projects:
-                create_dto = JiraProjectCreateDTO(
-                    project_id=project.project_id,
-                    key=project.key,
-                    name=project.name,
-                    jira_project_id=project.jira_project_id,
-                    avatar_url=project.avatar_url,
-                    description=project.description,
-                )
-                await self.jira_project_db_service.create_project(create_dto)
+            # Merge data
+            merged_projects = []
+            for jira_project in jira_projects:
+                project = jira_project
+                # Check if project exists in database
+                if jira_project.key in db_projects_dict:
+                    db_project = db_projects_dict[jira_project.key]
+                    project.is_system_linked = True
+                    project.id = db_project.id  # Preserve database ID if exists
+                else:
+                    project.is_system_linked = False
 
-        return projects
+                merged_projects.append(project)
+
+            return merged_projects
+
+        except Exception as e:
+            log.error(f"Error getting accessible projects: {str(e)}")
+            raise JiraRequestError(500, str(e)) from e
 
     async def get_project_sprints(
         self,
@@ -201,7 +209,8 @@ class JiraProjectApplicationService:
                     key=project_details.key,
                     name=project_details.name,
                     description=project_details.description,
-                    avatar_url=project_details.avatar_url
+                    avatar_url=project_details.avatar_url,
+                    user_id=user_id
                 )
                 return await session.project_repository.create_project(create_dto)
 

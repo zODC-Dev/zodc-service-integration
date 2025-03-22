@@ -33,3 +33,8 @@ class IJiraProjectRepository(ABC):
     async def get_by_jira_project_id(self, jira_project_id: str) -> Optional[JiraProjectModel]:
         """Get project by Jira project ID"""
         pass
+
+    @abstractmethod
+    async def get_projects_by_user_id(self, user_id: int) -> List[JiraProjectModel]:
+        """Get all projects for a specific user"""
+        pass

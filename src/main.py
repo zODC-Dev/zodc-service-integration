@@ -20,7 +20,6 @@ from src.app.services.nats_handlers.jira_issue_handler import JiraIssueMessageHa
 from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
 from src.app.services.nats_handlers.jira_project_sync_handler import JiraProjectSyncRequestHandler
 from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
-from src.app.services.nats_handlers.project_message_handler import ProjectMessageHandler
 from src.app.services.nats_handlers.user_message_handler import UserMessageHandler
 from src.configs.database import get_db, init_db, session_maker
 from src.configs.logger import log
@@ -126,7 +125,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             user_repository=user_repository,
             refresh_token_repository=refresh_token_repository
         ),
-        NATSSubscribeTopic.PROJECT_LINK.value: ProjectMessageHandler(project_repository),
         NATSSubscribeTopic.JIRA_ISSUE_UPDATE.value: JiraIssueMessageHandler(jira_issue_application_service)
     }
 
