@@ -5,17 +5,13 @@ from src.app.dtos.jira.jira_sync_dto import JiraBatchSyncRequestDTO, JiraIssueSy
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueType
 from src.domain.constants.nats_events import NATSPublishTopic
-from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.models.jira_issue import JiraIssueCreateDTO, JiraIssueUpdateDTO
-from src.domain.models.jira_webhook import JiraWebhookPayload
 from src.domain.models.nats_event import JiraActionType
-from src.domain.models.sync_log import SyncLogCreateDTO
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.nats_service import INATSService
-from src.infrastructure.mappers.jira_webhook_mapper import JiraWebhookMapper
 
 
 class JiraIssueApplicationService:
@@ -102,126 +98,126 @@ class JiraIssueApplicationService:
                 error_message=f"Internal error: {str(e)}"
             )
 
-    async def handle_webhook_update(self, webhook_data: JiraWebhookPayload) -> None:
-        """Handle Jira webhook update"""
-        try:
-            issue_id = webhook_data.issue.id
-            fields = webhook_data.issue.fields
+    # async def handle_webhook_update(self, webhook_data: JiraWebhookPayload) -> None:
+    #     """Handle Jira webhook update"""
+    #     try:
+    #         issue_id = webhook_data.issue.id
+    #         fields = webhook_data.issue.fields
 
-            # Log the webhook sync
-            await self.sync_log_repository.create_sync_log(
-                SyncLogCreateDTO(
-                    entity_type=EntityType.ISSUE,
-                    entity_id=issue_id,
-                    operation=OperationType.SYNC,
-                    request_payload=webhook_data.to_json_serializable(),
-                    response_status=200,
-                    response_body={},
-                    source=SourceType.WEBHOOK,
-                    sender=None
-                )
-            )
+    #         # Log the webhook sync
+    #         await self.sync_log_repository.create_sync_log(
+    #             SyncLogCreateDTO(
+    #                 entity_type=EntityType.ISSUE,
+    #                 entity_id=issue_id,
+    #                 operation=OperationType.SYNC,
+    #                 request_payload=webhook_data.to_json_serializable(),
+    #                 response_status=200,
+    #                 response_body={},
+    #                 source=SourceType.WEBHOOK,
+    #                 sender=None
+    #             )
+    #         )
 
-            # Get existing issue
-            issue = await self.jira_issue_repository.get_by_jira_issue_id(issue_id)
-            if not issue:
-                log.warning(f"Issue {issue_id} not found in database")
-                return
+    #         # Get existing issue
+    #         issue = await self.jira_issue_repository.get_by_jira_issue_id(issue_id)
+    #         if not issue:
+    #             log.warning(f"Issue {issue_id} not found in database")
+    #             return
 
-            # Map webhook data to update dict
-            update_data = JiraWebhookMapper.map_to_update_dto(webhook_data)
+    #         # Map webhook data to update dict
+    #         update_data = JiraWebhookMapper.map_to_update_dto(webhook_data)
 
-            # Check for conflicts
-            if issue.updated_locally and update_data.get("updated_at") > issue.last_synced_at:
-                await self._handle_conflict(
-                    issue_id,
-                    update_data["updated_at"],
-                    issue.last_synced_at
-                )
+    #         # Check for conflicts
+    #         if issue.updated_locally and update_data.get("updated_at") > issue.last_synced_at:
+    #             await self._handle_conflict(
+    #                 issue_id,
+    #                 update_data["updated_at"],
+    #                 issue.last_synced_at
+    #             )
 
-            # Update if there are changes
-            if update_data:
-                await self.jira_issue_repository.update(
-                    issue_id,
-                    JiraIssueUpdateDTO(**update_data)
-                )
+    #         # Update if there are changes
+    #         if update_data:
+    #             await self.jira_issue_repository.update(
+    #                 issue_id,
+    #                 JiraIssueUpdateDTO(**update_data)
+    #             )
 
-            # Update sync status
-            await self._update_sync_status(
-                issue_id=issue_id,
-                updated_at=update_data["updated_at"]
-            )
+    #         # Update sync status
+    #         await self._update_sync_status(
+    #             issue_id=issue_id,
+    #             updated_at=update_data["updated_at"]
+    #         )
 
-            log.info(f"Successfully processed issue update webhook for issue {issue_id}")
+    #         log.info(f"Successfully processed issue update webhook for issue {issue_id}")
 
-        except Exception as e:
-            log.error(f"Error handling webhook update: {str(e)}")
-            if 'issue_id' in locals():
-                await self.sync_log_repository.create_sync_log(
-                    SyncLogCreateDTO(
-                        entity_type=EntityType.ISSUE,
-                        entity_id=issue_id,
-                        operation=OperationType.SYNC,
-                        request_payload=webhook_data.to_json_serializable(),
-                        response_status=500,
-                        response_body={},
-                        source=SourceType.WEBHOOK,
-                        sender=None,
-                        error_message=str(e)
-                    )
-                )
-            raise
+    #     except Exception as e:
+    #         log.error(f"Error handling webhook update: {str(e)}")
+    #         if 'issue_id' in locals():
+    #             await self.sync_log_repository.create_sync_log(
+    #                 SyncLogCreateDTO(
+    #                     entity_type=EntityType.ISSUE,
+    #                     entity_id=issue_id,
+    #                     operation=OperationType.SYNC,
+    #                     request_payload=webhook_data.to_json_serializable(),
+    #                     response_status=500,
+    #                     response_body={},
+    #                     source=SourceType.WEBHOOK,
+    #                     sender=None,
+    #                     error_message=str(e)
+    #                 )
+    #             )
+    #         raise
 
-    async def handle_webhook_create(self, webhook_data: JiraWebhookPayload) -> None:
-        """Handle Jira issue creation webhook"""
-        try:
-            issue = webhook_data.issue
+    # async def handle_webhook_create(self, webhook_data: JiraWebhookPayload) -> None:
+    #     """Handle Jira issue creation webhook"""
+    #     try:
+    #         issue = webhook_data.issue
 
-            # Log the webhook sync first
-            await self.sync_log_repository.create_sync_log(
-                SyncLogCreateDTO(
-                    entity_type=EntityType.ISSUE,
-                    entity_id=issue.id,
-                    operation=OperationType.SYNC,
-                    request_payload=webhook_data.to_json_serializable(),
-                    response_status=200,
-                    response_body={},
-                    source=SourceType.WEBHOOK,
-                    sender=None
-                )
-            )
+    #         # Log the webhook sync first
+    #         await self.sync_log_repository.create_sync_log(
+    #             SyncLogCreateDTO(
+    #                 entity_type=EntityType.ISSUE,
+    #                 entity_id=issue.id,
+    #                 operation=OperationType.SYNC,
+    #                 request_payload=webhook_data.to_json_serializable(),
+    #                 response_status=200,
+    #                 response_body={},
+    #                 source=SourceType.WEBHOOK,
+    #                 sender=None
+    #             )
+    #         )
 
-            # Map webhook data to DTO
-            issue_create = JiraWebhookMapper.map_to_create_dto(webhook_data)
+    #         # Map webhook data to DTO
+    #         issue_create = JiraWebhookMapper.map_to_create_dto(webhook_data)
 
-            # Save to database
-            await self.jira_issue_repository.create(issue_create)
+    #         # Save to database
+    #         await self.jira_issue_repository.create(issue_create)
 
-            # Update sync status
-            await self._update_sync_status(
-                issue_id=issue.id,
-                updated_at=issue_create.updated_at
-            )
+    #         # Update sync status
+    #         await self._update_sync_status(
+    #             issue_id=issue.id,
+    #             updated_at=issue_create.updated_at
+    #         )
 
-            log.info(f"Successfully processed issue creation webhook for issue {issue.id}")
+    #         log.info(f"Successfully processed issue creation webhook for issue {issue.id}")
 
-        except Exception as e:
-            log.error(f"Error handling issue creation webhook: {str(e)}")
-            if hasattr(webhook_data, 'issue'):
-                await self.sync_log_repository.create_sync_log(
-                    SyncLogCreateDTO(
-                        entity_type=EntityType.ISSUE,
-                        entity_id=webhook_data.issue.id,
-                        operation=OperationType.SYNC,
-                        request_payload=webhook_data.to_json_serializable(),
-                        response_status=500,
-                        response_body={},
-                        source=SourceType.WEBHOOK,
-                        sender=None,
-                        error_message=str(e)
-                    )
-                )
-            raise
+    #     except Exception as e:
+    #         log.error(f"Error handling issue creation webhook: {str(e)}")
+    #         if hasattr(webhook_data, 'issue'):
+    #             await self.sync_log_repository.create_sync_log(
+    #                 SyncLogCreateDTO(
+    #                     entity_type=EntityType.ISSUE,
+    #                     entity_id=webhook_data.issue.id,
+    #                     operation=OperationType.SYNC,
+    #                     request_payload=webhook_data.to_json_serializable(),
+    #                     response_status=500,
+    #                     response_body={},
+    #                     source=SourceType.WEBHOOK,
+    #                     sender=None,
+    #                     error_message=str(e)
+    #                 )
+    #             )
+    #         raise
 
     async def _validate_update_request(
         self,

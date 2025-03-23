@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from src.configs.logger import log
+from src.configs.settings import settings
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.models.jira_issue import JiraIssueModel, JiraIssuePriorityModel
 from src.domain.models.jira_sprint import JiraSprintModel
@@ -64,9 +65,12 @@ class JiraIssueMapper:
             if hasattr(fields, 'customfield_10020') and fields.customfield_10020:
                 sprints = JiraIssueMapper._map_sprints(fields.customfield_10020)
 
-            # Create link URL
-            jira_base_url = JiraIssueMapper._extract_jira_base_url(api_response)
-            link_url = f"{jira_base_url}/browse/{api_response.key}" if jira_base_url else None
+            # Tạo link URL theo định dạng Jira dashboard
+            jira_base_url = settings.JIRA_DASHBOARD_URL  # URL cố định
+            project_key = api_response.key.split("-")[0]
+            # current_sprint_id = sprints[0].jira_sprint_id if sprints else None
+            current_sprint_id = 3
+            link_url = f"{jira_base_url}/jira/software/projects/{project_key}/boards/{current_sprint_id}?selectedIssue={api_response.key}" if sprints else None
 
             return JiraIssueModel(
                 key=api_response.key,
@@ -164,6 +168,7 @@ class JiraIssueMapper:
             updated_at=model.updated_at,
             last_synced_at=model.last_synced_at,
             updated_locally=model.updated_locally,
+            link_url=model.link_url,
             sprints=[]
         )
 
@@ -202,17 +207,5 @@ class JiraIssueMapper:
             jira_issue_id=entity.jira_issue_id,
             updated_locally=entity.updated_locally
         )
-
-    @staticmethod
-    def _extract_jira_base_url(api_response: JiraAPIIssueResponse) -> Optional[str]:
-        """Extract Jira base URL from API response"""
-        if hasattr(api_response, 'self') and api_response.self:
-            try:
-                parts = api_response.self.split('/rest/api')
-                if parts and len(parts) > 0:
-                    return parts[0]
-            except Exception as e:
-                log.warning(f"Could not extract Jira base URL: {str(e)}")
-        return None
 
     # Add other mapping methods as needed

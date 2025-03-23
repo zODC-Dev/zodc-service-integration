@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from src.configs.logger import log
+from src.domain.constants.jira import JiraSprintState
 from src.domain.models.jira_project import JiraProjectModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
@@ -63,63 +64,99 @@ class JiraSprintMapper:
         """Map sprint data from webhook to domain models"""
         sprints = []
 
-        # Handle case when input is a string (sprint name)
-        if isinstance(sprint_data, str):
-            log.info(f"Received sprint as string: {sprint_data}")
-            # Chỉ lấy tên sprint, không đủ thông tin để tạo model đầy đủ
+        # Handle case when input is None
+        if sprint_data is None:
             return None
+
+        # Handle case when input is a string (sprint ID)
+        if isinstance(sprint_data, str):
+            try:
+                sprint_id = int(sprint_data.strip())
+                log.info(f"Converting sprint string ID {sprint_data} to sprint model")
+                return [JiraSprintModel(
+                    jira_sprint_id=sprint_id,
+                    name=f"Sprint {sprint_id}",
+                    state=JiraSprintState.ACTIVE,
+                    created_at=datetime.now(timezone.utc)
+                )]
+            except (ValueError, TypeError):
+                log.warning(f"Could not parse sprint ID from string: {sprint_data}")
+                return None
 
         # Handle list of sprint data
         if isinstance(sprint_data, list):
             for item in sprint_data:
-                sprint = cls.from_webhook_item(item)
+                sprint = cls._parse_sprint_item(item)
                 if sprint:
                     sprints.append(sprint)
+
+        # Handle single sprint object
+        elif isinstance(sprint_data, dict):
+            sprint = cls._parse_sprint_item(sprint_data)
+            if sprint:
+                sprints.append(sprint)
 
         return sprints if sprints else None
 
     @classmethod
-    def from_webhook_item(cls, sprint_item: Any) -> Optional[JiraSprintModel]:
-        """Map a single sprint item from webhook"""
+    def _parse_sprint_item(cls, item: Any) -> Optional[JiraSprintModel]:
+        """Parse a single sprint item from various formats"""
         try:
-            if not sprint_item or not isinstance(sprint_item, dict):
-                return None
+            # Handle string (ID only)
+            if isinstance(item, str):
+                try:
+                    sprint_id = int(item.strip())
+                    return JiraSprintModel(
+                        jira_sprint_id=sprint_id,
+                        name=f"Sprint {sprint_id}",
+                        state=JiraSprintState.ACTIVE,
+                        created_at=datetime.now(timezone.utc)
+                    )
+                except ValueError:
+                    return None
 
-            # Extract required fields
-            sprint_id = sprint_item.get('id')
-            if not sprint_id:
-                log.warning("Sprint data missing required field 'id'")
-                return None
+            # Handle dictionary
+            elif isinstance(item, dict):
+                sprint_id = item.get('id')
+                if not sprint_id:
+                    return None
 
-            now = datetime.now(timezone.utc)
+                return JiraSprintModel(
+                    jira_sprint_id=sprint_id,
+                    name=item.get('name', f"Sprint {sprint_id}"),
+                    state=JiraSprintState.from_str(item.get('state', 'active')),
+                    start_date=cls._parse_date(item.get('startDate')),
+                    end_date=cls._parse_date(item.get('endDate')),
+                    complete_date=cls._parse_date(item.get('completeDate')),
+                    goal=item.get('goal'),
+                    created_at=datetime.now(timezone.utc)
+                )
 
-            # Parse dates
-            start_date = cls._parse_date(sprint_item.get('startDate'))
-            end_date = cls._parse_date(sprint_item.get('endDate'))
-            complete_date = cls._parse_date(sprint_item.get('completeDate'))
+            # Handle object with attributes
+            elif hasattr(item, 'id'):
+                sprint_id = item.id
+                if not sprint_id:
+                    return None
 
-            # Get project key from various possible fields
-            project_key = cls._extract_project_key(sprint_item)
+                return JiraSprintModel(
+                    jira_sprint_id=sprint_id,
+                    name=getattr(item, 'name', f"Sprint {sprint_id}"),
+                    state=JiraSprintState.from_str(getattr(item, 'state', 'active')),
+                    start_date=cls._parse_date(getattr(item, 'startDate', None)),
+                    end_date=cls._parse_date(getattr(item, 'endDate', None)),
+                    complete_date=cls._parse_date(getattr(item, 'completeDate', None)),
+                    goal=getattr(item, 'goal', None),
+                    created_at=datetime.now(timezone.utc)
+                )
 
-            return JiraSprintModel(
-                jira_sprint_id=int(sprint_id),
-                name=sprint_item.get('name', f"Sprint {sprint_id}"),
-                state=sprint_item.get('state', 'active'),
-                start_date=start_date,
-                end_date=end_date,
-                complete_date=complete_date,
-                goal=sprint_item.get('goal'),
-                project_key=project_key,
-                created_at=now
-            )
-
+            return None
         except Exception as e:
-            log.error(f"Error mapping sprint from webhook: {str(e)}")
+            log.error(f"Error parsing sprint item: {str(e)}")
             return None
 
     @staticmethod
     def _parse_date(date_str: Optional[str]) -> Optional[datetime]:
-        """Parse date string from Jira webhook"""
+        """Parse date string from Jira"""
         if not date_str:
             return None
 
@@ -128,17 +165,5 @@ class JiraSprintMapper:
                 date_str = date_str.replace('Z', '+00:00')
             return datetime.fromisoformat(date_str)
         except Exception as e:
-            log.warning(f"Failed to parse date '{date_str}': {str(e)}")
+            log.warning(f"Error parsing date '{date_str}': {str(e)}")
             return None
-
-    @staticmethod
-    def _extract_project_key(sprint_data: Dict[str, Any]) -> Optional[str]:
-        """Extract project key from sprint data"""
-        # Thử các trường khác nhau có thể chứa project key
-        for field in ['originBoardId', 'originBoardProjectKey', 'projectKey']:
-            if field in sprint_data and sprint_data[field]:
-                return str(sprint_data[field])
-
-        # Nếu không tìm thấy project key, log cảnh báo
-        log.warning(f"Could not extract project key from sprint data: {sprint_data}")
-        return None

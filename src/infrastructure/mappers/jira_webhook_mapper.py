@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from src.configs.logger import log
+from src.configs.settings import settings
 from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JIRA_STATUS_ID_MAPPING, JiraIssueStatus, JiraIssueType
 from src.domain.models.jira_issue import JiraIssueCreateDTO
 from src.domain.models.jira_webhook import JiraWebhookPayload
@@ -63,9 +64,14 @@ class JiraWebhookMapper:
             else:
                 issue_type = JiraIssueType.TASK
 
-            # Tạo link URL cho issue
-            jira_base_url = cls._extract_jira_base_url(fields)
-            link_url = f"{jira_base_url}/browse/{issue.key}" if jira_base_url else None
+            # Tạo link URL cho issue - sử dụng format URL mới
+            jira_base_url = settings.JIRA_DASHBOARD_URL
+            project_key = fields.project.key
+            issue_key = issue.key
+            current_sprint_id = 3
+            # Format URL theo định dạng Jira dashboard
+            link_url = f"{jira_base_url}/jira/software/projects/{project_key}/boards/{current_sprint_id}?selectedIssue={issue_key}" if current_sprint_id else None
+            log.info(f"link_url: {link_url}")
 
             return JiraIssueCreateDTO(
                 jira_issue_id=issue.id,
@@ -80,7 +86,6 @@ class JiraWebhookMapper:
                 created_at=cls._parse_datetime(fields.created),
                 updated_at=cls._parse_datetime(fields.updated),
                 estimate_point=fields.estimate_point,
-                is_deleted=False,
                 link_url=link_url
             )
         except Exception as e:
@@ -156,37 +161,10 @@ class JiraWebhookMapper:
         try:
             # Xử lý các trường hợp dựa vào field_id hoặc field_name
             if field_id_or_name == "status":
-                # Thử dùng ID mapping trước
-                if isinstance(value, (str, int)) and str(value) in JIRA_STATUS_ID_MAPPING:
-                    status = JIRA_STATUS_ID_MAPPING[str(value)]
-                    log.info(f"Mapped status ID {value} to {status}")
-                    return status
-
-                # Nếu không có trong ID mapping, thử dùng tên
-                try:
-                    return JiraIssueStatus(value)
-                except ValueError:
-                    # Fallback: dùng from_str để tìm kiếm theo cách không phân biệt hoa thường
-                    try:
-                        log.info(f"Trying to map status name {value} using from_str")
-                        return JiraIssueStatus.from_str(value)
-                    except ValueError:
-                        log.warning(f"Invalid status value: {value}, defaulting to TO_DO")
-                        return JiraIssueStatus.TO_DO
+                return cls._map_status(value)
 
             elif field_id_or_name == "issuetype":
-                # Thử dùng ID mapping trước
-                if isinstance(value, (str, int)) and str(value) in JIRA_ISSUE_TYPE_ID_MAPPING:
-                    issue_type = JIRA_ISSUE_TYPE_ID_MAPPING[str(value)]
-                    log.info(f"Mapped issue type ID {value} to {issue_type}")
-                    return issue_type
-
-                # Nếu không có trong ID mapping, thử dùng tên
-                try:
-                    return JiraIssueType(value)
-                except ValueError:
-                    log.warning(f"Invalid issue type value: {value}, defaulting to TASK")
-                    return JiraIssueType.TASK
+                return cls._map_issue_type(value)
 
             elif field_id_or_name == "assignee":
                 return value  # Assuming value is account_id
@@ -227,14 +205,36 @@ class JiraWebhookMapper:
         return datetime.fromisoformat(dt_str)
 
     @staticmethod
-    def _extract_jira_base_url(fields) -> Optional[str]:
-        """Extract Jira base URL from fields"""
-        if hasattr(fields, 'self') and fields.self:
+    def _map_issue_type(value: Any) -> str:
+        """Map issue type to string"""
+        if isinstance(value, (str, int)) and str(value) in JIRA_ISSUE_TYPE_ID_MAPPING:
+            issue_type = JIRA_ISSUE_TYPE_ID_MAPPING[str(value)]
+            log.info(f"Mapped issue type ID {value} to {issue_type.value}")
+            return issue_type.value
+        else:
+            # Nếu không có trong ID mapping, thử dùng tên
             try:
-                # Dạng của URL: https://your-jira-instance.com/rest/api/2/issue/123456
-                parts = fields.self.split('/rest/api')
-                if parts and len(parts) > 0:
-                    return parts[0]  # Lấy phần base URL
-            except Exception as e:
-                log.warning(f"Could not extract Jira base URL: {str(e)}")
-        return None
+                return JiraIssueType(value)
+            except ValueError:
+                log.warning(f"Invalid issue type value: {value}, defaulting to TASK")
+                return JiraIssueType.TASK
+
+    @staticmethod
+    def _map_status(value: Any) -> str:
+        """Map status to string"""
+        if isinstance(value, (str, int)) and str(value) in JIRA_STATUS_ID_MAPPING:
+            status = JIRA_STATUS_ID_MAPPING[str(value)]
+            log.info(f"Mapped status ID {value} to {status.value}")
+            return status.value
+
+        # Nếu không có trong ID mapping, thử dùng tên
+        try:
+            return JiraIssueStatus(value)
+        except ValueError:
+            # Fallback: dùng from_str để tìm kiếm theo cách không phân biệt hoa thường
+            try:
+                log.info(f"Trying to map status name {value} using from_str")
+                return JiraIssueStatus.from_str(value)
+            except ValueError:
+                log.warning(f"Invalid status value: {value}, defaulting to TO_DO")
+                return JiraIssueStatus.TO_DO

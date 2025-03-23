@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     JIRA_CLIENT_ID: str = ""
     JIRA_CLIENT_SECRET: str = ""
 
+    # Jira dashboard URL
+    JIRA_DASHBOARD_URL: str = "https://vphoa.atlassian.net"
+
     class Config:
         """Configuration settings."""
 

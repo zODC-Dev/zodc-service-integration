@@ -200,7 +200,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             last_synced_at=model.last_synced_at,
             updated_locally=model.updated_locally,
             is_system_linked=model.is_system_linked,
-            is_deleted=model.is_deleted
+            is_deleted=model.is_deleted,
+            link_url=model.link_url
         )
 
     def _to_domain(self, entity: JiraIssueEntity) -> JiraIssueModel:
@@ -252,7 +253,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             id=entity.id,
             is_system_linked=entity.is_system_linked,
             assignee=assignee,
-            is_deleted=entity.is_deleted
+            is_deleted=entity.is_deleted,
+            link_url=entity.link_url
         )
 
     async def get_project_issues(

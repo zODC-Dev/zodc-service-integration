@@ -121,6 +121,7 @@ class JiraIssueUpdateDTO(BaseModel):
     reporter_id: Optional[str] = None
     sprints: Optional[List['JiraSprintModel']] = None
     is_deleted: Optional[bool] = None
+    type: Optional[str] = None
 
     @classmethod
     def _to_domain(cls, entity: 'JiraIssueUpdateDTO') -> "JiraIssueModel":
@@ -136,6 +137,7 @@ class JiraIssueUpdateDTO(BaseModel):
             is_system_linked=entity.is_system_linked,
             reporter_id=entity.reporter_id,
             is_deleted=entity.is_deleted,
+            type=JiraIssueType(entity.type).value if entity.type else None,
         )
 
     @classmethod
@@ -153,4 +155,5 @@ class JiraIssueUpdateDTO(BaseModel):
             sprints=domain.sprints,
             reporter_id=domain.reporter_id,
             is_deleted=domain.is_deleted,
+            type=domain.type.value if domain.type else None,
         )

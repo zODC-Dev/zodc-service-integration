@@ -106,10 +106,9 @@ class JiraIssueFields(BaseModel):
     assignee: Optional[JiraUser] = None
     reporter: Optional[JiraUser] = None
     priority: Optional[JiraPriority] = None
-    sprints: Optional[List[JiraSprint]] = Field(default=None, alias="customfield_10020")
     estimate_point: Optional[float] = Field(default=None, alias="customfield_10016")
     actual_point: Optional[float] = Field(default=None, alias="customfield_10017")
-    self: Optional[str] = None  # URL tham chiếu đến issue
+    sprints: Optional[List[JiraSprint]] = Field(default=None, alias="customfield_10020")
 
 
 class JiraIssue(BaseModel):
