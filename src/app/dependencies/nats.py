@@ -2,13 +2,16 @@ from typing import Mapping
 
 from fastapi import Depends
 
-from src.app.dependencies.common import get_nats_service, get_redis_service
+from src.app.dependencies.common import (
+    get_jira_user_repository,
+    get_nats_service,
+    get_redis_service,
+    get_refresh_token_repository,
+)
 from src.app.dependencies.jira_issue import get_jira_issue_application_service
-from src.app.dependencies.jira_user import get_jira_user_repository
-from src.app.dependencies.refresh_token import get_refresh_token_repository
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.nats_event_service import NATSEventService
-from src.app.services.nats_handlers.jira_issue_handler import JiraIssueMessageHandler, JiraIssueSyncRequestHandler
+from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueMessageHandler, JiraIssueSyncRequestHandler
 from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
 from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
 from src.app.services.nats_handlers.user_message_handler import UserMessageHandler

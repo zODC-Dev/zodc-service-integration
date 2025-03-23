@@ -10,6 +10,7 @@ from src.domain.models.nats_event import JiraActionType
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
+from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.nats_service import INATSService
 
@@ -17,13 +18,15 @@ from src.domain.services.nats_service import INATSService
 class JiraIssueApplicationService:
     def __init__(
         self,
-        jira_issue_service: IJiraIssueDatabaseService,
+        jira_issue_db_service: IJiraIssueDatabaseService,
+        jira_issue_api_service: IJiraIssueAPIService,
         issue_repository: IJiraIssueRepository,
         project_repository: IJiraProjectRepository,
         nats_service: INATSService,
         sync_log_repository: ISyncLogRepository
     ):
-        self.jira_issue_service = jira_issue_service
+        self.jira_issue_db_service = jira_issue_db_service
+        self.jira_issue_api_service = jira_issue_api_service
         self.jira_issue_repository = issue_repository
         self.project_repository = project_repository
         self.nats_service = nats_service
@@ -48,6 +51,7 @@ class JiraIssueApplicationService:
     ) -> JiraIssueSyncResponseDTO:
         """Process single issue sync"""
         try:
+            log.info(f"Processing issue sync request: {request.action_type}")
             if request.action_type == JiraActionType.CREATE:
                 return await self._handle_create_issue(request)
             elif request.action_type == JiraActionType.UPDATE:
@@ -250,7 +254,7 @@ class JiraIssueApplicationService:
         update = JiraIssueUpdateDTO(**update_data)
 
         # Gọi Jira API để update
-        await self.jira_issue_service.update_issue(user_id, issue_id, update)
+        await self.jira_issue_db_service.update_issue(user_id, issue_id, update)
 
         # Đánh dấu đã update locally
         issue = await self.jira_issue_repository.get_by_jira_issue_id(issue_id)
@@ -331,7 +335,7 @@ class JiraIssueApplicationService:
 
     async def _handle_create_issue(self, request: JiraIssueSyncRequestDTO) -> JiraIssueSyncResponseDTO:
         try:
-            issue = await self.jira_issue_service.create_issue(
+            issue = await self.jira_issue_db_service.create_issue(
                 user_id=request.user_id,
                 issue=JiraIssueCreateDTO(
                     project_key=request.project_key,
@@ -360,7 +364,7 @@ class JiraIssueApplicationService:
             if not request.issue_id:
                 raise ValueError("issue_id is required for update")
 
-            issue = await self.jira_issue_service.update_issue(
+            issue = await self.jira_issue_api_service.update_issue(
                 user_id=request.user_id,
                 issue_id=request.issue_id,
                 update=JiraIssueUpdateDTO(

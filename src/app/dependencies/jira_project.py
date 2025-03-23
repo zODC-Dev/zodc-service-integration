@@ -4,11 +4,13 @@ from fastapi import Depends
 
 from src.app.controllers.jira_project_controller import JiraProjectController
 from src.app.dependencies.base import get_project_repository
-from src.app.dependencies.common import get_redis_service
+from src.app.dependencies.common import (
+    get_jira_api_client,
+    get_jira_user_repository,
+    get_redis_service,
+)
 from src.app.dependencies.jira_issue import get_jira_issue_database_service
 from src.app.dependencies.jira_sprint import get_jira_sprint_database_service
-from src.app.dependencies.jira_user import get_jira_user_repository
-from src.app.dependencies.refresh_token import get_token_scheduler_service
 from src.app.dependencies.sync_log import get_sync_log_repository
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.configs.database import get_db, session_maker
@@ -20,11 +22,11 @@ from src.domain.services.jira_project_api_service import IJiraProjectAPIService
 from src.domain.services.jira_project_database_service import IJiraProjectDatabaseService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
 from src.domain.services.redis_service import IRedisService
-from src.domain.services.token_scheduler_service import ITokenSchedulerService
 from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
 from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
 from src.infrastructure.services.jira_project_api_service import JiraProjectAPIService
 from src.infrastructure.services.jira_project_database_service import JiraProjectDatabaseService
+from src.infrastructure.services.jira_service import JiraAPIClient
 from src.infrastructure.unit_of_works.sqlalchemy_jira_sync_session import SQLAlchemyJiraSyncSession
 
 
@@ -41,12 +43,11 @@ def get_jira_project_repository(session=Depends(get_db)) -> IJiraProjectReposito
 
 
 def get_jira_project_api_service(
-    redis_service: IRedisService = Depends(get_redis_service),
-    token_scheduler_service: ITokenSchedulerService = Depends(get_token_scheduler_service),
+    jira_api_client: JiraAPIClient = Depends(get_jira_api_client),
     user_repository: IJiraUserRepository = Depends(get_jira_user_repository)
 ) -> IJiraProjectAPIService:
     """Get Jira project API service instance."""
-    return JiraProjectAPIService(redis_service, token_scheduler_service, user_repository)
+    return JiraProjectAPIService(jira_api_client, user_repository)
 
 
 async def get_jira_project_database_service(

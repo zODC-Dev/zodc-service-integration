@@ -14,8 +14,8 @@ class NATSSubscribeTopic(str, Enum):
     USER_CREATED = "user.created"
     USER_LOGOUT = "user.logout"
     PROJECT_USERS_REQUEST = "project.users.request"
-    JIRA_ISSUES_SYNC = "jira.issues.sync"
-    JIRA_PROJECT_SYNC = "jira.project.sync"
+    JIRA_ISSUES_SYNC = "jira.issues.sync.request"
+    JIRA_PROJECT_SYNC = "jira.project.sync.request"
 
 
 class NATSPublishTopic(str, Enum):

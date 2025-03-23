@@ -58,9 +58,9 @@ class JiraIssueSyncRequestHandler(INATSRequestHandler):
         """Handle Jira issue sync requests"""
         try:
             # Convert raw message to DTO
-            request = JiraBatchSyncRequestDTO(
-                issues=[JiraIssueSyncRequestDTO(**item) for item in message]
-            )
+            request = JiraBatchSyncRequestDTO.model_validate(message)
+
+            log.info(f"Received Jira issue sync request: {request}")
 
             # Process sync request
             results = await self.jira_issue_service.handle_sync_request(request)

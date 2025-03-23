@@ -1,203 +1,121 @@
-from typing import Any, Dict, List, Optional
-
-import aiohttp
+from typing import List, Optional
 
 from src.app.mappers.jira_mapper import JiraSprintMapper, JiraUserMapper
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.jira import JiraIssueType
-from src.domain.constants.refresh_tokens import TokenType
-from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.jira_project import JiraProjectModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
-from src.domain.services.redis_service import IRedisService
-from src.domain.services.token_scheduler_service import ITokenSchedulerService
 from src.infrastructure.dtos.jira.issue_responses import JiraAPIIssueResponse
 from src.infrastructure.dtos.jira.project_responses import JiraAPIProjectResponse
 from src.infrastructure.dtos.jira.sprint_responses import JiraAPISprintResponse
 from src.infrastructure.dtos.jira.user_responses import JiraAPIUserResponse
 from src.infrastructure.mappers.jira_issue_mapper import JiraIssueMapper
 from src.infrastructure.mappers.jira_project_mapper import JiraProjectMapper
+from src.infrastructure.services.jira_service import JiraAPIClient
 
 
 class JiraProjectAPIService(IJiraProjectAPIService):
+    """Service để tương tác với Jira Project API"""
+
     def __init__(
         self,
-        redis_service: IRedisService,
-        token_scheduler_service: ITokenSchedulerService,
-        user_repository: IJiraUserRepository,
-        timeout: int = 30
+        jira_api_client: JiraAPIClient,
+        user_repository: IJiraUserRepository
     ):
-        self.redis_service = redis_service
-        self.token_scheduler_service = token_scheduler_service
+        self.client = jira_api_client
         self.user_repository = user_repository
-        self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.base_url = settings.JIRA_BASE_URL
 
-    async def _get_token(self, user_id: int) -> str:
-        # Schedule token refresh check
-        await self.token_scheduler_service.schedule_token_refresh(user_id)
-
-        # Try to get token from cache first
-        token = await self.redis_service.get_cached_jira_token(user_id)
-        if token:
-            return token
-
-        # If not in cache, using refresh token to get new access token
-        await self.token_scheduler_service.refresh_token_chain(user_id, TokenType.JIRA)
-
-        # Try to get token from cache again
-        token = await self.redis_service.get_cached_jira_token(user_id)
-        if token:
-            return token
-
-        raise JiraAuthenticationError("Failed to get Jira token")
-
     async def get_project_details(self, user_id: int, project_key: str) -> JiraProjectModel:
-        """Get project details from Jira API"""
-        try:
-            token = await self._get_token(user_id)
-            log.info(f"Got token for user {user_id}: {token}...")  # Log first 10 chars of token
+        """Lấy thông tin chi tiết dự án từ Jira API"""
+        response_data = await self.client.get(
+            f"/rest/api/3/project/{project_key}",
+            user_id,
+            error_msg=f"Lỗi khi lấy thông tin dự án {project_key}"
+        )
 
-            headers = self._get_headers(token)
-            url = f"{settings.JIRA_BASE_URL}/rest/api/3/project/{project_key}"
-
-            log.info(f"Fetching project details from: {url}")
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.get(url, headers=headers) as response:
-                    if response.status == 401:
-                        log.error(f"Authentication failed for user {user_id}")
-                        raise JiraAuthenticationError("Invalid or expired token")
-                    if response.status != 200:
-                        error_text = await response.text()
-                        log.error(f"Failed to fetch project details. Status: {response.status}, Error: {error_text}")
-                        raise JiraRequestError(response.status, f"Failed to fetch project details: {error_text}")
-
-                    data = await response.json()
-
-                    api_response = JiraAPIProjectResponse.model_validate(data)
-                    return JiraProjectMapper.to_domain(api_response)
-
-        except aiohttp.ClientConnectorError as e:
-            log.error(f"Failed to connect to Jira API: {str(e)}")
-            raise JiraConnectionError(f"Could not connect to Jira API: {str(e)}") from e
-        except Exception as e:
-            log.error(f"Error fetching project details: {str(e)}", exc_info=True)
-            raise
+        return await self.client.map_to_domain(
+            response_data,
+            JiraAPIProjectResponse,
+            JiraProjectMapper
+        )
 
     async def get_project_users(self, user_id: int, project_key: str) -> List[JiraUserModel]:
-        """Get project users from Jira API"""
-        try:
-            token = await self._get_token(user_id)
+        """Lấy danh sách người dùng có thể gán cho dự án từ Jira API"""
+        response_data = await self.client.get(
+            "/rest/api/3/user/assignable/search",
+            user_id,
+            params={"project": project_key},
+            error_msg=f"Lỗi khi lấy danh sách người dùng cho dự án {project_key}"
+        )
 
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.get(
-                    f"{settings.JIRA_BASE_URL}/rest/api/3/user/assignable/search",
-                    params={"project": project_key},
-                    headers=self._get_headers(token)
-                ) as response:
-                    if response.status == 401:
-                        raise JiraAuthenticationError("Invalid or expired token")
-                    if response.status != 200:
-                        raise JiraRequestError(response.status, "Failed to fetch project users")
+        users = []
+        for user_data in response_data:
+            user = await self.client.map_to_domain(
+                user_data,
+                JiraAPIUserResponse,
+                JiraUserMapper
+            )
+            users.append(user)
 
-                    data = await response.json()
-                    users = []
-                    for user_data in data:
-                        api_response = JiraAPIUserResponse.model_validate(user_data)
-                        users.append(JiraUserMapper.to_domain(api_response))
-                    return users
-
-        except aiohttp.ClientConnectorError as e:
-            log.error(f"Failed to connect to Jira API: {str(e)}")
-            raise JiraConnectionError(f"Could not connect to Jira API: {str(e)}") from e
-        except Exception as e:
-            log.error(f"Error fetching project users: {str(e)}")
-            raise
+        return users
 
     async def get_project_sprints(self, user_id: int, project_key: str) -> List[JiraSprintModel]:
-        """Get project sprints from Jira API"""
-        try:
-            token = await self._get_token(user_id)
+        """Lấy danh sách sprints của dự án từ Jira API"""
+        # Trước tiên lấy board ID cho dự án
+        board_response = await self.client.get(
+            "/rest/agile/1.0/board",
+            user_id,
+            params={"projectKeyOrId": project_key},
+            error_msg=f"Lỗi khi lấy board cho dự án {project_key}"
+        )
 
-            # First get the board ID for the project
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.get(
-                    f"{settings.JIRA_BASE_URL}/rest/agile/1.0/board",
-                    params={"projectKeyOrId": project_key},
-                    headers=self._get_headers(token)
-                ) as response:
-                    if response.status == 401:
-                        raise JiraAuthenticationError("Invalid or expired token")
-                    if response.status != 200:
-                        raise JiraRequestError(response.status, "Failed to fetch project board")
+        if not board_response.get("values"):
+            return []
 
-                    data = await response.json()
-                    if not data.get("values"):
-                        return []
+        board_id = board_response["values"][0]["id"]
 
-                    board_id = data["values"][0]["id"]
+        # Sau đó lấy sprints cho board
+        sprint_response = await self.client.get(
+            f"/rest/agile/1.0/board/{board_id}/sprint",
+            user_id,
+            error_msg=f"Lỗi khi lấy sprints cho board {board_id}"
+        )
 
-                    # Then get sprints for the board
-                    async with session.get(
-                        f"{settings.JIRA_BASE_URL}/rest/agile/1.0/board/{board_id}/sprint",
-                        headers=self._get_headers(token)
-                    ) as sprint_response:
-                        if sprint_response.status == 401:
-                            raise JiraAuthenticationError("Invalid or expired token")
-                        if sprint_response.status != 200:
-                            raise JiraRequestError(sprint_response.status, "Failed to fetch sprints")
+        sprints = []
+        for sprint_data in sprint_response.get("values", []):
+            sprint = await self.client.map_to_domain(
+                sprint_data,
+                JiraAPISprintResponse,
+                JiraSprintMapper
+            )
+            sprints.append(sprint)
 
-                        sprint_data = await sprint_response.json()
-                        sprints = []
-                        for sprint in sprint_data.get("values", []):
-                            api_response = JiraAPISprintResponse.model_validate(sprint)
-                            sprints.append(JiraSprintMapper.to_domain(api_response))
-                        return sprints
-
-        except aiohttp.ClientConnectorError as e:
-            log.error(f"Failed to connect to Jira API: {str(e)}")
-            raise JiraConnectionError(f"Could not connect to Jira API: {str(e)}") from e
-        except Exception as e:
-            log.error(f"Error fetching project sprints: {str(e)}")
-            raise
+        return sprints
 
     async def get_accessible_projects(self, user_id: int) -> List[JiraProjectModel]:
-        """Get all accessible Jira projects for a user"""
-        token = await self._get_token(user_id)
+        """Lấy tất cả dự án mà người dùng có quyền truy cập"""
+        response_data = await self.client.get(
+            "/rest/api/3/project",
+            user_id,
+            error_msg="Lỗi khi lấy danh sách dự án"
+        )
 
-        try:
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.get(
-                    f"{self.base_url}/rest/api/3/project",
-                    headers=self._get_headers(token)
-                ) as response:
-                    if response.status != 200:
-                        raise JiraRequestError(
-                            response.status,
-                            await response.text()
-                        )
+        projects = []
+        for project_data in response_data:
+            project = await self.client.map_to_domain(
+                project_data,
+                JiraAPIProjectResponse,
+                JiraProjectMapper
+            )
+            projects.append(project)
 
-                    data = await response.json()
-                    projects = [
-                        JiraAPIProjectResponse.model_validate(project)
-                        for project in data
-                    ]
-                    return [
-                        JiraProjectMapper.to_domain_project(project)
-                        for project in projects
-                    ]
-
-        except aiohttp.ClientConnectorError as e:
-            log.error(f"Failed to connect to Jira API: {str(e)}")
-            raise JiraConnectionError(str(e)) from e
-        except Exception as e:
-            log.error(f"Error fetching Jira projects: {str(e)}")
-            raise JiraRequestError(500, str(e)) from e
+        return projects
 
     async def get_project_issues(
         self,
@@ -210,78 +128,105 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         limit: int = 50,
         start_at: int = 0
     ) -> List[JiraIssueModel]:
-        """Get project issues from Jira API with pagination"""
-        try:
-            token = await self._get_token(user_id)
+        """Lấy danh sách issues của dự án từ Jira API với phân trang"""
+        # Xây dựng JQL query
+        jql_parts = [f"project = {project_key}"]
+        if sprint_id:
+            jql_parts.append(f"sprint = {sprint_id}")
+        if is_backlog is not None:
+            jql_parts.append("sprint is EMPTY" if is_backlog else "sprint is not EMPTY")
+        if issue_type:
+            jql_parts.append(f"issuetype = {issue_type.value}")
+        if search:
+            jql_parts.append(f'(summary ~ "{search}" OR description ~ "{search}")')
 
-            # Build JQL query
-            jql_parts = [f"project = {project_key}"]
-            if sprint_id:
-                jql_parts.append(f"sprint = {sprint_id}")
-            if is_backlog is not None:
-                jql_parts.append("sprint is EMPTY" if is_backlog else "sprint is not EMPTY")
-            if issue_type:
-                jql_parts.append(f"issuetype = {issue_type.value}")
-            if search:
-                jql_parts.append(f"(summary ~ \"{search}\" OR description ~ \"{search}\")")
+        jql = " AND ".join(jql_parts)
 
-            jql = " AND ".join(jql_parts)
+        response_data = await self.client.post(
+            "/rest/api/3/search",
+            user_id,
+            {
+                "jql": jql,
+                "startAt": start_at,
+                "maxResults": limit,
+                "fields": "summary,description,status,assignee,priority,issuetype,created,updated,customfield_10016,customfield_10017,customfield_10020"
+            },
+            error_msg=f"Lỗi khi tìm kiếm issues cho dự án {project_key}"
+        )
 
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                url = f"{settings.JIRA_BASE_URL}/rest/api/3/search"
-                params = {
-                    "jql": jql,
-                    "maxResults": limit,
-                    "startAt": start_at,
-                    "fields": "summary,description,status,assignee,priority,issuetype,created,updated,customfield_10016,customfield_10017,customfield_10020"
-                }
+        issues = []
+        for issue_data in response_data.get("issues", []):
+            issue = await self.client.map_to_domain(
+                issue_data,
+                JiraAPIIssueResponse,
+                JiraIssueMapper
+            )
+            issues.append(issue)
 
-                async with session.get(
-                    url,
-                    params=params,
-                    headers=self._get_headers(token)
-                ) as response:
-                    if response.status == 401:
-                        raise JiraAuthenticationError("Invalid or expired token")
-                    if response.status != 200:
-                        raise JiraRequestError(response.status, "Failed to fetch project issues")
+        return issues
 
-                    data = await response.json()
-                    issues = []
-                    for issue_data in data.get("issues", []):
-                        api_response = JiraAPIIssueResponse.model_validate(issue_data)
-                        issues.append(JiraIssueMapper.to_domain_issue(api_response))
-                    return issues
-
-        except aiohttp.ClientConnectorError as e:
-            log.error(f"Failed to connect to Jira API: {str(e)}")
-            raise JiraConnectionError(f"Could not connect to Jira API: {str(e)}") from e
-        except Exception as e:
-            log.error(f"Error fetching project issues: {str(e)}")
-            raise
-
-    def _get_headers(self, token: str) -> Dict[str, str]:
-        return {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/json"
-        }
-
-    async def _get_project_board(
+    async def get_sprint_issues(
         self,
-        session: aiohttp.ClientSession,
-        token: str,
-        project_id: str
-    ) -> List[Dict[str, Any]]:
-        async with session.get(
-            f"{self.base_url}/rest/agile/1.0/board",
-            params={"projectKeyOrId": project_id},
-            headers=self._get_headers(token)
-        ) as response:
-            if response.status != 200:
-                raise JiraRequestError(
-                    response.status,
-                    await response.text()
-                )
+        user_id: int,
+        sprint_id: str,
+        issue_type: Optional[JiraIssueType] = None,
+        limit: int = 50
+    ) -> List[JiraIssueModel]:
+        """Lấy danh sách issues trong một sprint cụ thể"""
+        # Xây dựng JQL query
+        jql_parts = [f"sprint = {sprint_id}"]
+        if issue_type:
+            jql_parts.append(f"issuetype = {issue_type.value}")
 
-            data: Dict[str, List[Dict[str, Any]]] = await response.json()
-            return data.get("values", [])
+        jql = " AND ".join(jql_parts)
+
+        return await self.search_issues(user_id, jql, limit=limit)
+
+    async def search_issues(
+        self,
+        user_id: int,
+        jql: str,
+        start_at: int = 0,
+        limit: int = 50
+    ) -> List[JiraIssueModel]:
+        """Tìm kiếm issues với JQL"""
+        response_data = await self.client.post(
+            "/rest/api/3/search",
+            user_id,
+            {
+                "jql": jql,
+                "startAt": start_at,
+                "maxResults": limit,
+                "fields": "summary,description,status,assignee,priority,issuetype,created,updated,customfield_10016,customfield_10017,customfield_10020"
+            },
+            error_msg="Lỗi khi tìm kiếm issues với JQL"
+        )
+
+        issues = []
+        for issue_data in response_data.get("issues", []):
+            issue = await self.client.map_to_domain(
+                issue_data,
+                JiraAPIIssueResponse,
+                JiraIssueMapper
+            )
+            issues.append(issue)
+
+        return issues
+
+    async def get_sprint_by_id(self, user_id: int, sprint_id: str) -> Optional[JiraSprintModel]:
+        """Lấy thông tin chi tiết về một sprint cụ thể"""
+        try:
+            response_data = await self.client.get(
+                f"/rest/agile/1.0/sprint/{sprint_id}",
+                user_id,
+                error_msg=f"Lỗi khi lấy thông tin sprint {sprint_id}"
+            )
+
+            return await self.client.map_to_domain(
+                response_data,
+                JiraAPISprintResponse,
+                JiraSprintMapper
+            )
+        except Exception as e:
+            log.error(f"Lỗi khi lấy sprint {sprint_id}: {str(e)}")
+            return None

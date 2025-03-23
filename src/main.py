@@ -16,7 +16,7 @@ from src.app.routers.util_router import router as util_router
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.nats_event_service import NATSEventService
-from src.app.services.nats_handlers.jira_issue_handler import JiraIssueMessageHandler, JiraIssueSyncRequestHandler
+from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueMessageHandler, JiraIssueSyncRequestHandler
 from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
 from src.app.services.nats_handlers.jira_project_sync_handler import JiraProjectSyncRequestHandler
 from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
@@ -31,9 +31,11 @@ from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQ
 from src.infrastructure.repositories.sqlalchemy_jira_user_repository import SQLAlchemyJiraUserRepository
 from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
+from src.infrastructure.services.jira_issue_api_service import JiraIssueAPIService
 from src.infrastructure.services.jira_issue_database_service import JiraIssueDatabaseService
 from src.infrastructure.services.jira_project_api_service import JiraProjectAPIService
 from src.infrastructure.services.jira_project_database_service import JiraProjectDatabaseService
+from src.infrastructure.services.jira_service import JiraAPIClient
 from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.redis_service import RedisService
@@ -94,12 +96,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         jira_issue_repository
     )
 
+    jira_api_client = JiraAPIClient(redis_service, token_scheduler_service)
+    jira_issue_api_service = JiraIssueAPIService(jira_api_client)
+
     jira_issue_application_service = JiraIssueApplicationService(
-        jira_issue_database_service, jira_issue_repository, project_repository, nats_service, sync_log_repository)
+        jira_issue_database_service, jira_issue_api_service, jira_issue_repository, project_repository, nats_service, sync_log_repository)
 
     sync_session = SQLAlchemyJiraSyncSession(session_maker, redis_service)
 
-    jira_project_api_service = JiraProjectAPIService(redis_service, token_scheduler_service, user_repository)
+    jira_project_api_service = JiraProjectAPIService(jira_api_client, user_repository)
     jira_project_database_service = JiraProjectDatabaseService(project_repository)
     jira_sprint_repository = SQLAlchemyJiraSprintRepository(db)
     jira_sprint_database_service = JiraSprintDatabaseService(jira_sprint_repository)
@@ -130,7 +135,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize NATS Request Handlers
     request_handlers = {
-        NATSSubscribeTopic.JIRA_ISSUE_SYNC.value: JiraIssueSyncRequestHandler(jira_issue_application_service),
+        NATSSubscribeTopic.JIRA_ISSUES_SYNC.value: JiraIssueSyncRequestHandler(jira_issue_application_service),
         NATSSubscribeTopic.JIRA_PROJECT_SYNC.value: JiraProjectSyncRequestHandler(
             jira_project_application_service, sync_log_repository)
     }
