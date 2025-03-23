@@ -12,7 +12,7 @@ from src.domain.constants.jira import JiraIssueType
 from src.domain.constants.nats_events import NATSPublishTopic
 from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.exceptions.jira_exceptions import JiraRequestError
-from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_issue import JiraIssueCreateDTO, JiraIssueModel, JiraIssueUpdateDTO
 from src.domain.models.jira_project import JiraProjectCreateDTO, JiraProjectModel, JiraProjectUpdateDTO
 from src.domain.models.jira_sprint import JiraSprintCreateDTO, JiraSprintModel, JiraSprintUpdateDTO
 from src.domain.models.jira_user import JiraUserCreateDTO, JiraUserModel, JiraUserUpdateDTO
@@ -345,11 +345,15 @@ class JiraProjectApplicationService:
                     if existing_issue:
                         if jira_issue.updated_at > existing_issue.last_synced_at:
                             # Update existing issue with new data
-                            updated_issue = await session.issue_repository.update(jira_issue)
+                            updated_issue = await session.issue_repository.update(
+                                existing_issue.jira_issue_id,
+                                JiraIssueUpdateDTO._from_domain(jira_issue)
+                            )
                             synced_issues.append(updated_issue)
                     else:
                         # Create new issue
-                        new_issue = await session.issue_repository.create(jira_issue)
+                        issue_create_dto = JiraIssueCreateDTO._from_domain(jira_issue)
+                        new_issue = await session.issue_repository.create(issue_create_dto)
                         synced_issues.append(new_issue)
 
                 except Exception as e:

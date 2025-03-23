@@ -5,7 +5,6 @@ from src.domain.constants.jira import JiraIssueType
 from src.domain.models.jira_issue import (
     JiraIssueCreateDTO,
     JiraIssueModel,
-    JiraIssueStatus,
     JiraIssueUpdateDTO,
 )
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
@@ -25,27 +24,27 @@ class JiraIssueDatabaseService(IJiraIssueDatabaseService):
 
     async def create_issue(self, user_id: int, issue: JiraIssueCreateDTO) -> JiraIssueModel:
         """Create a new issue in database"""
-        now = datetime.now(timezone.utc)
+        # now = datetime.now(timezone.utc)
 
-        new_issue = JiraIssueModel(
-            jira_issue_id=issue.jira_issue_id,
-            key=issue.key,
-            summary=issue.summary,
-            description=issue.description,
-            status=JiraIssueStatus.TO_DO,  # Default status for new issues
-            type=issue.issue_type,
-            estimate_point=issue.estimate_points or 0,
-            actual_point=None,
-            created_at=now,
-            updated_at=now,
-            project_key=issue.project_key,
-            last_synced_at=None,
-            reporter_id=user_id,
-            assignee_id=issue.assignee,
-            needs_sync=True  # Mark as needing sync with Jira
-        )
+        # new_issue = JiraIssueCreateDTO(
+        #     jira_issue_id=issue.jira_issue_id,
+        #     key=issue.key,
+        #     summary=issue.summary,
+        #     description=issue.description,
+        #     status=JiraIssueStatus.TO_DO,  # Default status for new issues
+        #     type=issue.issue_type,
+        #     estimate_point=issue.estimate_points or 0,
+        #     actual_point=None,
+        #     created_at=now,
+        #     updated_at=now,
+        #     project_key=issue.project_key,
+        #     last_synced_at=None,
+        #     reporter_id=user_id,
+        #     assignee_id=issue.assignee,
+        #     needs_sync=True  # Mark as needing sync with Jira
+        # )
 
-        return await self.issue_repository.create(new_issue)
+        return await self.issue_repository.create(issue)
 
     async def update_issue(
         self,

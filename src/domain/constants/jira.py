@@ -53,3 +53,12 @@ class JiraSprintState(Enum):
 class JiraActionType(str, Enum):
     CREATE = "create"
     UPDATE = "update"
+
+
+class JiraWebhookEvent(str, Enum):
+    ISSUE_CREATED = "jira:issue_created"
+    ISSUE_UPDATED = "jira:issue_updated"
+    ISSUE_DELETED = "jira:issue_deleted"
+    SPRINT_CREATED = "jira:sprint_created"
+    SPRINT_UPDATED = "jira:sprint_updated"
+    PROJECT_UPDATED = "jira:project_updated"

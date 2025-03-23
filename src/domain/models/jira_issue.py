@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -55,9 +55,50 @@ class JiraIssueCreateDTO(BaseModel):
     project_key: str
     summary: str
     description: Optional[str] = None
-    issue_type: str
-    assignee: Optional[str] = None
+    type: str
     estimate_points: Optional[float] = None
+    status: Optional[str] = None
+    assignee_id: Optional[str] = None
+    reporter_id: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def _to_domain(cls, entity: 'JiraIssueCreateDTO') -> "JiraIssueModel":
+        return JiraIssueModel(
+            jira_issue_id=entity.jira_issue_id,
+            key=entity.key,
+            project_key=entity.project_key,
+            summary=entity.summary,
+            description=entity.description,
+            type=JiraIssueType(entity.type),
+            assignee_id=entity.assignee_id,
+            estimate_point=entity.estimate_points or 0,
+            status=JiraIssueStatus(entity.status),
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+            reporter_id=entity.reporter_id,
+            last_synced_at=datetime.now(timezone.utc),
+            updated_locally=False,
+            is_system_linked=False,
+        )
+
+    @classmethod
+    def _from_domain(cls, domain: 'JiraIssueModel') -> 'JiraIssueCreateDTO':
+        return cls(
+            jira_issue_id=domain.jira_issue_id,
+            key=domain.key,
+            project_key=domain.project_key,
+            summary=domain.summary,
+            type=domain.type.value if domain.type else None,
+            description=domain.description,
+            estimate_points=domain.estimate_point,
+            status=domain.status.value if domain.status else None,
+            assignee_id=domain.assignee_id,
+            reporter_id=domain.reporter_id,
+            created_at=domain.created_at,
+            updated_at=domain.updated_at,
+        )
 
 
 class JiraIssueUpdateDTO(BaseModel):
@@ -67,3 +108,40 @@ class JiraIssueUpdateDTO(BaseModel):
     assignee: Optional[str] = None
     estimate_points: Optional[float] = None
     actual_points: Optional[float] = None
+    last_synced_at: Optional[datetime] = None
+    updated_locally: Optional[bool] = None
+    is_system_linked: Optional[bool] = None
+    assignee_id: Optional[str] = None
+    reporter_id: Optional[str] = None
+    sprints: Optional[List['JiraSprintModel']] = None
+
+    @classmethod
+    def _to_domain(cls, entity: 'JiraIssueUpdateDTO') -> "JiraIssueModel":
+        return JiraIssueModel(
+            summary=entity.summary,
+            description=entity.description,
+            status=JiraIssueStatus(entity.status),
+            assignee_id=entity.assignee_id,
+            estimate_point=entity.estimate_points,
+            last_synced_at=entity.last_synced_at,
+            updated_locally=entity.updated_locally,
+            is_system_linked=entity.is_system_linked,
+            sprints=entity.sprints,
+            reporter_id=entity.reporter_id,
+        )
+
+    @classmethod
+    def _from_domain(cls, domain: 'JiraIssueModel') -> 'JiraIssueUpdateDTO':
+        return cls(
+            summary=domain.summary,
+            description=domain.description,
+            status=domain.status.value if domain.status else None,
+            assignee_id=domain.assignee_id,
+            estimate_points=domain.estimate_point,
+            actual_points=domain.actual_point,
+            last_synced_at=domain.last_synced_at,
+            updated_locally=domain.updated_locally,
+            is_system_linked=domain.is_system_linked,
+            sprints=domain.sprints,
+            reporter_id=domain.reporter_id,
+        )

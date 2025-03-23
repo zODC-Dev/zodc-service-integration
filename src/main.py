@@ -95,7 +95,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
 
     jira_issue_application_service = JiraIssueApplicationService(
-        jira_issue_database_service, jira_issue_repository, nats_service, sync_log_repository)
+        jira_issue_database_service, jira_issue_repository, project_repository, nats_service, sync_log_repository)
 
     sync_session = SQLAlchemyJiraSyncSession(session_maker, redis_service)
 

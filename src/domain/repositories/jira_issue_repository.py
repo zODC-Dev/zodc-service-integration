@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from src.domain.constants.jira import JiraIssueType
-from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_issue import JiraIssueCreateDTO, JiraIssueModel, JiraIssueUpdateDTO
 
 
 class IJiraIssueRepository(ABC):
@@ -11,11 +11,11 @@ class IJiraIssueRepository(ABC):
         pass
 
     @abstractmethod
-    async def update(self, issue: JiraIssueModel) -> JiraIssueModel:
+    async def update(self, issue_id: str, issue_update: JiraIssueUpdateDTO) -> JiraIssueModel:
         pass
 
     @abstractmethod
-    async def create(self, issue: JiraIssueModel) -> JiraIssueModel:
+    async def create(self, issue: JiraIssueCreateDTO) -> JiraIssueModel:
         pass
 
     @abstractmethod

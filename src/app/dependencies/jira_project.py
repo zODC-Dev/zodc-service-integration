@@ -1,6 +1,9 @@
+from typing import AsyncGenerator
+
 from fastapi import Depends
 
 from src.app.controllers.jira_project_controller import JiraProjectController
+from src.app.dependencies.base import get_project_repository
 from src.app.dependencies.common import get_redis_service
 from src.app.dependencies.jira_issue import get_jira_issue_database_service
 from src.app.dependencies.jira_sprint import get_jira_sprint_database_service
@@ -46,16 +49,16 @@ def get_jira_project_api_service(
     return JiraProjectAPIService(redis_service, token_scheduler_service, user_repository)
 
 
-def get_jira_project_db_service(
-    project_repository: IJiraProjectRepository = Depends(get_jira_project_repository)
-) -> IJiraProjectDatabaseService:
+async def get_jira_project_database_service(
+    project_repository=Depends(get_project_repository)
+) -> AsyncGenerator[IJiraProjectDatabaseService, None]:
     """Get Jira project database service instance."""
-    return JiraProjectDatabaseService(project_repository)
+    yield JiraProjectDatabaseService(project_repository)
 
 
 def get_jira_project_application_service(
     jira_project_api_service: IJiraProjectAPIService = Depends(get_jira_project_api_service),
-    jira_project_db_service: IJiraProjectDatabaseService = Depends(get_jira_project_db_service),
+    jira_project_db_service: IJiraProjectDatabaseService = Depends(get_jira_project_database_service),
     jira_issue_db_service: IJiraIssueDatabaseService = Depends(get_jira_issue_database_service),
     jira_sprint_db_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service),
     sync_session: IJiraSyncSession = Depends(get_sqlalchemy_jira_sync_session),

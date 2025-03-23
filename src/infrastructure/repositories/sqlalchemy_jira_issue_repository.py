@@ -6,7 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
-from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_issue import JiraIssueCreateDTO, JiraIssueModel, JiraIssueUpdateDTO
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
@@ -27,22 +27,23 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         entity = result.first()
         return self._to_domain(entity) if entity else None
 
-    async def create(self, issue: JiraIssueModel) -> JiraIssueModel:
+    async def create(self, issue: JiraIssueCreateDTO) -> JiraIssueModel:
         try:
+            issue_model = JiraIssueCreateDTO._to_domain(issue)
             # Create issue entity
-            issue_entity = self._to_entity(issue)
+            issue_entity = self._to_entity(issue_model)
             self.session.add(issue_entity)
             await self.session.flush()  # Flush to get the issue ID
 
             # Create sprint relationships
-            if issue.sprints:
-                for sprint in issue.sprints:
+            if issue_model.sprints:
+                for sprint in issue_model.sprints:
                     # Get or create sprint
                     await self._get_or_create_sprint(sprint)
 
                     # Create issue-sprint relationship
                     issue_sprint = JiraIssueSprintEntity(
-                        jira_issue_id=issue.jira_issue_id,
+                        jira_issue_id=issue_model.jira_issue_id,
                         jira_sprint_id=sprint.jira_sprint_id,
                         created_at=datetime.now(timezone.utc)
                     )
@@ -57,37 +58,45 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             log.error(f"Error creating issue: {str(e)}")
             raise
 
-    async def update(self, issue: JiraIssueModel) -> JiraIssueModel:
+    async def update(self, issue_id: str, issue_update: JiraIssueUpdateDTO) -> JiraIssueModel:
         try:
+            # Fetch existing issue
             result = await self.session.exec(
                 select(JiraIssueEntity).where(
-                    JiraIssueEntity.jira_issue_id == issue.jira_issue_id
+                    JiraIssueEntity.jira_issue_id == issue_id
                 )
             )
             issue_entity = result.first()
 
             if not issue_entity:
-                raise ValueError(f"Issue with jira_issue_id {issue.jira_issue_id} not found")
+                raise ValueError(f"Issue with jira_issue_id {issue_id} not found")
 
-            # Update basic fields
-            updated_data = self._to_entity(issue)
-            for key, value in updated_data.model_dump(exclude={'sprints'}).items():
-                setattr(issue_entity, key, value)
+            # Convert existing entity to domain model
+            existing_issue = self._to_domain(issue_entity)
 
-            # Update sprint relationships
-            # Remove existing relationships
-            await self.session.exec(
-                delete(JiraIssueSprintEntity).where(
-                    JiraIssueSprintEntity.jira_issue_id == issue.jira_issue_id
+            # Combine existing data with update data
+            updated_issue = self._merge_update_with_existing(existing_issue, issue_update)
+
+            # Convert back to entity and update fields
+            updated_entity = self._to_entity(updated_issue)
+            for key, value in updated_entity.model_dump(exclude={'id', 'sprints'}).items():
+                if value is not None:  # Only update non-None values
+                    setattr(issue_entity, key, value)
+
+            # Handle sprint updates if present
+            if issue_update.sprints is not None:
+                # Remove existing relationships
+                await self.session.exec(
+                    delete(JiraIssueSprintEntity).where(
+                        JiraIssueSprintEntity.jira_issue_id == issue_id
+                    )
                 )
-            )
 
-            # Create new relationships
-            if issue.sprints:
-                for sprint in issue.sprints:
+                # Create new relationships
+                for sprint in issue_update.sprints:
                     await self._get_or_create_sprint(sprint)
                     issue_sprint = JiraIssueSprintEntity(
-                        jira_issue_id=issue.jira_issue_id,
+                        jira_issue_id=issue_id,
                         jira_sprint_id=sprint.jira_sprint_id,
                         created_at=datetime.now(timezone.utc)
                     )
@@ -101,6 +110,32 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             await self.session.rollback()
             log.error(f"Error updating issue: {str(e)}")
             raise
+
+    def _merge_update_with_existing(
+        self,
+        existing: JiraIssueModel,
+        update: JiraIssueUpdateDTO
+    ) -> JiraIssueModel:
+        """Merge update DTO with existing model to create a complete domain model"""
+        # Convert update to dict and filter out None values
+        update_dict = update.model_dump(exclude_unset=True)
+
+        # Create a new dict with existing data
+        merged_data = existing.model_dump()
+
+        # Update only the fields that are present in the update
+        for key, value in update_dict.items():
+            if value is not None:
+                merged_data[key] = value
+
+        # Special handling for enums
+        if 'status' in update_dict:
+            merged_data['status'] = JiraIssueStatus(update_dict['status'])
+        if 'type' in update_dict:
+            merged_data['type'] = JiraIssueType(update_dict['type'])
+
+        # Create new domain model with merged data
+        return JiraIssueModel(**merged_data)
 
     async def _get_or_create_sprint(self, sprint: JiraSprintModel) -> JiraSprintEntity:
         # Try to get existing sprint
