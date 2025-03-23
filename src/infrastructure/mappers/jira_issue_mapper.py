@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
@@ -47,27 +47,26 @@ class JiraIssueMapper:
             fields = api_response.fields
             now = datetime.now(timezone.utc)
 
-            # Map all sprints from the customfield
-            sprints = []
-            if fields.customfield_10020:
-                for jira_sprint in fields.customfield_10020:
-                    sprint = JiraIssueMapper._map_sprint(jira_sprint)
-                    if sprint:
-                        sprints.append(sprint)
-
-            # Get reporter_id directly from accountId
-            reporter_id = None
-            if hasattr(fields, 'reporter') and fields.reporter:
-                reporter_id = getattr(fields.reporter, 'accountId', None)
-                log.info(f"Found reporter_id: {reporter_id} for issue {api_response.key}")
-
-            # Get assignee and assignee_id
+            # Map user data
             assignee = None
             assignee_id = None
-            if hasattr(fields, 'assignee') and fields.assignee:
+            reporter_id = None
+
+            if fields.assignee:
+                assignee_id = fields.assignee.accountId
                 assignee = JiraIssueMapper._map_user(fields.assignee)
-                if assignee:
-                    assignee_id = assignee.jira_account_id
+
+            if fields.reporter:
+                reporter_id = fields.reporter.accountId
+
+            # Map sprints
+            sprints = []
+            if hasattr(fields, 'customfield_10020') and fields.customfield_10020:
+                sprints = JiraIssueMapper._map_sprints(fields.customfield_10020)
+
+            # Create link URL
+            jira_base_url = JiraIssueMapper._extract_jira_base_url(api_response)
+            link_url = f"{jira_base_url}/browse/{api_response.key}" if jira_base_url else None
 
             return JiraIssueModel(
                 key=api_response.key,
@@ -86,7 +85,9 @@ class JiraIssueMapper:
                 jira_issue_id=api_response.id,
                 project_key=api_response.key.split("-")[0],
                 reporter_id=reporter_id,
-                last_synced_at=now
+                last_synced_at=now,
+                is_deleted=False,
+                link_url=link_url
             )
         except Exception as e:
             log.error(f"Error mapping issue response to domain for issue {api_response.key}: {str(e)}")
@@ -107,7 +108,9 @@ class JiraIssueMapper:
                 last_synced_at=now,
                 reporter_id=None,
                 assignee_id=None,
-                assignee=None
+                assignee=None,
+                is_deleted=False,
+                link_url=None
             )
 
     @staticmethod
@@ -135,6 +138,12 @@ class JiraIssueMapper:
         except Exception as e:
             log.error(f"Error mapping sprint: {str(e)}")
             return None
+
+    @staticmethod
+    def _map_sprints(api_sprints: List[JiraAPISprintResponse]) -> List[JiraSprintModel]:
+        if not api_sprints:
+            return []
+        return [JiraIssueMapper._map_sprint(sprint) for sprint in api_sprints]
 
     @staticmethod
     def to_entity(model: JiraIssueModel) -> JiraIssueEntity:
@@ -193,5 +202,17 @@ class JiraIssueMapper:
             jira_issue_id=entity.jira_issue_id,
             updated_locally=entity.updated_locally
         )
+
+    @staticmethod
+    def _extract_jira_base_url(api_response: JiraAPIIssueResponse) -> Optional[str]:
+        """Extract Jira base URL from API response"""
+        if hasattr(api_response, 'self') and api_response.self:
+            try:
+                parts = api_response.self.split('/rest/api')
+                if parts and len(parts) > 0:
+                    return parts[0]
+            except Exception as e:
+                log.warning(f"Could not extract Jira base URL: {str(e)}")
+        return None
 
     # Add other mapping methods as needed

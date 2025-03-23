@@ -40,9 +40,12 @@ class JiraIssueMessageHandler(INATSMessageHandler):
 
         except Exception as e:
             log.error(f"Error handling Jira issue message: {str(e)}")
+
+            issue_id: str = message.get("issue_id")
+
             # Publish error event if needed
             await self.jira_issue_service.publish_update_error(
-                issue_id=message.get("issue_id"),
+                issue_id=issue_id,
                 error=str(e)
             )
 

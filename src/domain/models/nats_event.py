@@ -84,8 +84,8 @@ class JiraIssueSyncPayload(BaseModel):
     issue_type: Optional[str] = None  # Required for creates
     status: Optional[str] = None
     assignee: Optional[str] = None
-    estimate_points: Optional[float] = None
-    actual_points: Optional[float] = None
+    estimate_point: Optional[float] = None
+    actual_point: Optional[float] = None
     user_id: int  # User ID for authentication
 
 

@@ -20,8 +20,8 @@ class JiraIssueCreateRequest(BaseRequest):
 class JiraIssueUpdateRequest(BaseRequest):
     assignee: Optional[str] = None
     status: Optional[JiraIssueStatus] = None
-    estimate_points: Optional[float] = None
-    actual_points: Optional[float] = None
+    estimate_point: Optional[float] = None
+    actual_point: Optional[float] = None
 
 
 class JiraIssueGetRequest(BaseRequest):

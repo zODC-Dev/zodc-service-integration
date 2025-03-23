@@ -343,7 +343,7 @@ class JiraIssueApplicationService:
                     description=request.description,
                     type=request.issue_type.value if request.issue_type else JiraIssueType.TASK.value,
                     assignee_id=request.assignee_id,
-                    estimate_points=request.estimate_points,
+                    estimate_point=request.estimate_point,
                     status=request.status.value if request.status else None
                 )
             )
@@ -372,8 +372,8 @@ class JiraIssueApplicationService:
                     description=request.description,
                     status=request.status,
                     assignee_id=request.assignee_id,
-                    estimate_points=request.estimate_points,
-                    actual_points=request.actual_points
+                    estimate_point=request.estimate_point,
+                    actual_point=request.actual_point
                 )
             )
             return JiraIssueSyncResponseDTO(

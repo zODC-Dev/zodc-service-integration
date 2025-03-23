@@ -30,6 +30,7 @@ class IJiraIssueRepository(ABC):
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
         search: Optional[str] = None,
+        include_deleted: bool = False,
         limit: int = 50
     ) -> List[JiraIssueModel]:
         pass

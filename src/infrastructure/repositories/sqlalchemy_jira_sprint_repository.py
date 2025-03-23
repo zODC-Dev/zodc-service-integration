@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -20,7 +20,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             return dt.replace(tzinfo=timezone.utc)
         return dt
 
-    def _prepare_data(self, data: dict) -> dict:
+    def _prepare_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare data for database by ensuring all datetime fields have timezone info"""
         datetime_fields = ['start_date', 'end_date', 'complete_date', 'created_at', 'updated_at']
         for field in datetime_fields:
@@ -45,8 +45,9 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
         sprint = await self.session.get(JiraSprintEntity, sprint_id)
         return self._to_domain(sprint) if sprint else None
 
-    async def get_sprints_by_project_id(self, project_id: int) -> List[JiraSprintModel]:
-        result = await self.session.exec(select(JiraSprintEntity).where(JiraSprintEntity.project_id == project_id))
+    async def get_sprints_by_project_key(self, project_key: str) -> List[JiraSprintModel]:
+        result = await self.session.exec(
+            select(JiraSprintEntity).where(JiraSprintEntity.project_key == project_key))
         sprints = result.all()
         return [self._to_domain(sprint) for sprint in sprints]
 

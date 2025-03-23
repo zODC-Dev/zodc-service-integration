@@ -32,6 +32,26 @@ class JiraIssueStatus(Enum):
         raise ValueError(f"Invalid status: {status}")
 
 
+# Status ID mapping - cần cập nhật các ID tương ứng với Jira instance của bạn
+JIRA_STATUS_ID_MAPPING = {
+    "10000": JiraIssueStatus.TO_DO,        # Thay bằng ID thực tế
+    "10001": JiraIssueStatus.IN_PROGRESS,  # Thay bằng ID thực tế
+    "10002": JiraIssueStatus.IN_REVIEW,    # Thay bằng ID thực tế
+    "10003": JiraIssueStatus.DONE,         # Thay bằng ID thực tế
+    # Thêm các mapping khác nếu có thêm status
+}
+
+# Issue Type ID mapping
+JIRA_ISSUE_TYPE_ID_MAPPING = {
+    "10000": JiraIssueType.TASK,       # Thay bằng ID thực tế
+    "10001": JiraIssueType.STORY,      # Thay bằng ID thực tế
+    "10002": JiraIssueType.EPIC,       # Thay bằng ID thực tế
+    "10003": JiraIssueType.BUG,        # Thay bằng ID thực tế
+    "10004": JiraIssueType.SUB_TASK,   # Thay bằng ID thực tế
+    # Thêm các mapping khác nếu có thêm issue type
+}
+
+
 class JiraSprintState(Enum):
     ACTIVE = "active"
     CLOSED = "closed"

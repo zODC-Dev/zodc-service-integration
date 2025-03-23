@@ -33,6 +33,8 @@ class JiraIssueEntity(BaseEntityWithTimestamps, table=True):
     created_at: datetime = Field(sa_type=DateTime(timezone=True))
     updated_at: datetime = Field(sa_type=DateTime(timezone=True))
     is_system_linked: bool = Field(default=False)
+    is_deleted: bool = Field(default=False)
+    link_url: Optional[str] = Field(default=None)
 
     project: "JiraProjectEntity" = Relationship(back_populates="jira_issues")
     sprints: List["JiraSprintEntity"] = Relationship(

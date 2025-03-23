@@ -44,6 +44,8 @@ class JiraIssueModel(BaseModel):
     last_synced_at: datetime
     updated_locally: bool = Field(default=False)
     is_system_linked: bool = Field(default=False)
+    is_deleted: bool = Field(default=False)
+    link_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -56,12 +58,13 @@ class JiraIssueCreateDTO(BaseModel):
     summary: str
     description: Optional[str] = None
     type: str
-    estimate_points: Optional[float] = None
+    estimate_point: Optional[float] = None
     status: Optional[str] = None
     assignee_id: Optional[str] = None
     reporter_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    link_url: Optional[str] = None
 
     @classmethod
     def _to_domain(cls, entity: 'JiraIssueCreateDTO') -> "JiraIssueModel":
@@ -73,7 +76,7 @@ class JiraIssueCreateDTO(BaseModel):
             description=entity.description,
             type=JiraIssueType(entity.type),
             assignee_id=entity.assignee_id,
-            estimate_point=entity.estimate_points or 0,
+            estimate_point=entity.estimate_point or 0,
             status=JiraIssueStatus(entity.status),
             created_at=entity.created_at,
             updated_at=entity.updated_at,
@@ -81,6 +84,8 @@ class JiraIssueCreateDTO(BaseModel):
             last_synced_at=datetime.now(timezone.utc),
             updated_locally=False,
             is_system_linked=False,
+            is_deleted=False,
+            link_url=entity.link_url,
         )
 
     @classmethod
@@ -92,12 +97,13 @@ class JiraIssueCreateDTO(BaseModel):
             summary=domain.summary,
             type=domain.type.value if domain.type else None,
             description=domain.description,
-            estimate_points=domain.estimate_point,
+            estimate_point=domain.estimate_point,
             status=domain.status.value if domain.status else None,
             assignee_id=domain.assignee_id,
             reporter_id=domain.reporter_id,
             created_at=domain.created_at,
             updated_at=domain.updated_at,
+            link_url=domain.link_url,
         )
 
 
@@ -106,14 +112,15 @@ class JiraIssueUpdateDTO(BaseModel):
     description: Optional[str] = None
     status: Optional[str] = None
     assignee: Optional[str] = None
-    estimate_points: Optional[float] = None
-    actual_points: Optional[float] = None
+    estimate_point: Optional[float] = None
+    actual_point: Optional[float] = None
     last_synced_at: Optional[datetime] = None
     updated_locally: Optional[bool] = None
     is_system_linked: Optional[bool] = None
     assignee_id: Optional[str] = None
     reporter_id: Optional[str] = None
     sprints: Optional[List['JiraSprintModel']] = None
+    is_deleted: Optional[bool] = None
 
     @classmethod
     def _to_domain(cls, entity: 'JiraIssueUpdateDTO') -> "JiraIssueModel":
@@ -122,12 +129,13 @@ class JiraIssueUpdateDTO(BaseModel):
             description=entity.description,
             status=JiraIssueStatus(entity.status),
             assignee_id=entity.assignee_id,
-            estimate_point=entity.estimate_points,
+            estimate_point=entity.estimate_point,
+            actual_point=entity.actual_point,
             last_synced_at=entity.last_synced_at,
             updated_locally=entity.updated_locally,
             is_system_linked=entity.is_system_linked,
-            sprints=entity.sprints,
             reporter_id=entity.reporter_id,
+            is_deleted=entity.is_deleted,
         )
 
     @classmethod
@@ -137,11 +145,12 @@ class JiraIssueUpdateDTO(BaseModel):
             description=domain.description,
             status=domain.status.value if domain.status else None,
             assignee_id=domain.assignee_id,
-            estimate_points=domain.estimate_point,
-            actual_points=domain.actual_point,
+            estimate_point=domain.estimate_point,
+            actual_point=domain.actual_point,
             last_synced_at=domain.last_synced_at,
             updated_locally=domain.updated_locally,
             is_system_linked=domain.is_system_linked,
             sprints=domain.sprints,
             reporter_id=domain.reporter_id,
+            is_deleted=domain.is_deleted,
         )

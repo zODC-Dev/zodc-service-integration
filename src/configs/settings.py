@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # Logging
-    LOG_LEVEL: str = "INFO"
+    LOG_LEVEL: str = "DEBUG"
 
     # Port
     PORT: int = 8001

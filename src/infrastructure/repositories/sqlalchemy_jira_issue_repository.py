@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlmodel import delete, select
+from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
@@ -20,10 +20,14 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_by_jira_issue_id(self, jira_issue_id: str) -> Optional[JiraIssueModel]:
-        result = await self.session.exec(
-            select(JiraIssueEntity).where(JiraIssueEntity.jira_issue_id == jira_issue_id)
-        )
+    async def get_by_jira_issue_id(self, jira_issue_id: str, include_deleted: bool = False) -> Optional[JiraIssueModel]:
+        query = select(JiraIssueEntity).where(JiraIssueEntity.jira_issue_id == jira_issue_id)
+
+        # Filter out deleted issues unless explicitly requested
+        if not include_deleted:
+            query = query.where(JiraIssueEntity.is_deleted == False)  # noqa: E712
+
+        result = await self.session.exec(query)
         entity = result.first()
         return self._to_domain(entity) if entity else None
 
@@ -165,8 +169,15 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
         return sprint_entity
 
-    async def get_all(self) -> List[JiraIssueModel]:
-        result = await self.session.exec(select(JiraIssueEntity))
+    async def get_all(self, include_deleted: bool = False) -> List[JiraIssueModel]:
+        """Get all issues, optionally including deleted ones"""
+        query = select(JiraIssueEntity)
+
+        # Filter out deleted issues unless explicitly requested
+        if not include_deleted:
+            query = query.where(JiraIssueEntity.is_deleted == False)  # noqa: E712
+
+        result = await self.session.exec(query)
         entities = result.all()
         return [self._to_domain(entity) for entity in entities]
 
@@ -188,7 +199,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             updated_at=model.updated_at,
             last_synced_at=model.last_synced_at,
             updated_locally=model.updated_locally,
-            is_system_linked=model.is_system_linked
+            is_system_linked=model.is_system_linked,
+            is_deleted=model.is_deleted
         )
 
     def _to_domain(self, entity: JiraIssueEntity) -> JiraIssueModel:
@@ -239,7 +251,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             sprints=sprints,
             id=entity.id,
             is_system_linked=entity.is_system_linked,
-            assignee=assignee
+            assignee=assignee,
+            is_deleted=entity.is_deleted
         )
 
     async def get_project_issues(
@@ -249,6 +262,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
         search: Optional[str] = None,
+        include_deleted: bool = False,
         limit: int = 50
     ) -> List[JiraIssueModel]:
         """Get project issues with filters"""
@@ -259,6 +273,10 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                 .outerjoin(JiraUserEntity, JiraIssueEntity.assignee_id == JiraUserEntity.jira_account_id)
                 .where(JiraIssueEntity.project_key == project_key)
             )
+
+            # Filter out deleted issues unless explicitly requested
+            if not include_deleted:
+                query = query.where(JiraIssueEntity.is_deleted == False)  # noqa: E712
 
             # Add sprint filter
             if sprint_id or is_backlog is not None:
@@ -284,8 +302,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             if search:
                 search_pattern = f"%{search}%"
                 query = query.where(
-                    (JiraIssueEntity.summary.ilike(search_pattern)) |
-                    (JiraIssueEntity.description.ilike(search_pattern))
+                    (col(JiraIssueEntity.summary).ilike(search_pattern)) |
+                    (col(JiraIssueEntity.description).ilike(search_pattern))
                 )
 
             # Add limit

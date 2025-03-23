@@ -183,7 +183,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
                 users = await user_repository.get_all_users()
                 for user in users:
-                    await token_scheduler_service.schedule_token_refresh(user.user_id)
+                    if user and user.user_id:
+                        await token_scheduler_service.schedule_token_refresh(user.user_id)
                 log.info("Completed token refresh check")
             finally:
                 await db.close()

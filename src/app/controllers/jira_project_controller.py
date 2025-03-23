@@ -49,7 +49,8 @@ class JiraProjectController:
             )
             return StandardResponse(
                 message="Issues fetched successfully from database",
-                data=[GetJiraIssueResponse.from_domain(issue, int(sprint_id)) for issue in issues]
+                data=[GetJiraIssueResponse.from_domain(issue, int(
+                    sprint_id) if sprint_id else None) for issue in issues]
             )
         except Exception as e:
             log.error(f"Error fetching issues from database: {str(e)}")

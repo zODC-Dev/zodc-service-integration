@@ -24,26 +24,6 @@ class JiraIssueDatabaseService(IJiraIssueDatabaseService):
 
     async def create_issue(self, user_id: int, issue: JiraIssueCreateDTO) -> JiraIssueModel:
         """Create a new issue in database"""
-        # now = datetime.now(timezone.utc)
-
-        # new_issue = JiraIssueCreateDTO(
-        #     jira_issue_id=issue.jira_issue_id,
-        #     key=issue.key,
-        #     summary=issue.summary,
-        #     description=issue.description,
-        #     status=JiraIssueStatus.TO_DO,  # Default status for new issues
-        #     type=issue.issue_type,
-        #     estimate_point=issue.estimate_points or 0,
-        #     actual_point=None,
-        #     created_at=now,
-        #     updated_at=now,
-        #     project_key=issue.project_key,
-        #     last_synced_at=None,
-        #     reporter_id=user_id,
-        #     assignee_id=issue.assignee,
-        #     needs_sync=True  # Mark as needing sync with Jira
-        # )
-
         return await self.issue_repository.create(issue)
 
     async def update_issue(
@@ -64,17 +44,17 @@ class JiraIssueDatabaseService(IJiraIssueDatabaseService):
             current_issue.description = update.description
         if update.assignee:
             current_issue.assignee_id = update.assignee
-        if update.estimate_points is not None:
-            current_issue.estimate_point = update.estimate_points
-        if update.actual_points is not None:
-            current_issue.actual_point = update.actual_points
+        if update.estimate_point is not None:
+            current_issue.estimate_point = update.estimate_point
+        if update.actual_point is not None:
+            current_issue.actual_point = update.actual_point
         if update.status:
             current_issue.status = update.status
 
         current_issue.updated_at = datetime.now(timezone.utc)
         current_issue.needs_sync = True  # Mark as needing sync with Jira
 
-        return await self.issue_repository.update(current_issue)
+        return await self.issue_repository.update(issue_id, JiraIssueUpdateDTO(**current_issue))
 
     async def get_project_issues(
         self,

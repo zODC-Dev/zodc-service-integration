@@ -48,7 +48,7 @@ class NATSService(INATSService):
 
             payload = json.dumps(message).encode()
             await self._client.publish(subject, payload)
-            log.debug(f"Published message to {subject}: {message}")
+            log.info(f"Published message to {subject}: {message}")
         except Exception as e:
             log.error(f"Failed to publish message: {str(e)}")
             raise
@@ -90,7 +90,7 @@ class NATSService(INATSService):
                     response_data = json.dumps(response).encode()
                     await msg.respond(response_data)
 
-                    log.debug(f"Handled request for {msg.subject} with response: {response}")
+                    log.info(f"Handled request for {msg.subject} with response: {response}")
                 except Exception as e:
                     # Send error response
                     error_response = json.dumps({"error": str(e)}).encode()

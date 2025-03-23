@@ -1,37 +1,62 @@
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
-from src.app.services.jira_issue_service import JiraIssueApplicationService
+from src.app.services.jira_webhook_handlers.issue_create_webhook_handler import IssueCreateWebhookHandler
+from src.app.services.jira_webhook_handlers.issue_delete_webhook_handler import IssueDeleteWebhookHandler
+from src.app.services.jira_webhook_handlers.issue_update_webhook_handler import IssueUpdateWebhookHandler
+from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.logger import log
-from src.domain.constants.jira import JiraWebhookEvent
 from src.domain.models.jira_webhook import JiraWebhookPayload
-from src.domain.services.jira_webhook_service import IJiraWebhookService
+from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
+from src.domain.repositories.sync_log_repository import ISyncLogRepository
 
 
-class JiraWebhookService(IJiraWebhookService):
-    """Implementation of Jira webhook service"""
+class JiraWebhookService:
+    """Service for handling Jira webhooks"""
 
     def __init__(
         self,
-        jira_issue_service: JiraIssueApplicationService
+        jira_issue_repository: IJiraIssueRepository,
+        sync_log_repository: ISyncLogRepository
     ):
-        self.jira_issue_service = jira_issue_service
+        self.handlers: List[JiraWebhookHandler] = []
+        self._init_handlers(jira_issue_repository, sync_log_repository)
 
-    async def handle_webhook(self, payload: Dict[str, Any]) -> None:
-        """Route webhook to appropriate handler"""
+    def _init_handlers(
+        self,
+        jira_issue_repository: IJiraIssueRepository,
+        sync_log_repository: ISyncLogRepository
+    ):
+        """Initialize webhook handlers"""
+        self.handlers = [
+            IssueCreateWebhookHandler(jira_issue_repository, sync_log_repository),
+            IssueUpdateWebhookHandler(jira_issue_repository, sync_log_repository),
+            IssueDeleteWebhookHandler(jira_issue_repository, sync_log_repository)
+            # Add more handlers as needed
+        ]
+
+    async def handle_webhook(self, webhook_data: JiraWebhookPayload) -> Optional[Dict[str, Any]]:
+        """Handle a webhook by delegating to appropriate handler"""
         try:
-            # Parse webhook payload
-            webhook_data = JiraWebhookPayload.parse_webhook(payload)
+            log.info(f"Received webhook event: {webhook_data.webhook_event}")
 
-            if webhook_data.webhook_event == JiraWebhookEvent.ISSUE_CREATED:
-                await self.jira_issue_service.handle_webhook_create(webhook_data)
-            elif webhook_data.webhook_event == JiraWebhookEvent.ISSUE_UPDATED:
-                await self.jira_issue_service.handle_webhook_update(webhook_data)
-            else:
-                log.warning(f"Unhandled webhook event type: {webhook_data.webhook_event}")
+            # Validate webhook data
+            if not webhook_data.webhook_event:
+                log.error("Webhook event type is missing")
+                return {"error": "Missing webhook event type"}
 
-        except ValueError as e:
-            log.error(f"Invalid webhook payload: {str(e)}")
-            raise
+            if not webhook_data.issue or not webhook_data.issue.id:
+                log.error("Webhook is missing issue data")
+                return {"error": "Missing issue data"}
+
+            # Try all handlers
+            for handler in self.handlers:
+                result = await handler.process(webhook_data)
+                if result is not None:
+                    return result
+
+            log.warning(f"No handler found for webhook event: {webhook_data.webhook_event}")
+            return {"error": f"Unsupported webhook event: {webhook_data.webhook_event}"}
+
         except Exception as e:
-            log.error(f"Error processing webhook: {str(e)}")
-            raise
+            log.error(f"Error handling webhook: {str(e)}")
+            return {"error": str(e)}

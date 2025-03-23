@@ -1,4 +1,5 @@
-from typing import Callable
+from types import TracebackType
+from typing import Callable, Optional, Type
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -31,7 +32,7 @@ class SQLAlchemyJiraSyncSession(IJiraSyncSession):
         await self.session.begin()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Optional[Type[Exception]], exc_val: Optional[Exception], exc_tb: Optional[TracebackType]) -> None:
         """Exit context manager"""
         try:
             if exc_type:
@@ -44,10 +45,10 @@ class SQLAlchemyJiraSyncSession(IJiraSyncSession):
         finally:
             await self.session.close()
 
-    async def complete(self):
+    async def complete(self) -> None:
         """Commit all changes to the database"""
         await self.session.commit()
 
-    async def abort(self):
+    async def abort(self) -> None:
         """Rollback all changes to the database"""
         await self.session.rollback()

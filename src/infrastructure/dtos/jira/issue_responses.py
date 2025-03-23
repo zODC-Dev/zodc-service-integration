@@ -33,6 +33,7 @@ class JiraAPIIssueFieldsResponse(JiraAPIFieldsBase):
     description: Optional[Dict[str, Any]]
     status: JiraAPIIssueStatusResponse
     assignee: Optional[JiraAPIUserResponse]
+    reporter: Optional[JiraAPIUserResponse]
     priority: Optional[JiraAPIIssuePriorityResponse]
     issuetype: JiraAPIIssueTypeResponse
     created: datetime

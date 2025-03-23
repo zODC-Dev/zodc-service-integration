@@ -107,8 +107,9 @@ class JiraIssueFields(BaseModel):
     reporter: Optional[JiraUser] = None
     priority: Optional[JiraPriority] = None
     sprints: Optional[List[JiraSprint]] = Field(default=None, alias="customfield_10020")
-    estimate_points: Optional[float] = Field(default=None, alias="customfield_10016")
-    actual_points: Optional[float] = Field(default=None, alias="customfield_10017")
+    estimate_point: Optional[float] = Field(default=None, alias="customfield_10016")
+    actual_point: Optional[float] = Field(default=None, alias="customfield_10017")
+    self: Optional[str] = None  # URL tham chiếu đến issue
 
 
 class JiraIssue(BaseModel):
@@ -140,7 +141,7 @@ class JiraWebhookPayload(BaseModel):
     """Main webhook payload"""
     timestamp: int
     webhook_event: str = Field(alias="webhookEvent")
-    issue_event_type_name: str = Field(alias="issue_event_type_name")
+    issue_event_type_name: Optional[str] = Field(default=None, alias="issue_event_type_name")
     user: JiraUser
     issue: JiraIssue
     changelog: Optional[JiraChangelog] = None
