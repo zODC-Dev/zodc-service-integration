@@ -9,15 +9,18 @@ from src.app.dependencies.base import (
     get_project_repository,
     get_sync_log_repository,
 )
+from src.app.dependencies.common import get_jira_api_client, get_jira_user_repository
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.infrastructure.services.jira_issue_api_service import JiraIssueAPIService
 from src.infrastructure.services.jira_issue_database_service import JiraIssueDatabaseService
 
 
 async def get_jira_issue_api_service(
+    jira_api_client=Depends(get_jira_api_client),
+    user_repository=Depends(get_jira_user_repository)
 ) -> AsyncGenerator[JiraIssueAPIService, None]:
     """Get Jira issue API service"""
-    yield JiraIssueAPIService()
+    yield JiraIssueAPIService(jira_api_client, user_repository)
 
 
 async def get_jira_issue_database_service(

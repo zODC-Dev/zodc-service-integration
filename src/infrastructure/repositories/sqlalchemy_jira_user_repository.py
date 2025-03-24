@@ -22,7 +22,7 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
 
     async def get_user_by_id(self, user_id: int) -> Optional[JiraUserModel]:
         result = await self.session.exec(
-            select(JiraUserEntity).where(JiraUserEntity.id == user_id)
+            select(JiraUserEntity).where(JiraUserEntity.user_id == user_id)
         )
         user = result.first()
         return self._to_domain(user) if user else None

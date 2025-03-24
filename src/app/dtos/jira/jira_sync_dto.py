@@ -14,7 +14,7 @@ class JiraIssueSyncRequestDTO(BaseModel):
     description: Optional[str] = None
     issue_type: Optional[JiraIssueType] = None
     status: Optional[JiraIssueStatus] = None
-    assignee_id: Optional[int] = None
+    assignee_id: Optional[int] = None  # Internal user id
     estimate_point: Optional[float] = None
     actual_point: Optional[float] = None
     action_type: JiraActionType

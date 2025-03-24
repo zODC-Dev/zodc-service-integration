@@ -371,7 +371,7 @@ class JiraIssueApplicationService:
                     summary=request.summary,
                     description=request.description,
                     status=request.status,
-                    assignee_id=request.assignee_id,
+                    assignee_id=str(request.assignee_id) if request.assignee_id else None,
                     estimate_point=request.estimate_point,
                     actual_point=request.actual_point
                 )

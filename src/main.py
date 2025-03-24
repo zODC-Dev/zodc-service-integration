@@ -97,7 +97,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
 
     jira_api_client = JiraAPIClient(redis_service, token_scheduler_service)
-    jira_issue_api_service = JiraIssueAPIService(jira_api_client)
+    jira_issue_api_service = JiraIssueAPIService(jira_api_client, user_repository)
 
     jira_issue_application_service = JiraIssueApplicationService(
         jira_issue_database_service, jira_issue_api_service, jira_issue_repository, project_repository, nats_service, sync_log_repository)

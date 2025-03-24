@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
@@ -110,7 +110,7 @@ class JiraIssueCreateDTO(BaseModel):
 class JiraIssueUpdateDTO(BaseModel):
     summary: Optional[str] = None
     description: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[Union[JiraIssueStatus, str]] = None
     assignee: Optional[str] = None
     estimate_point: Optional[float] = None
     actual_point: Optional[float] = None
@@ -121,14 +121,36 @@ class JiraIssueUpdateDTO(BaseModel):
     reporter_id: Optional[str] = None
     sprints: Optional[List['JiraSprintModel']] = None
     is_deleted: Optional[bool] = None
-    type: Optional[str] = None
+    type: Optional[Union[JiraIssueType, str]] = None
+
+    @field_validator('status')
+    def validate_status(self, v):
+        if v is None:
+            return None
+        if isinstance(v, JiraIssueStatus):
+            return v
+        try:
+            return JiraIssueStatus(v)
+        except ValueError as e:
+            raise ValueError(f"Invalid status: {v}") from e
+
+    @field_validator('type')
+    def validate_type(self, v):
+        if v is None:
+            return None
+        if isinstance(v, JiraIssueType):
+            return v
+        try:
+            return JiraIssueType(v)
+        except ValueError as e:
+            raise ValueError(f"Invalid issue type: {v}") from e
 
     @classmethod
     def _to_domain(cls, entity: 'JiraIssueUpdateDTO') -> "JiraIssueModel":
         return JiraIssueModel(
             summary=entity.summary,
             description=entity.description,
-            status=JiraIssueStatus(entity.status),
+            status=entity.status,
             assignee_id=entity.assignee_id,
             estimate_point=entity.estimate_point,
             actual_point=entity.actual_point,
@@ -137,7 +159,7 @@ class JiraIssueUpdateDTO(BaseModel):
             is_system_linked=entity.is_system_linked,
             reporter_id=entity.reporter_id,
             is_deleted=entity.is_deleted,
-            type=JiraIssueType(entity.type).value if entity.type else None,
+            type=entity.type,
         )
 
     @classmethod
@@ -145,7 +167,7 @@ class JiraIssueUpdateDTO(BaseModel):
         return cls(
             summary=domain.summary,
             description=domain.description,
-            status=domain.status.value if domain.status else None,
+            status=domain.status,
             assignee_id=domain.assignee_id,
             estimate_point=domain.estimate_point,
             actual_point=domain.actual_point,
@@ -155,5 +177,5 @@ class JiraIssueUpdateDTO(BaseModel):
             sprints=domain.sprints,
             reporter_id=domain.reporter_id,
             is_deleted=domain.is_deleted,
-            type=domain.type.value if domain.type else None,
+            type=domain.type,
         )
