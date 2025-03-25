@@ -2,21 +2,24 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any, Callable, List, Optional, TypeVar
 
-from src.app.dtos.jira.jira_project_sync import (
-    JiraProjectSyncRequestDTO,
-    JiraProjectSyncResponseDTO,
-    JiraProjectSyncSummaryDTO,
-)
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueType
-from src.domain.constants.nats_events import NATSPublishTopic
 from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.exceptions.jira_exceptions import JiraRequestError
-from src.domain.models.jira_issue import JiraIssueCreateDTO, JiraIssueModel, JiraIssueUpdateDTO
-from src.domain.models.jira_project import JiraProjectCreateDTO, JiraProjectModel, JiraProjectUpdateDTO
-from src.domain.models.jira_sprint import JiraSprintCreateDTO, JiraSprintModel, JiraSprintUpdateDTO
-from src.domain.models.jira_user import JiraUserCreateDTO, JiraUserModel, JiraUserUpdateDTO
-from src.domain.models.sync_log import SyncLogCreateDTO
+from src.domain.models.database.jira_issue import JiraIssueDBCreateDTO, JiraIssueDBUpdateDTO
+from src.domain.models.database.jira_project import JiraProjectDBCreateDTO, JiraProjectDBUpdateDTO
+from src.domain.models.database.jira_sprint import JiraSprintDBCreateDTO, JiraSprintDBUpdateDTO
+from src.domain.models.database.jira_user import JiraUserDBCreateDTO, JiraUserDBUpdateDTO
+from src.domain.models.database.sync_log import SyncLogDBCreateDTO
+from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_project import JiraProjectModel
+from src.domain.models.jira_sprint import JiraSprintModel
+from src.domain.models.jira_user import JiraUserModel
+from src.domain.models.nats.replies.jira_project import (
+    JiraProjectSyncNATSReplyDTO,
+    JiraProjectSyncSummaryDTO,
+)
+from src.domain.models.nats.requests.jira_project import JiraProjectSyncNATSRequestDTO
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
@@ -113,12 +116,12 @@ class JiraProjectApplicationService:
     async def update_project(
         self,
         project_id: int,
-        project_data: JiraProjectUpdateDTO
+        project_data: JiraProjectDBUpdateDTO
     ) -> JiraProjectModel:
         """Update project in database"""
         return await self.jira_project_db_service.update_project(project_id, project_data)
 
-    async def sync_project(self, request: JiraProjectSyncRequestDTO) -> JiraProjectSyncResponseDTO:
+    async def sync_project(self, request: JiraProjectSyncNATSRequestDTO) -> JiraProjectSyncNATSReplyDTO:
         try:
             log.info(f"Starting sync for project {request.project_key}")
             started_at = datetime.now(timezone.utc)
@@ -142,7 +145,7 @@ class JiraProjectApplicationService:
 
                 log.info(f"Successfully completed sync for project {request.project_key}")
 
-                return JiraProjectSyncResponseDTO(
+                return JiraProjectSyncNATSReplyDTO(
                     success=True,
                     project_key=request.project_key,
                     sync_summary=JiraProjectSyncSummaryDTO(
@@ -156,24 +159,6 @@ class JiraProjectApplicationService:
         except Exception as e:
             log.error(f"Error during project sync: {str(e)}")
             raise
-
-    async def _publish_sync_result(
-        self,
-        project_key: str,
-        success: bool,
-        sync_summary: Optional[JiraProjectSyncSummaryDTO] = None,
-        error_message: Optional[str] = None
-    ) -> None:
-        """Publish sync result to NATS"""
-        await self.nats_service.publish(
-            NATSPublishTopic.JIRA_PROJECT_SYNC_RESULT.value,
-            {
-                "success": success,
-                "project_key": project_key,
-                "sync_summary": sync_summary.model_dump() if sync_summary else None,
-                "error_message": error_message
-            }
-        )
 
     async def _sync_project_details(
         self,
@@ -193,7 +178,7 @@ class JiraProjectApplicationService:
 
             if existing_project:
                 # Update existing project
-                update_dto = JiraProjectUpdateDTO(
+                update_dto = JiraProjectDBUpdateDTO(
                     name=project_details.name,
                     avatar_url=project_details.avatar_url,
                     description=project_details.description
@@ -204,7 +189,7 @@ class JiraProjectApplicationService:
                 )
             else:
                 # Create new project
-                create_dto = JiraProjectCreateDTO(
+                create_dto = JiraProjectDBCreateDTO(
                     jira_project_id=project_details.jira_project_id,
                     key=project_details.key,
                     name=project_details.name,
@@ -243,7 +228,7 @@ class JiraProjectApplicationService:
 
                     if existing_user:
                         # Update existing user if needed
-                        update_dto = JiraUserUpdateDTO(
+                        update_dto = JiraUserDBUpdateDTO(
                             email=jira_user.email,
                             avatar_url=jira_user.avatar_url
                         )
@@ -251,7 +236,7 @@ class JiraProjectApplicationService:
                         synced_users.append(existing_user)
                     else:
                         # Create new user only if they don't exist
-                        create_dto = JiraUserCreateDTO(
+                        create_dto = JiraUserDBCreateDTO(
                             jira_account_id=jira_user.jira_account_id,
                             email=jira_user.email,
                             avatar_url=jira_user.avatar_url,
@@ -285,7 +270,7 @@ class JiraProjectApplicationService:
                 # Check if sprint exists by jira_sprint_id
                 existing_sprint = await session.sprint_repository.get_by_jira_sprint_id(sprint.jira_sprint_id)
 
-                sprint_data = JiraSprintCreateDTO(
+                sprint_data = JiraSprintDBCreateDTO(
                     jira_sprint_id=sprint.jira_sprint_id,
                     name=sprint.name,
                     state=sprint.state,
@@ -300,7 +285,7 @@ class JiraProjectApplicationService:
                     # Update if exists
                     updated_sprint = await session.sprint_repository.update_sprint(
                         existing_sprint.id,
-                        JiraSprintUpdateDTO(**sprint_data.model_dump())
+                        JiraSprintDBUpdateDTO(**sprint_data.model_dump())
                     )
                     if updated_sprint:
                         sprint_id_mapping[sprint.jira_sprint_id] = updated_sprint.id
@@ -347,12 +332,12 @@ class JiraProjectApplicationService:
                             # Update existing issue with new data
                             updated_issue = await session.issue_repository.update(
                                 existing_issue.jira_issue_id,
-                                JiraIssueUpdateDTO._from_domain(jira_issue)
+                                JiraIssueDBUpdateDTO._from_domain(jira_issue)
                             )
                             synced_issues.append(updated_issue)
                     else:
                         # Create new issue
-                        issue_create_dto = JiraIssueCreateDTO._from_domain(jira_issue)
+                        issue_create_dto = JiraIssueDBCreateDTO._from_domain(jira_issue)
                         new_issue = await session.issue_repository.create(issue_create_dto)
                         synced_issues.append(new_issue)
 
@@ -424,7 +409,7 @@ class JiraProjectApplicationService:
         """Create sync log entry for project sync"""
         try:
             await self.sync_log_repository.create_sync_log(
-                SyncLogCreateDTO(
+                SyncLogDBCreateDTO(
                     entity_type=EntityType.PROJECT,
                     entity_id=project.key,
                     operation=OperationType.SYNC,

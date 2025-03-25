@@ -1,5 +1,5 @@
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.database import get_db
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository

@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
 from src.configs.logger import log
-from src.domain.models.nats_event import UserEvent
+from src.domain.models.nats.subscribes.jira_user import JiraUserChangeNATSSubscribeDTO
 from src.domain.services.nats_message_handler import INATSMessageHandler
 from src.domain.services.redis_service import IRedisService
 
@@ -14,7 +14,7 @@ class UserMessageHandler(INATSMessageHandler):
         """Handle user events and clear related caches"""
         try:
             # Parse the event
-            event = UserEvent.model_validate(message)
+            event = JiraUserChangeNATSSubscribeDTO.model_validate(message)
 
             log.info(f"Handling user event: {event.event_type} for user {event.user_id}")
 

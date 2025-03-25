@@ -1,9 +1,9 @@
 from typing import Dict, Optional, Union
 
-from src.infrastructure.dtos.jira.base import JiraAPIResponseBase
+from src.domain.models.jira.apis.responses.base import JiraAPIResponseBase
 
 
-class JiraAPIUserResponse(JiraAPIResponseBase):
+class JiraUserAPIGetResponseDTO(JiraAPIResponseBase):
     accountId: str
     emailAddress: Optional[str] = None
     displayName: str

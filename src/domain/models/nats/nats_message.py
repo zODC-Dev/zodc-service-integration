@@ -1,5 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+
+from pydantic import BaseModel
 
 
 class NATSMessage:
@@ -46,7 +48,12 @@ class NATSEvent(NATSMessage):
         subject: str,
         event_type: str,
         data: Dict[str, Any],
-        timestamp: datetime = datetime.utcnow()
+        timestamp: datetime = datetime.now(timezone.utc)
     ):
         super().__init__(subject, data, timestamp)
         self.event_type = event_type
+
+
+class NATSMessageBaseDTO(BaseModel):
+    subject: str
+    timestamp: datetime = datetime.now(timezone.utc)

@@ -20,16 +20,16 @@ class IJiraSyncSession(ABC):
         pass
 
     @abstractmethod
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit context manager"""
         pass
 
     @abstractmethod
-    async def complete(self):
+    async def complete(self) -> None:
         """Complete the sync session successfully"""
         pass
 
     @abstractmethod
-    async def abort(self):
+    async def abort(self) -> None:
         """Abort the sync session due to error"""
         pass

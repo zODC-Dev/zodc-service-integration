@@ -1,8 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from sqlalchemy import JSON, CheckConstraint, Column
-from sqlmodel import Field
+from sqlmodel import JSON, CheckConstraint, Column, Field
 
 from src.infrastructure.entities.base import BaseEntityWithTimestamps
 

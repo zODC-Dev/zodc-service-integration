@@ -136,7 +136,7 @@ class JiraChangelog(BaseModel):
     items: List[JiraChangelogItem]
 
 
-class JiraWebhookPayload(BaseModel):
+class JiraWebhookResponseDTO(BaseModel):
     """Main webhook payload"""
     timestamp: int
     webhook_event: str = Field(alias="webhookEvent")
@@ -146,7 +146,7 @@ class JiraWebhookPayload(BaseModel):
     changelog: Optional[JiraChangelog] = None
 
     @classmethod
-    def parse_webhook(cls, data: Dict[str, Any]) -> "JiraWebhookPayload":
+    def parse_webhook(cls, data: Dict[str, Any]) -> "JiraWebhookResponseDTO":
         """Parse webhook data into model"""
         try:
             return cls.model_validate(data)

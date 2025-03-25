@@ -11,7 +11,7 @@ from src.app.dependencies.common import (
 from src.app.dependencies.jira_issue import get_jira_issue_application_service
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.nats_event_service import NATSEventService
-from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueMessageHandler, JiraIssueSyncRequestHandler
+from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueSyncRequestHandler
 from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
 from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
 from src.app.services.nats_handlers.user_message_handler import UserMessageHandler
@@ -41,8 +41,6 @@ def get_nats_event_service(
             MicrosoftLoginMessageHandler(redis_service, user_repository, refresh_token_repository),
         NATSSubscribeTopic.JIRA_LOGIN.value:
             JiraLoginMessageHandler(user_repository, refresh_token_repository, redis_service),
-        NATSSubscribeTopic.JIRA_ISSUE_UPDATE.value:
-            JiraIssueMessageHandler(jira_issue_application_service)
     }
 
     # Configure request handlers

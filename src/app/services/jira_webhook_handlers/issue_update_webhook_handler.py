@@ -1,12 +1,13 @@
+from datetime import datetime
 from typing import Any, Dict
 
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
 from src.domain.constants.sync import EntityType, OperationType, SourceType
-from src.domain.models.jira_issue import JiraIssueUpdateDTO
-from src.domain.models.jira_webhook import JiraWebhookPayload
-from src.domain.models.sync_log import SyncLogCreateDTO
+from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
+from src.domain.models.database.sync_log import SyncLogDBCreateDTO
+from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.infrastructure.mappers.jira_webhook_mapper import JiraWebhookMapper
@@ -27,13 +28,13 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         """Check if this handler can process the given webhook event"""
         return webhook_event == JiraWebhookEvent.ISSUE_UPDATED
 
-    async def handle(self, webhook_data: JiraWebhookPayload) -> Dict[str, Any]:
+    async def handle(self, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:
         """Handle the issue update webhook"""
         issue_id = webhook_data.issue.id
 
         # Log the webhook sync
         await self.sync_log_repository.create_sync_log(
-            SyncLogCreateDTO(
+            SyncLogDBCreateDTO(
                 entity_type=EntityType.ISSUE,
                 entity_id=issue_id,
                 operation=OperationType.SYNC,
@@ -55,15 +56,16 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         update_data = JiraWebhookMapper.map_to_update_dto(webhook_data)
 
         # Check for conflicts
-        if issue.updated_locally and update_data.get("updated_at") > issue.last_synced_at:
-            await self._handle_conflict(issue_id, update_data["updated_at"], issue.last_synced_at)
+        updated_at: datetime = update_data.get("updated_at")
+        if issue.updated_locally and updated_at > issue.last_synced_at:
+            await self._handle_conflict(issue_id, updated_at, issue.last_synced_at)
 
         # Update if there are changes
         updated_issue = None
         if update_data:
             updated_issue = await self.jira_issue_repository.update(
                 issue_id,
-                JiraIssueUpdateDTO(**update_data)
+                JiraIssueDBUpdateDTO(**update_data)
             )
 
         # Update sync status
@@ -88,7 +90,7 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         """Update the sync status of an issue"""
         await self.jira_issue_repository.update(
             issue_id,
-            JiraIssueUpdateDTO(
+            JiraIssueDBUpdateDTO(
                 last_synced_at=updated_at,
                 updated_locally=False
             )

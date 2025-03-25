@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlmodel import DateTime, Field, Relationship
+from sqlmodel import Column, DateTime, Field, Relationship
 
 from src.infrastructure.entities.base import BaseEntityWithTimestamps
 from src.infrastructure.entities.jira_issue_sprint import JiraIssueSprintEntity
@@ -18,9 +18,9 @@ class JiraSprintEntity(BaseEntityWithTimestamps, table=True):
     jira_sprint_id: int = Field(index=True, unique=True)  # ID của sprint từ Jira
     name: str
     state: str  # active, closed, future
-    start_date: Optional[datetime] = Field(sa_type=DateTime(timezone=True))
-    end_date: Optional[datetime] = Field(sa_type=DateTime(timezone=True))
-    complete_date: Optional[datetime] = Field(sa_type=DateTime(timezone=True))
+    start_date: Optional[datetime] = Field(sa_column=Column(DateTime(timezone=True)))
+    end_date: Optional[datetime] = Field(sa_column=Column(DateTime(timezone=True)))
+    complete_date: Optional[datetime] = Field(sa_column=Column(DateTime(timezone=True)))
     goal: Optional[str] = None
 
     # Foreign key to project
@@ -34,5 +34,5 @@ class JiraSprintEntity(BaseEntityWithTimestamps, table=True):
         sa_relationship_kwargs={'lazy': 'selectin'}
     )
 
-    created_at: datetime = Field(sa_type=DateTime(timezone=True))
-    updated_at: Optional[datetime] = Field(sa_type=DateTime(timezone=True))
+    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
+    updated_at: Optional[datetime] = Field(sa_column=Column(DateTime(timezone=True)))

@@ -1,11 +1,12 @@
 from typing import Any, Dict, List, Optional, Union
 
 from src.configs.logger import log
-from src.domain.constants.jira import JiraIssueStatus
-from src.domain.models.jira_issue import JiraIssueCreateDTO, JiraIssueModel, JiraIssueUpdateDTO
+from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JiraIssueStatus, JiraIssueType
+from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
+from src.domain.models.jira.apis.responses.jira_issue import JiraIssueAPIGetResponseDTO
+from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
-from src.infrastructure.dtos.jira.issue_responses import JiraAPIIssueResponse
 from src.infrastructure.mappers.jira_issue_mapper import JiraIssueMapper
 from src.infrastructure.services.jira_service import JiraAPIClient
 
@@ -30,33 +31,45 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             error_msg=f"Error when getting issue {issue_id}"
         )
 
-        # log.info(f"Issue response: {response_data}")
+        log.info(f"Issue response from Get Issue: {response_data}")
 
         return await self.client.map_to_domain(
             response_data,
-            JiraAPIIssueResponse,
+            JiraIssueAPIGetResponseDTO,
             JiraIssueMapper
         )
 
-    async def create_issue(self, user_id: int, issue: JiraIssueCreateDTO) -> JiraIssueModel:
+    async def create_issue(self, user_id: int, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
         """Create new issue in Jira"""
+        log.info(f"Creating issue with data: {issue_data}")
+
         # Prepare payload
         payload = {
             "fields": {
-                "project": {"key": issue.project_key},
-                "summary": issue.summary,
-                "description": issue.description,
-                "issuetype": {"name": issue.type.value},
+                "project": {"key": issue_data.project_key},
+                "summary": issue_data.summary,
+                "description": issue_data.description,
+                "issuetype": self._get_issue_type_payload(issue_data.type),
             }
         }
 
+        # Add sprint if available
+        if issue_data.sprint_id:
+            # Jira expects customfield_10020 as a value of 1 active sprint
+            payload["fields"]["customfield_10020"] = issue_data.sprint_id
+            log.info(f"Adding issue to sprints: {issue_data.sprint_id}")
+
         # Add optional fields
-        if issue.assignee:
-            payload["fields"]["assignee"] = {"accountId": issue.assignee}
+        if issue_data.assignee_id:
+            log.info(f"Updating assignee_id: {issue_data.assignee_id}")
+            jira_user = await self.user_repository.get_user_by_id(int(issue_data.assignee_id))
+            if jira_user and jira_user.jira_account_id:
+                payload["fields"]["assignee"] = {"id": jira_user.jira_account_id}
 
-        if issue.estimate_point is not None:
-            payload["fields"]["customfield_10016"] = issue.estimate_point
+        if issue_data.estimate_point is not None:
+            payload["fields"]["customfield_10016"] = issue_data.estimate_point
 
+        log.info(f"Creating issue with payload: {payload}")
         response_data = await self.client.post(
             "/rest/api/3/issue",
             user_id,
@@ -66,16 +79,41 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         # Get new created issue
         created_issue_id = response_data.get("id")
-        return await self.get_issue(user_id, created_issue_id)
+        created_issue = await self.get_issue(user_id, created_issue_id)
 
-    async def update_issue(self, user_id: int, issue_id: str, update: JiraIssueUpdateDTO) -> JiraIssueModel:
+        # Handle initial status if specified
+        if issue_data.status:
+            log.info(f"Setting initial status to {issue_data.status}")
+            await self.transition_issue(user_id, created_issue_id, issue_data.status)
+            created_issue = await self.get_issue(user_id, created_issue_id)
+
+        return created_issue
+
+    def _get_issue_type_payload(self, issue_type: Union[JiraIssueType, str]) -> Dict[str, Any]:
+        """Get issue type payload for Jira API"""
+        if isinstance(issue_type, str):
+            try:
+                issue_type = JiraIssueType(issue_type)
+            except ValueError:
+                log.warning(f"Invalid issue type: {issue_type}, using TASK")
+                issue_type = JiraIssueType.TASK
+
+        # Tìm ID từ mapping
+        for type_id, mapped_type in JIRA_ISSUE_TYPE_ID_MAPPING.items():
+            if mapped_type == issue_type:
+                return {"id": type_id}
+
+        # Fallback to using name if no ID mapping found
+        return {"name": issue_type.value}
+
+    async def update_issue(self, user_id: int, issue_id: str, update: JiraIssueAPIUpdateRequestDTO) -> JiraIssueModel:
         """Update issue in Jira"""
         # Prepare payload for fields
-        payload = {"fields": {}}
+        payload: Dict[str, Any] = {"fields": {}}
 
         # Lưu lại thông tin status để xử lý riêng
         status_to_update = update.status
-        update_result = {"success": True, "messages": []}
+        update_result: Dict[str, Any] = {"success": True, "messages": []}
 
         # Đảm bảo không đưa status vào payload
         update.status = None
@@ -160,7 +198,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         for issue_data in response_data.get("issues", []):
             issue = await self.client.map_to_domain(
                 issue_data,
-                JiraAPIIssueResponse,
+                JiraIssueAPIGetResponseDTO,
                 JiraIssueMapper
             )
             issues.append(issue)
@@ -348,18 +386,3 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 }
             ]
         }
-
-    # async def update_issue_with_user_id(self, user_id: int, issue_id: str, update: JiraIssueUpdateDTO, assignee_user_id: Optional[int] = None) -> JiraIssueModel:
-    #     """Update issue with internal user ID for assignee"""
-    #     # Nếu có assignee_user_id, tìm Jira account ID từ database
-    #     if assignee_user_id is not None:
-    #         # Giả sử bạn có repository để truy vấn thông tin user
-    #         jira_user = await self.user_repository.get_user_by_id(assignee_user_id)
-    #         if jira_user and jira_user.jira_account_id:
-    #             # Gán Jira account ID vào update DTO
-    #             update.assignee_id = jira_user.jira_account_id
-    #         else:
-    #             log.warning(f"Không tìm thấy Jira account ID cho user {assignee_user_id}")
-
-    #     # Gọi phương thức update_issue bình thường
-    #     return await self.update_issue(user_id, issue_id, update)

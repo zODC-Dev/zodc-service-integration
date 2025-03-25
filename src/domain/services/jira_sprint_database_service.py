@@ -1,16 +1,17 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from src.domain.models.jira_sprint import JiraSprintCreateDTO, JiraSprintModel, JiraSprintUpdateDTO
+from src.domain.models.database.jira_sprint import JiraSprintDBCreateDTO, JiraSprintDBUpdateDTO
+from src.domain.models.jira_sprint import JiraSprintModel
 
 
 class IJiraSprintDatabaseService(ABC):
     @abstractmethod
-    async def create_sprint(self, sprint_data: JiraSprintCreateDTO) -> JiraSprintModel:
+    async def create_sprint(self, sprint_data: JiraSprintDBCreateDTO) -> JiraSprintModel:
         pass
 
     @abstractmethod
-    async def update_sprint(self, sprint_id: str, sprint_data: JiraSprintUpdateDTO) -> JiraSprintModel:
+    async def update_sprint(self, sprint_id: str, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
         pass
 
     @abstractmethod

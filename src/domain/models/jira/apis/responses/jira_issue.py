@@ -3,16 +3,10 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from src.infrastructure.dtos.jira.sprint_responses import JiraAPISprintResponse
-from src.infrastructure.dtos.jira.user_responses import JiraAPIUserResponse
-
-from .base import JiraAPIFieldsBase, JiraAPIResponseBase
-
-
-class JiraAPIIssuePriorityResponse(JiraAPIResponseBase):
-    id: str
-    name: str
-    icon_url: str = Field(alias="iconUrl")
+from src.domain.models.jira.apis.responses.base import JiraAPIFieldsBase, JiraAPIResponseBase
+from src.domain.models.jira.apis.responses.common import JiraAPIIssuePriorityResponse
+from src.domain.models.jira.apis.responses.jira_sprint import JiraSprintAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_user import JiraUserAPIGetResponseDTO
 
 
 class JiraAPIIssueTypeResponse(JiraAPIResponseBase):
@@ -32,18 +26,18 @@ class JiraAPIIssueFieldsResponse(JiraAPIFieldsBase):
     summary: str
     description: Optional[Dict[str, Any]]
     status: JiraAPIIssueStatusResponse
-    assignee: Optional[JiraAPIUserResponse]
-    reporter: Optional[JiraAPIUserResponse]
+    assignee: Optional[JiraUserAPIGetResponseDTO]
+    reporter: Optional[JiraUserAPIGetResponseDTO]
     priority: Optional[JiraAPIIssuePriorityResponse]
     issuetype: JiraAPIIssueTypeResponse
     created: datetime
     updated: datetime
     customfield_10016: Optional[float] = None  # Story points
     customfield_10017: Optional[float] = None  # Actual points
-    customfield_10020: Optional[List[JiraAPISprintResponse]] = None  # Sprints
+    customfield_10020: Optional[List[JiraSprintAPIGetResponseDTO]] = None  # Sprints
 
 
-class JiraAPIIssueResponse(JiraAPIResponseBase):
+class JiraIssueAPIGetResponseDTO(JiraAPIResponseBase):
     id: str
     key: str
     self: str

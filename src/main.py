@@ -16,7 +16,7 @@ from src.app.routers.util_router import router as util_router
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.nats_event_service import NATSEventService
-from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueMessageHandler, JiraIssueSyncRequestHandler
+from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueSyncRequestHandler
 from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
 from src.app.services.nats_handlers.jira_project_sync_handler import JiraProjectSyncRequestHandler
 from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
@@ -130,7 +130,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             user_repository=user_repository,
             refresh_token_repository=refresh_token_repository
         ),
-        NATSSubscribeTopic.JIRA_ISSUE_UPDATE.value: JiraIssueMessageHandler(jira_issue_application_service)
     }
 
     # Initialize NATS Request Handlers

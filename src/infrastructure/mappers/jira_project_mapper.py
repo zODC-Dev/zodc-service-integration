@@ -1,18 +1,18 @@
 import logging
 
+from src.domain.models.jira.apis.responses.jira_project import JiraProjectAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_sprint import JiraSprintAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_user import JiraUserAPIGetResponseDTO
 from src.domain.models.jira_project import JiraProjectModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
-from src.infrastructure.dtos.jira.project_responses import JiraAPIProjectResponse
-from src.infrastructure.dtos.jira.sprint_responses import JiraAPISprintResponse
-from src.infrastructure.dtos.jira.user_responses import JiraAPIUserResponse
 
 log = logging.getLogger(__name__)
 
 
 class JiraProjectMapper:
     @staticmethod
-    def to_domain(api_response: JiraAPIProjectResponse) -> JiraProjectModel:
+    def to_domain(api_response: JiraProjectAPIGetResponseDTO) -> JiraProjectModel:
         try:
             avatar_url = ""
             if isinstance(api_response.avatarUrls, dict):
@@ -35,7 +35,7 @@ class JiraProjectMapper:
             )
 
     @staticmethod
-    def to_domain_sprint(api_response: JiraAPISprintResponse) -> JiraSprintModel:
+    def to_domain_sprint(api_response: JiraSprintAPIGetResponseDTO) -> JiraSprintModel:
         try:
             return JiraSprintModel(
                 jira_sprint_id=api_response.id,
@@ -54,7 +54,7 @@ class JiraProjectMapper:
             )
 
     @staticmethod
-    def to_domain_user(api_response: JiraAPIUserResponse) -> JiraUserModel:
+    def to_domain_user(api_response: JiraUserAPIGetResponseDTO) -> JiraUserModel:
         avatar_url = ""
         try:
             if isinstance(api_response.avatarUrls, dict):
@@ -79,7 +79,7 @@ class JiraProjectMapper:
             )
 
     @staticmethod
-    def to_domain_project(api_response: JiraAPIProjectResponse) -> JiraProjectModel:
+    def to_domain_project(api_response: JiraProjectAPIGetResponseDTO) -> JiraProjectModel:
         return JiraProjectModel(
             jira_project_id=api_response.id,
             key=api_response.key,

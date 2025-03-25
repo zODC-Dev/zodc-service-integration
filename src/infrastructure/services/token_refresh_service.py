@@ -6,7 +6,7 @@ from aiohttp import ClientSession
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.models.refresh_token import CreateRefreshTokenDTO
+from src.domain.models.database.refresh_token import RefreshTokenDBCreateDTO
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.domain.services.redis_service import IRedisService
@@ -106,7 +106,7 @@ class TokenRefreshService(ITokenRefreshService):
                                                       token_data.get("expires_in", 3600) * 2)
             expires_at = datetime.now(timezone.utc) + timedelta(seconds=refresh_token_expires_in)
 
-            refresh_token_dto = CreateRefreshTokenDTO(
+            refresh_token_dto = RefreshTokenDBCreateDTO(
                 token=token_data["refresh_token"],
                 user_id=user_id,
                 token_type=TokenType.MICROSOFT,
@@ -130,7 +130,7 @@ class TokenRefreshService(ITokenRefreshService):
                 # Fallback to default if JWT decode fails
                 expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600) * 2)
 
-            refresh_token_dto = CreateRefreshTokenDTO(
+            refresh_token_dto = RefreshTokenDBCreateDTO(
                 token=token_data["refresh_token"],
                 user_id=user_id,
                 token_type=TokenType.JIRA,

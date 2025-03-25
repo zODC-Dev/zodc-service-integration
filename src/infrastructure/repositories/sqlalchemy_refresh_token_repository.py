@@ -6,7 +6,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.models.refresh_token import CreateRefreshTokenDTO, RefreshTokenModel
+from src.domain.models.database.refresh_token import RefreshTokenDBCreateDTO
+from src.domain.models.refresh_token import RefreshTokenModel
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.infrastructure.entities.refresh_token import RefreshTokenEntity
 
@@ -15,7 +16,7 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_refresh_token(self, refresh_token_dto: CreateRefreshTokenDTO) -> RefreshTokenModel:
+    async def create_refresh_token(self, refresh_token_dto: RefreshTokenDBCreateDTO) -> RefreshTokenModel:
         """Create new refresh token and revoke old ones"""
         try:
             # Convert to UTC then remove timezone info for database

@@ -4,19 +4,19 @@ from typing import List, Optional
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
+from src.domain.models.jira.apis.responses.common import JiraAPIIssuePriorityResponse
+from src.domain.models.jira.apis.responses.jira_issue import JiraIssueAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_sprint import JiraSprintAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_user import JiraUserAPIGetResponseDTO
 from src.domain.models.jira_issue import JiraIssueModel, JiraIssuePriorityModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
-from src.infrastructure.dtos.jira.common import JiraAPIIssuePriorityResponse
-from src.infrastructure.dtos.jira.issue_responses import JiraAPIIssueResponse
-from src.infrastructure.dtos.jira.sprint_responses import JiraAPISprintResponse
-from src.infrastructure.dtos.jira.user_responses import JiraAPIUserResponse
 from src.infrastructure.entities.jira_issue import JiraIssueEntity
 
 
 class JiraIssueMapper:
     @staticmethod
-    def _map_user(user_response: JiraAPIUserResponse) -> Optional[JiraUserModel]:
+    def _map_user(user_response: JiraUserAPIGetResponseDTO) -> Optional[JiraUserModel]:
         if not user_response:
             return None
         try:
@@ -43,21 +43,25 @@ class JiraIssueMapper:
             )
 
     @staticmethod
-    def to_domain_issue(api_response: JiraAPIIssueResponse) -> JiraIssueModel:
+    def to_domain_issue(api_response: JiraIssueAPIGetResponseDTO) -> JiraIssueModel:
         try:
             fields = api_response.fields
             now = datetime.now(timezone.utc)
+
+            # Đảm bảo truy cập các field từ fields object
+            summary = fields.summary if hasattr(fields, 'summary') else ""
+            description = fields.description if hasattr(fields, 'description') else None
 
             # Map user data
             assignee = None
             assignee_id = None
             reporter_id = None
 
-            if fields.assignee:
+            if hasattr(fields, 'assignee') and fields.assignee:
                 assignee_id = fields.assignee.accountId
                 assignee = JiraIssueMapper._map_user(fields.assignee)
 
-            if fields.reporter:
+            if hasattr(fields, 'reporter') and fields.reporter:
                 reporter_id = fields.reporter.accountId
 
             # Map sprints
@@ -65,57 +69,33 @@ class JiraIssueMapper:
             if hasattr(fields, 'customfield_10020') and fields.customfield_10020:
                 sprints = JiraIssueMapper._map_sprints(fields.customfield_10020)
 
-            # Tạo link URL theo định dạng Jira dashboard
-            jira_base_url = settings.JIRA_DASHBOARD_URL  # URL cố định
+            # Create link URL
+            jira_base_url = settings.JIRA_DASHBOARD_URL
             project_key = api_response.key.split("-")[0]
-            # current_sprint_id = sprints[0].jira_sprint_id if sprints else None
-            current_sprint_id = 3
-            link_url = f"{jira_base_url}/jira/software/projects/{project_key}/boards/{current_sprint_id}?selectedIssue={api_response.key}" if sprints else None
+            current_sprint_id = sprints[0].board_id if sprints else 3
+            link_url = f"{jira_base_url}/jira/software/projects/{project_key}/boards/{current_sprint_id}?selectedIssue={api_response.key}"
 
             return JiraIssueModel(
-                key=api_response.key,
-                summary=fields.summary,
-                description=fields.description or "",
-                status=JiraIssueStatus(fields.status.name),
-                assignee=assignee,  # Use mapped assignee
-                assignee_id=assignee_id,  # Use assignee_id from mapped assignee
-                priority=JiraIssueMapper._map_priority(fields.priority) if fields.priority else None,
-                type=JiraIssueType(fields.issuetype.name),
-                sprints=sprints,
-                estimate_point=fields.customfield_10016 or 0,
-                actual_point=fields.customfield_10017,
-                created_at=fields.created.replace(tzinfo=timezone.utc) if fields.created else now,
-                updated_at=fields.updated.replace(tzinfo=timezone.utc) if fields.updated else now,
                 jira_issue_id=api_response.id,
-                project_key=api_response.key.split("-")[0],
+                key=api_response.key,
+                project_key=project_key,
+                summary=summary,
+                description=description,
+                type=JiraIssueType(fields.issuetype.name) if hasattr(fields, 'issuetype') else JiraIssueType.TASK,
+                status=JiraIssueStatus(fields.status.name) if hasattr(fields, 'status') else JiraIssueStatus.TO_DO,
+                assignee_id=assignee_id,
                 reporter_id=reporter_id,
-                last_synced_at=now,
-                is_deleted=False,
-                link_url=link_url
+                estimate_point=getattr(fields, 'customfield_10016', None),
+                actual_point=getattr(fields, 'customfield_10017', None),
+                created_at=JiraIssueMapper._parse_datetime(fields.created) if hasattr(fields, 'created') else now,
+                updated_at=JiraIssueMapper._parse_datetime(fields.updated) if hasattr(fields, 'updated') else now,
+                sprints=sprints,
+                link_url=link_url,
+                assignee=assignee
             )
         except Exception as e:
-            log.error(f"Error mapping issue response to domain for issue {api_response.key}: {str(e)}")
-            # Return minimal valid model
-            now = datetime.now(timezone.utc)
-            return JiraIssueModel(
-                key=api_response.key,
-                summary=getattr(api_response.fields, 'summary', 'No summary'),
-                description='',
-                status=JiraIssueStatus.TO_DO,
-                type=JiraIssueType.TASK,
-                estimate_point=0,
-                sprints=[],
-                jira_issue_id=api_response.id,
-                project_key=api_response.key.split("-")[0],
-                created_at=now,
-                updated_at=now,
-                last_synced_at=now,
-                reporter_id=None,
-                assignee_id=None,
-                assignee=None,
-                is_deleted=False,
-                link_url=None
-            )
+            log.error(f"Error mapping API response to domain issue: {str(e)}")
+            raise
 
     @staticmethod
     def _map_priority(api_priority: JiraAPIIssuePriorityResponse) -> JiraIssuePriorityModel:
@@ -126,7 +106,7 @@ class JiraIssueMapper:
         )
 
     @staticmethod
-    def _map_sprint(api_sprint: JiraAPISprintResponse) -> Optional[JiraSprintModel]:
+    def _map_sprint(api_sprint: JiraSprintAPIGetResponseDTO) -> Optional[JiraSprintModel]:
         try:
             now = datetime.now(timezone.utc)
             return JiraSprintModel(
@@ -144,10 +124,10 @@ class JiraIssueMapper:
             return None
 
     @staticmethod
-    def _map_sprints(api_sprints: List[JiraAPISprintResponse]) -> List[JiraSprintModel]:
+    def _map_sprints(api_sprints: List[JiraSprintAPIGetResponseDTO]) -> List[JiraSprintModel]:
         if not api_sprints:
             return []
-        return [JiraIssueMapper._map_sprint(sprint) for sprint in api_sprints]
+        return [JiraIssueMapper._map_sprint(sprint) for sprint in api_sprints if sprint]
 
     @staticmethod
     def to_entity(model: JiraIssueModel) -> JiraIssueEntity:

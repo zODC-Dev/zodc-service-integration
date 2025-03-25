@@ -4,7 +4,8 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.domain.exceptions.project_exceptions import ProjectNotFoundError
-from src.domain.models.jira_project import JiraProjectCreateDTO, JiraProjectModel, JiraProjectUpdateDTO
+from src.domain.models.database.jira_project import JiraProjectDBCreateDTO, JiraProjectDBUpdateDTO
+from src.domain.models.jira_project import JiraProjectModel
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 from src.infrastructure.entities.jira_project import JiraProjectEntity
 
@@ -26,7 +27,7 @@ class SQLAlchemyJiraProjectRepository(IJiraProjectRepository):
         )
         return model
 
-    async def create_project(self, project_data: JiraProjectCreateDTO) -> JiraProjectModel:
+    async def create_project(self, project_data: JiraProjectDBCreateDTO) -> JiraProjectModel:
         project = JiraProjectEntity(
             jira_project_id=project_data.jira_project_id,
             key=project_data.key,
@@ -55,7 +56,7 @@ class SQLAlchemyJiraProjectRepository(IJiraProjectRepository):
         projects = result.all()
         return [self._to_domain(p) for p in projects]
 
-    async def update_project(self, project_id: int, project_data: JiraProjectUpdateDTO) -> JiraProjectModel:
+    async def update_project(self, project_id: int, project_data: JiraProjectDBUpdateDTO) -> JiraProjectModel:
         project = await self.session.get(JiraProjectEntity, project_id)
         if project:
             if project_data.name is not None:

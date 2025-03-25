@@ -3,15 +3,6 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class JiraProjectSyncRequestDTO(BaseModel):
-    user_id: int
-    project_key: str
-    jira_project_id: str
-    sync_issues: bool = True
-    sync_sprints: bool = True
-    sync_users: bool = True
-
-
 class JiraProjectSyncSummaryDTO(BaseModel):
     total_issues: int = 0
     synced_issues: int = 0
@@ -23,7 +14,7 @@ class JiraProjectSyncSummaryDTO(BaseModel):
     completed_at: Optional[str] = None
 
 
-class JiraProjectSyncResponseDTO(BaseModel):
+class JiraProjectSyncNATSReplyDTO(BaseModel):
     success: bool
     project_key: str
     error_message: Optional[str] = None

@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from src.domain.models.jira_project import JiraProjectCreateDTO, JiraProjectModel, JiraProjectUpdateDTO
+from src.domain.models.database.jira_project import JiraProjectDBCreateDTO, JiraProjectDBUpdateDTO
+from src.domain.models.jira_project import JiraProjectModel
 
 
 class IJiraProjectRepository(ABC):
     @abstractmethod
-    async def create_project(self, project_data: JiraProjectCreateDTO) -> JiraProjectModel:
+    async def create_project(self, project_data: JiraProjectDBCreateDTO) -> JiraProjectModel:
         pass
 
     @abstractmethod
@@ -22,7 +23,7 @@ class IJiraProjectRepository(ABC):
         pass
 
     @abstractmethod
-    async def update_project(self, project_id: int, project_data: JiraProjectUpdateDTO) -> JiraProjectModel:
+    async def update_project(self, project_id: int, project_data: JiraProjectDBUpdateDTO) -> JiraProjectModel:
         pass
 
     @abstractmethod

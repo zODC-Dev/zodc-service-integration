@@ -4,16 +4,16 @@ from src.app.mappers.jira_mapper import JiraSprintMapper, JiraUserMapper
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.jira import JiraIssueType
+from src.domain.models.jira.apis.responses.jira_issue import JiraIssueAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_project import JiraProjectAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_sprint import JiraSprintAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_user import JiraUserAPIGetResponseDTO
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.jira_project import JiraProjectModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
-from src.infrastructure.dtos.jira.issue_responses import JiraAPIIssueResponse
-from src.infrastructure.dtos.jira.project_responses import JiraAPIProjectResponse
-from src.infrastructure.dtos.jira.sprint_responses import JiraAPISprintResponse
-from src.infrastructure.dtos.jira.user_responses import JiraAPIUserResponse
 from src.infrastructure.mappers.jira_issue_mapper import JiraIssueMapper
 from src.infrastructure.mappers.jira_project_mapper import JiraProjectMapper
 from src.infrastructure.services.jira_service import JiraAPIClient
@@ -41,7 +41,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
 
         return await self.client.map_to_domain(
             response_data,
-            JiraAPIProjectResponse,
+            JiraProjectAPIGetResponseDTO,
             JiraProjectMapper
         )
 
@@ -58,7 +58,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         for user_data in response_data:
             user = await self.client.map_to_domain(
                 user_data,
-                JiraAPIUserResponse,
+                JiraUserAPIGetResponseDTO,
                 JiraUserMapper
             )
             users.append(user)
@@ -91,7 +91,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         for sprint_data in sprint_response.get("values", []):
             sprint = await self.client.map_to_domain(
                 sprint_data,
-                JiraAPISprintResponse,
+                JiraSprintAPIGetResponseDTO,
                 JiraSprintMapper
             )
             sprints.append(sprint)
@@ -110,7 +110,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         for project_data in response_data:
             project = await self.client.map_to_domain(
                 project_data,
-                JiraAPIProjectResponse,
+                JiraProjectAPIGetResponseDTO,
                 JiraProjectMapper
             )
             projects.append(project)
@@ -158,7 +158,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         for issue_data in response_data.get("issues", []):
             issue = await self.client.map_to_domain(
                 issue_data,
-                JiraAPIIssueResponse,
+                JiraIssueAPIGetResponseDTO,
                 JiraIssueMapper
             )
             issues.append(issue)
@@ -206,7 +206,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         for issue_data in response_data.get("issues", []):
             issue = await self.client.map_to_domain(
                 issue_data,
-                JiraAPIIssueResponse,
+                JiraIssueAPIGetResponseDTO,
                 JiraIssueMapper
             )
             issues.append(issue)
@@ -224,7 +224,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
 
             return await self.client.map_to_domain(
                 response_data,
-                JiraAPISprintResponse,
+                JiraSprintAPIGetResponseDTO,
                 JiraSprintMapper
             )
         except Exception as e:

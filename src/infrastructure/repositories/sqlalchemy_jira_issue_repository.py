@@ -6,7 +6,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
-from src.domain.models.jira_issue import JiraIssueCreateDTO, JiraIssueModel, JiraIssueUpdateDTO
+from src.domain.models.database.jira_issue import JiraIssueDBCreateDTO, JiraIssueDBUpdateDTO
+from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
@@ -31,9 +32,9 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         entity = result.first()
         return self._to_domain(entity) if entity else None
 
-    async def create(self, issue: JiraIssueCreateDTO) -> JiraIssueModel:
+    async def create(self, issue: JiraIssueDBCreateDTO) -> JiraIssueModel:
         try:
-            issue_model = JiraIssueCreateDTO._to_domain(issue)
+            issue_model = JiraIssueDBCreateDTO._to_domain(issue)
             # Create issue entity
             issue_entity = self._to_entity(issue_model)
             self.session.add(issue_entity)
@@ -62,7 +63,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             log.error(f"Error creating issue: {str(e)}")
             raise
 
-    async def update(self, issue_id: str, issue_update: JiraIssueUpdateDTO) -> JiraIssueModel:
+    async def update(self, issue_id: str, issue_update: JiraIssueDBUpdateDTO) -> JiraIssueModel:
         try:
             # Fetch existing issue
             result = await self.session.exec(
@@ -92,7 +93,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                 # Remove existing relationships
                 await self.session.exec(
                     delete(JiraIssueSprintEntity).where(
-                        JiraIssueSprintEntity.jira_issue_id == issue_id
+                        col(JiraIssueSprintEntity.jira_issue_id) == issue_id
                     )
                 )
 
@@ -118,7 +119,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
     def _merge_update_with_existing(
         self,
         existing: JiraIssueModel,
-        update: JiraIssueUpdateDTO
+        update: JiraIssueDBUpdateDTO
     ) -> JiraIssueModel:
         """Merge update DTO with existing model to create a complete domain model"""
         # Convert update to dict and filter out None values
@@ -272,8 +273,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             # Base query with user join
             query = (
                 select(JiraIssueEntity)
-                .outerjoin(JiraUserEntity, JiraIssueEntity.assignee_id == JiraUserEntity.jira_account_id)
-                .where(JiraIssueEntity.project_key == project_key)
+                .outerjoin(JiraUserEntity, col(JiraIssueEntity.assignee_id) == col(JiraUserEntity.jira_account_id))
+                .where(col(JiraIssueEntity.project_key) == project_key)
             )
 
             # Filter out deleted issues unless explicitly requested
@@ -287,18 +288,18 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                     # Join with issue_sprint table to filter by sprint_id
                     query = query.join(
                         JiraIssueSprintEntity,
-                        JiraIssueEntity.jira_issue_id == JiraIssueSprintEntity.jira_issue_id
-                    ).where(JiraIssueSprintEntity.jira_sprint_id == sprint_number)
+                        col(JiraIssueEntity.jira_issue_id) == col(JiraIssueSprintEntity.jira_issue_id)
+                    ).where(col(JiraIssueSprintEntity.jira_sprint_id) == sprint_number)
                 elif is_backlog:
                     # Issues without any sprint are in backlog
                     query = query.outerjoin(
                         JiraIssueSprintEntity,
-                        JiraIssueEntity.jira_issue_id == JiraIssueSprintEntity.jira_issue_id
-                    ).where(JiraIssueSprintEntity.jira_sprint_id == None)  # noqa: E711
+                        col(JiraIssueEntity.jira_issue_id) == col(JiraIssueSprintEntity.jira_issue_id)
+                    ).where(col(JiraIssueSprintEntity.jira_sprint_id) == None)  # noqa: E711
 
             # Add issue type filter
             if issue_type:
-                query = query.where(JiraIssueEntity.type == issue_type.value)
+                query = query.where(col(JiraIssueEntity.type) == issue_type.value)
 
             # Add search filter
             if search:
@@ -312,7 +313,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             query = query.limit(limit)
 
             # Order by created_at desc to get newest issues first
-            query = query.order_by(JiraIssueEntity.created_at.desc())
+            query = query.order_by(col(JiraIssueEntity.created_at).desc())
 
             # Execute query
             result = await self.session.exec(query)

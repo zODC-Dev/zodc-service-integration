@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from src.app.dtos.jira.jira_project_sync import JiraProjectSyncRequestDTO
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.configs.logger import log
 from src.domain.constants.sync import EntityType, OperationType, SourceType
-from src.domain.models.sync_log import SyncLogCreateDTO
+from src.domain.models.database.sync_log import SyncLogDBCreateDTO
+from src.domain.models.nats.requests.jira_project import JiraProjectSyncNATSRequestDTO
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.nats_message_handler import INATSRequestHandler
 
@@ -21,7 +21,7 @@ class JiraProjectSyncRequestHandler(INATSRequestHandler):
 
     async def handle(self, subject: str, data: Dict[str, Any]) -> Dict[str, Any]:
         # Parse request data
-        request = JiraProjectSyncRequestDTO.model_validate(data)
+        request = JiraProjectSyncNATSRequestDTO.model_validate(data)
 
         # Create sync log entry
         sync_log = await self._create_sync_log(request)
@@ -40,9 +40,9 @@ class JiraProjectSyncRequestHandler(INATSRequestHandler):
             await self._update_sync_log(sync_log.id, False, str(e))
             raise
 
-    async def _create_sync_log(self, request: JiraProjectSyncRequestDTO):
+    async def _create_sync_log(self, request: JiraProjectSyncNATSRequestDTO):
         """Create initial sync log entry for project sync request"""
-        sync_log_data = SyncLogCreateDTO(
+        sync_log_data = SyncLogDBCreateDTO(
             entity_type=EntityType.PROJECT,
             entity_id=request.project_key,
             operation=OperationType.SYNC,

@@ -2,11 +2,8 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from src.domain.constants.jira import JiraIssueType
-from src.domain.models.jira_issue import (
-    JiraIssueCreateDTO,
-    JiraIssueModel,
-    JiraIssueUpdateDTO,
-)
+from src.domain.models.database.jira_issue import JiraIssueDBCreateDTO, JiraIssueDBUpdateDTO
+from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 
@@ -22,7 +19,7 @@ class JiraIssueDatabaseService(IJiraIssueDatabaseService):
         """Get issue from database by ID"""
         return await self.issue_repository.get_by_jira_issue_id(issue_id)
 
-    async def create_issue(self, user_id: int, issue: JiraIssueCreateDTO) -> JiraIssueModel:
+    async def create_issue(self, user_id: int, issue: JiraIssueDBCreateDTO) -> JiraIssueModel:
         """Create a new issue in database"""
         return await self.issue_repository.create(issue)
 
@@ -30,7 +27,7 @@ class JiraIssueDatabaseService(IJiraIssueDatabaseService):
         self,
         user_id: int,
         issue_id: str,
-        update: JiraIssueUpdateDTO
+        update: JiraIssueDBUpdateDTO
     ) -> JiraIssueModel:
         """Update an existing issue in database"""
         current_issue = await self.issue_repository.get_by_jira_issue_id(issue_id)
@@ -54,7 +51,7 @@ class JiraIssueDatabaseService(IJiraIssueDatabaseService):
         current_issue.updated_at = datetime.now(timezone.utc)
         current_issue.needs_sync = True  # Mark as needing sync with Jira
 
-        return await self.issue_repository.update(issue_id, JiraIssueUpdateDTO(**current_issue))
+        return await self.issue_repository.update(issue_id, JiraIssueDBUpdateDTO(**current_issue))
 
     async def get_project_issues(
         self,

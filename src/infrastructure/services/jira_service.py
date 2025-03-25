@@ -124,6 +124,8 @@ class JiraAPIClient:
                 # Không retry với lỗi xác thực hoặc request
                 raise
 
+        raise JiraRequestError(500, "Error fetching data from Jira")
+
     async def get(self, endpoint: str, user_id: int, params: Optional[Dict[str, Any]] = None, error_msg: str = "Lỗi khi lấy dữ liệu từ Jira") -> Dict[str, Any]:
         """Thực hiện HTTP GET request"""
         url = f"{self.base_url}{endpoint}"

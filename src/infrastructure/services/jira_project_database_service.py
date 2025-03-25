@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from src.domain.models.database.jira_project import JiraProjectDBCreateDTO, JiraProjectDBUpdateDTO
 from src.domain.models.jira_issue import JiraIssueModel, JiraIssueType
-from src.domain.models.jira_project import JiraProjectCreateDTO, JiraProjectModel, JiraProjectUpdateDTO
+from src.domain.models.jira_project import JiraProjectModel
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 from src.domain.services.jira_project_database_service import IJiraProjectDatabaseService
 
@@ -20,14 +21,14 @@ class JiraProjectDatabaseService(IJiraProjectDatabaseService):
     async def get_all_projects(self) -> List[JiraProjectModel]:
         return await self.project_repository.get_all_projects()
 
-    async def create_project(self, project_data: JiraProjectCreateDTO) -> JiraProjectModel:
+    async def create_project(self, project_data: JiraProjectDBCreateDTO) -> JiraProjectModel:
         project_data.last_synced_at = datetime.now(timezone.utc)
         return await self.project_repository.create_project(project_data)
 
     async def update_project(
         self,
         project_id: int,
-        project_data: JiraProjectUpdateDTO
+        project_data: JiraProjectDBUpdateDTO
     ) -> JiraProjectModel:
         return await self.project_repository.update_project(project_id, project_data)
 

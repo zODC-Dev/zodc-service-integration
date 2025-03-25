@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from src.domain.models.jira_user import JiraUserCreateDTO, JiraUserModel, JiraUserUpdateDTO
+from src.domain.models.database.jira_user import JiraUserDBCreateDTO, JiraUserDBUpdateDTO
+from src.domain.models.jira_user import JiraUserModel
 
 
 class IJiraUserRepository(ABC):
@@ -21,12 +22,12 @@ class IJiraUserRepository(ABC):
         pass
 
     @abstractmethod
-    async def create_user(self, user: JiraUserCreateDTO) -> JiraUserModel:
+    async def create_user(self, user: JiraUserDBCreateDTO) -> JiraUserModel:
         """Create a new user"""
         pass
 
     @abstractmethod
-    async def update_user(self, user: JiraUserUpdateDTO) -> None:
+    async def update_user(self, user: JiraUserDBUpdateDTO) -> None:
         """Update a user"""
         pass
 

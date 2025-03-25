@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 from src.configs.logger import log
-from src.domain.models.jira_webhook import JiraWebhookPayload
+from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
 
 
 class JiraWebhookHandler(ABC):
@@ -14,11 +14,11 @@ class JiraWebhookHandler(ABC):
         pass
 
     @abstractmethod
-    async def handle(self, webhook_data: JiraWebhookPayload) -> Dict[str, Any]:
+    async def handle(self, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:
         """Handle the webhook event and return the result"""
         pass
 
-    async def process(self, webhook_data: JiraWebhookPayload) -> Optional[Dict[str, Any]]:
+    async def process(self, webhook_data: JiraWebhookResponseDTO) -> Optional[Dict[str, Any]]:
         """Process the webhook if this handler can handle it"""
         try:
             event_type = webhook_data.webhook_event

@@ -3,17 +3,17 @@ from typing import Any, List, Optional
 
 from src.configs.logger import log
 from src.domain.constants.jira import JiraSprintState
+from src.domain.models.jira.apis.responses.jira_project import JiraProjectAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_sprint import JiraSprintAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_user import JiraUserAPIGetResponseDTO
 from src.domain.models.jira_project import JiraProjectModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
-from src.infrastructure.dtos.jira.project_responses import JiraAPIProjectResponse
-from src.infrastructure.dtos.jira.sprint_responses import JiraAPISprintResponse
-from src.infrastructure.dtos.jira.user_responses import JiraAPIUserResponse
 
 
 class JiraProjectMapper:
     @staticmethod
-    def to_domain(api_response: JiraAPIProjectResponse) -> JiraProjectModel:
+    def to_domain(api_response: JiraProjectAPIGetResponseDTO) -> JiraProjectModel:
         return JiraProjectModel(
             project_id=api_response.id,
             key=api_response.key,
@@ -25,19 +25,18 @@ class JiraProjectMapper:
 
 class JiraUserMapper:
     @staticmethod
-    def to_domain(api_response: JiraAPIUserResponse) -> JiraUserModel:
+    def to_domain(api_response: JiraUserAPIGetResponseDTO) -> JiraUserModel:
         return JiraUserModel(
             jira_account_id=api_response.accountId,
             email=api_response.emailAddress,
             name=api_response.displayName,
-            is_active=api_response.active,
             avatar_url=api_response.avatarUrls.get("48x48", "")
         )
 
 
 class JiraSprintMapper:
     @staticmethod
-    def to_domain(api_response: JiraAPISprintResponse) -> JiraSprintModel:
+    def to_domain(api_response: JiraSprintAPIGetResponseDTO) -> JiraSprintModel:
         try:
             now = datetime.now(timezone.utc)
             return JiraSprintModel(

@@ -6,7 +6,7 @@ from typing import Dict, Set
 from src.configs.database import AsyncSessionLocal
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
-from src.domain.models.jira_webhook import JiraWebhookPayload
+from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
 from src.infrastructure.services.jira_webhook_service import JiraWebhookService
@@ -29,16 +29,17 @@ class JiraWebhookQueueService:
 
         # Queue cho các webhook cần retry
         self.retry_queue: asyncio.Queue = asyncio.Queue()
+        self.RETRY_INTERVAL = 1  # 1s
 
         # Bắt đầu worker xử lý retry
         self._start_retry_worker()
 
-    def _start_retry_worker(self):
+    def _start_retry_worker(self) -> None:
         """Khởi động worker xử lý retry queue"""
         retry_task = asyncio.create_task(self._process_retry_queue())
         self._track_task(retry_task)
 
-    def _track_task(self, task: asyncio.Task):
+    def _track_task(self, task: asyncio.Task) -> None:
         """Theo dõi task để đảm bảo xử lý lỗi và dọn dẹp"""
         self.running_tasks.add(task)
         task.add_done_callback(lambda t: self.running_tasks.remove(t))
@@ -46,12 +47,12 @@ class JiraWebhookQueueService:
         # Xử lý exception nếu có
         task.add_done_callback(self._handle_task_exception)
 
-    def _handle_task_exception(self, task: asyncio.Task):
+    def _handle_task_exception(self, task: asyncio.Task) -> None:
         """Xử lý exception từ task nếu có"""
         if not task.cancelled() and task.exception():
             log.error(f"Task failed with exception: {task.exception()}")
 
-    async def add_webhook_to_queue(self, webhook_data: JiraWebhookPayload) -> bool:
+    async def add_webhook_to_queue(self, webhook_data: JiraWebhookResponseDTO) -> bool:
         """Thêm webhook vào hàng đợi và xử lý theo thứ tự ưu tiên"""
         try:
             issue_id = webhook_data.issue.id
@@ -83,7 +84,7 @@ class JiraWebhookQueueService:
             log.error(f"Error adding webhook to queue: {str(e)}")
             return False
 
-    def _calculate_priority(self, webhook_data: JiraWebhookPayload) -> int:
+    def _calculate_priority(self, webhook_data: JiraWebhookResponseDTO) -> int:
         """Tính toán độ ưu tiên của webhook (thấp = ưu tiên cao)"""
         event = webhook_data.webhook_event
 
@@ -148,51 +149,74 @@ class JiraWebhookQueueService:
         finally:
             self.processing.remove(issue_id)
 
-    async def _maybe_add_to_retry_queue(self, webhook: JiraWebhookPayload, retry_count: int) -> None:
+    async def _maybe_add_to_retry_queue(self, webhook: JiraWebhookResponseDTO, retry_count: int) -> None:
         """Đưa một webhook vào retry queue nếu chưa vượt quá số lần retry tối đa"""
         if retry_count < self.max_retries:
             # Tăng thời gian chờ theo số lần retry (exponential backoff)
             delay = 2 ** retry_count  # 1s, 2s, 4s, ...
+            process_time = time.time() + delay
 
             log.info(
-                f"Scheduling retry #{retry_count+1} for {webhook.webhook_event} on issue {webhook.issue.id} after {delay}s")
+                f"Scheduling retry #{retry_count+1} for {webhook.webhook_event} "
+                f"on issue {webhook.issue.id} after {delay}s"
+            )
 
             # Đặt vào retry queue với (thời gian xử lý, webhook, số lần retry)
-            process_time = time.time() + delay
             await self.retry_queue.put((process_time, webhook, retry_count + 1))
         else:
-            log.warning(f"Abandoning {webhook.webhook_event} for issue {webhook.issue.id} after {retry_count} retries")
+            log.warning(
+                f"Abandoning {webhook.webhook_event} for issue {webhook.issue.id} "
+                f"after {retry_count} retries"
+            )
 
-    async def _process_retry_queue(self) -> None:
-        """Worker xử lý retry queue"""
-        while True:  # Chạy vĩnh viễn
+    async def _process_retry_queue(self):
+        """Process the retry queue"""
+        while True:
             try:
-                # Lấy webhook tiếp theo cần retry
-                process_time, webhook, retry_count = await self.retry_queue.get()
+                # Kiểm tra nếu queue rỗng
+                if self.retry_queue.empty():
+                    await asyncio.sleep(self.RETRY_INTERVAL)
+                    continue
 
-                # Tính thời gian cần đợi
-                now = time.time()
-                wait_time = max(0, process_time - now)
+                # Lấy webhook từ queue
+                process_time, webhook_data, retry_count = await self.retry_queue.get()
+                current_time = time.time()
 
-                if wait_time > 0:
-                    await asyncio.sleep(wait_time)
+                # Kiểm tra xem đã đến thời gian xử lý chưa
+                if current_time < process_time:
+                    # Nếu chưa đến thời gian, đưa lại vào queue và đợi
+                    await self.retry_queue.put((process_time, webhook_data, retry_count))
+                    await asyncio.sleep(min(process_time - current_time, self.RETRY_INTERVAL))
+                    continue
 
-                log.info(
-                    f"Retrying {webhook.webhook_event} for issue {webhook.issue.id} (attempt {retry_count}/{self.max_retries})")
+                try:
+                    # Xử lý webhook với session mới
+                    async with self._get_webhook_service() as webhook_service:
+                        result = await webhook_service.handle_webhook(webhook_data)
 
-                # Xử lý với session mới
-                success = await self._process_webhook_with_new_session(webhook)
+                        if result and "error" in result:
+                            error_msg = result.get("error", "Unknown error")
+                            if "Issue not found" in error_msg:
+                                # Nếu vẫn chưa tìm thấy issue và chưa vượt quá số lần retry
+                                await self._maybe_add_to_retry_queue(webhook_data, retry_count)
+                            else:
+                                log.error(f"Failed to process webhook after {retry_count} retries: {error_msg}")
+                        else:
+                            log.info(
+                                f"Successfully processed webhook for issue {webhook_data.issue.id} on retry #{retry_count}")
 
-                if not success:
-                    # Lên lịch retry lại nếu cần
-                    await self._maybe_add_to_retry_queue(webhook, retry_count)
+                except Exception as e:
+                    log.error(f"Error processing webhook in retry queue: {str(e)}")
+                    # Thử lại nếu chưa vượt quá số lần retry
+                    await self._maybe_add_to_retry_queue(webhook_data, retry_count)
 
-                # Đánh dấu task hoàn thành
-                self.retry_queue.task_done()
+                finally:
+                    # Đánh dấu task này đã được xử lý
+                    self.retry_queue.task_done()
 
             except Exception as e:
-                log.error(f"Error in retry queue worker: {str(e)}")
-                await asyncio.sleep(1)  # Tránh tight loop nếu có lỗi
+                log.error(f"Error in retry queue processor: {str(e)}")
+                await asyncio.sleep(self.RETRY_INTERVAL)
 
     @asynccontextmanager
     async def _get_webhook_service(self):
@@ -215,7 +239,7 @@ class JiraWebhookQueueService:
             finally:
                 await session.close()
 
-    async def _process_webhook_with_new_session(self, webhook_data: JiraWebhookPayload) -> bool:
+    async def _process_webhook_with_new_session(self, webhook_data: JiraWebhookResponseDTO) -> bool:
         """Xử lý webhook với một session database mới và độc lập"""
         try:
             # Sử dụng context manager để đảm bảo session được đóng đúng cách

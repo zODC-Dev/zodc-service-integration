@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlmodel import DateTime, Field, Relationship
+from sqlmodel import Column, DateTime, Field, Relationship
 
 from src.infrastructure.entities.base import BaseEntityWithTimestamps
 from src.infrastructure.entities.jira_issue_sprint import JiraIssueSprintEntity
@@ -27,11 +27,11 @@ class JiraIssueEntity(BaseEntityWithTimestamps, table=True):
     actual_point: Optional[float] = None
     project_key: str = Field(foreign_key="jira_projects.key")
     reporter_id: Optional[str] = Field(default=None, foreign_key="jira_users.jira_account_id")
-    last_synced_at: datetime = Field(sa_type=DateTime(timezone=True))
+    last_synced_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
     updated_locally: bool = Field(default=False)
     assignee_id: Optional[str] = Field(default=None, foreign_key="jira_users.jira_account_id")
-    created_at: datetime = Field(sa_type=DateTime(timezone=True))
-    updated_at: datetime = Field(sa_type=DateTime(timezone=True))
+    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
+    updated_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
     is_system_linked: bool = Field(default=False)
     is_deleted: bool = Field(default=False)
     link_url: Optional[str] = Field(default=None)

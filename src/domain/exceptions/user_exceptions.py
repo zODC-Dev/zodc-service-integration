@@ -28,7 +28,7 @@ class UserPermissionError(UserError):
     pass
 
 
-class JiraUserUpdateDTOError(UserError):
+class JiraUserDBUpdateDTOError(UserError):
     """Raised when user update fails"""
     pass
 

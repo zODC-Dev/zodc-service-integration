@@ -3,8 +3,8 @@ from typing import Any, Dict
 
 from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.models.jira_user import JiraUserCreateDTO, JiraUserUpdateDTO
-from src.domain.models.nats_event import JiraLoginEvent
+from src.domain.models.database.jira_user import JiraUserDBCreateDTO, JiraUserDBUpdateDTO
+from src.domain.models.nats.subscribes.jira_user import JiraUserLoginNATSSubscribeDTO
 from src.domain.models.refresh_token import RefreshTokenModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
@@ -26,14 +26,14 @@ class JiraLoginMessageHandler(INATSMessageHandler):
 
     async def handle(self, subject: str, message: Dict[str, Any]) -> None:
         try:
-            event = JiraLoginEvent.model_validate(message)
+            event = JiraUserLoginNATSSubscribeDTO.model_validate(message)
 
             # Check if user exists
             user = await self.user_repository.get_user_by_email(event.email)
 
             if user:
                 # Update Jira info if user exists
-                user_update = JiraUserUpdateDTO(
+                user_update = JiraUserDBUpdateDTO(
                     email=event.email,
                     jira_account_id=event.jira_account_id,
                 )
@@ -41,7 +41,7 @@ class JiraLoginMessageHandler(INATSMessageHandler):
                 log.info(f"Updated Jira link for existing user {user.id}")
             else:
                 # Create new user with Jira info
-                new_user = JiraUserCreateDTO(
+                new_user = JiraUserDBCreateDTO(
                     email=event.email,
                     user_id=event.user_id,
                     jira_account_id=event.jira_account_id,

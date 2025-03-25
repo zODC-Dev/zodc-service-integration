@@ -5,7 +5,8 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
-from src.domain.models.jira_user import JiraUserCreateDTO, JiraUserModel, JiraUserUpdateDTO
+from src.domain.models.database.jira_user import JiraUserDBCreateDTO, JiraUserDBUpdateDTO
+from src.domain.models.jira_user import JiraUserModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.redis_service import IRedisService
 from src.infrastructure.entities.jira_user import JiraUserEntity
@@ -45,14 +46,14 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
         users = result.all()
         return [self._to_domain(user) for user in users]
 
-    async def create_user(self, user_data: JiraUserCreateDTO) -> JiraUserModel:
+    async def create_user(self, user_data: JiraUserDBCreateDTO) -> JiraUserModel:
         user = JiraUserEntity(**user_data.model_dump())
         self.session.add(user)
         await self.session.commit()
         await self.session.refresh(user)
         return self._to_domain(user)
 
-    async def update_user(self, user: JiraUserUpdateDTO) -> None:
+    async def update_user(self, user: JiraUserDBUpdateDTO) -> None:
         try:
             stmt = (
                 update(JiraUserEntity).where(JiraUserEntity.email == user.email).values(  # type: ignore
@@ -87,8 +88,6 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
             return None
 
     def _to_domain(self, db_user: JiraUserEntity) -> JiraUserModel:
-        if not db_user:
-            return None
         return JiraUserModel(
             id=db_user.id,
             jira_account_id=db_user.jira_account_id,

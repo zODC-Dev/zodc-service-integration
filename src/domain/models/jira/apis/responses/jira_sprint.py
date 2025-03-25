@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from src.infrastructure.dtos.jira.base import JiraAPIResponseBase
+from src.domain.models.jira.apis.responses.base import JiraAPIResponseBase
 
 
-class JiraAPISprintResponse(JiraAPIResponseBase):
+class JiraSprintAPIGetResponseDTO(JiraAPIResponseBase):
     id: int
     name: str
     state: str

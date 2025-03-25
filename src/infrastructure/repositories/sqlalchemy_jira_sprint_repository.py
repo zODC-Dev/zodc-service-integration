@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
-from src.domain.models.jira_sprint import JiraSprintCreateDTO, JiraSprintModel, JiraSprintUpdateDTO
+from src.domain.constants.jira import JiraSprintState
+from src.domain.models.database.jira_sprint import JiraSprintDBCreateDTO, JiraSprintDBUpdateDTO
+from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.infrastructure.entities.jira_sprint import JiraSprintEntity
 
@@ -28,7 +30,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
                 data[field] = self._ensure_timezone(data[field])
         return data
 
-    async def create_sprint(self, sprint_data: JiraSprintCreateDTO) -> JiraSprintModel:
+    async def create_sprint(self, sprint_data: JiraSprintDBCreateDTO) -> JiraSprintModel:
         data = self._prepare_data(sprint_data.model_dump())
         sprint = JiraSprintEntity(**data)
         self.session.add(sprint)
@@ -51,7 +53,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
         sprints = result.all()
         return [self._to_domain(sprint) for sprint in sprints]
 
-    async def update_sprint(self, sprint_id: int, sprint_data: JiraSprintUpdateDTO) -> Optional[JiraSprintModel]:
+    async def update_sprint(self, sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> Optional[JiraSprintModel]:
         try:
             sprint = await self.session.get(JiraSprintEntity, sprint_id)
             if not sprint:
@@ -69,7 +71,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             log.error(f"Error updating sprint {sprint_id}: {str(e)}")
             raise
 
-    async def get_by_jira_sprint_id(self, jira_sprint_id: str) -> Optional[JiraSprintModel]:
+    async def get_by_jira_sprint_id(self, jira_sprint_id: int) -> Optional[JiraSprintModel]:
         result = await self.session.exec(select(JiraSprintEntity).where(JiraSprintEntity.jira_sprint_id == jira_sprint_id))
         sprint = result.first()
         return self._to_domain(sprint) if sprint else None
@@ -85,6 +87,17 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
         sprints = result.all()
         log.info(f"Found {len(sprints)} sprints for project {project_key}")
         return [self._to_domain(sprint) for sprint in sprints]
+
+    async def get_current_sprint(self, project_key: str) -> Optional[JiraSprintModel]:
+        result = await self.session.exec(
+            select(JiraSprintEntity).where(
+                col(JiraSprintEntity.project_key) == project_key,
+                col(JiraSprintEntity.state) == JiraSprintState.ACTIVE
+            )
+        )
+
+        sprint = result.first()
+        return self._to_domain(sprint) if sprint else None
 
     def _to_domain(self, sprint: JiraSprintEntity) -> JiraSprintModel:
         return JiraSprintModel(

@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from src.domain.constants.jira import JiraIssueType
-from src.domain.models.jira_issue import JiraIssueCreateDTO, JiraIssueModel, JiraIssueUpdateDTO
+from src.domain.models.database.jira_issue import JiraIssueDBCreateDTO, JiraIssueDBUpdateDTO
+from src.domain.models.jira_issue import JiraIssueModel
 
 
 class IJiraIssueDatabaseService(ABC):
@@ -14,7 +15,7 @@ class IJiraIssueDatabaseService(ABC):
     async def create_issue(
         self,
         user_id: int,
-        issue: JiraIssueCreateDTO
+        issue: JiraIssueDBCreateDTO
     ) -> JiraIssueModel:
         """Create a new Jira issue"""
         pass
@@ -24,7 +25,7 @@ class IJiraIssueDatabaseService(ABC):
         self,
         user_id: int,
         issue_id: str,
-        update: JiraIssueUpdateDTO
+        update: JiraIssueDBUpdateDTO
     ) -> JiraIssueModel:
         """Update an existing Jira issue"""
         pass

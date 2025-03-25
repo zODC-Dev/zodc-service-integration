@@ -5,7 +5,7 @@ from src.app.services.jira_webhook_handlers.issue_delete_webhook_handler import 
 from src.app.services.jira_webhook_handlers.issue_update_webhook_handler import IssueUpdateWebhookHandler
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.logger import log
-from src.domain.models.jira_webhook import JiraWebhookPayload
+from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 
@@ -34,7 +34,7 @@ class JiraWebhookService:
             # Add more handlers as needed
         ]
 
-    async def handle_webhook(self, webhook_data: JiraWebhookPayload) -> Optional[Dict[str, Any]]:
+    async def handle_webhook(self, webhook_data: JiraWebhookResponseDTO) -> Optional[Dict[str, Any]]:
         """Handle a webhook by delegating to appropriate handler"""
         try:
             log.info(f"Received webhook event: {webhook_data.webhook_event}")

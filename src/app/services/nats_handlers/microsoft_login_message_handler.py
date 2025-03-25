@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
-from src.app.dtos.user.user_event_dto import MicrosoftLoginEventDTO
 from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.models.jira_user import JiraUserCreateDTO
+from src.domain.models.database.jira_user import JiraUserDBCreateDTO
+from src.domain.models.nats.subscribes.jira_user import MicrosoftUserLoginNATSSubscribeDTO
 from src.domain.models.refresh_token import RefreshTokenModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
@@ -25,12 +25,12 @@ class MicrosoftLoginMessageHandler(INATSMessageHandler):
 
     async def handle(self, subject: str, message: Dict[str, Any]) -> None:
         try:
-            event = MicrosoftLoginEventDTO(**message)
+            event = MicrosoftUserLoginNATSSubscribeDTO(**message)
 
             # Check if user exists
             user = await self.user_repository.get_user_by_email(event.email)
             if not user:
-                new_user = JiraUserCreateDTO(
+                new_user = JiraUserDBCreateDTO(
                     email=event.email,
                     user_id=event.user_id,
                 )
@@ -77,7 +77,7 @@ class MicrosoftLoginMessageHandler(INATSMessageHandler):
 #             # Create or update user
 #             user = await self.user_repository.get_user_by_email(event.email)
 #             if not user:
-#                 new_user = JiraUserCreateDTO(
+#                 new_user = JiraUserDBCreateDTO(
 #                     email=event.email,
 #                     user_id=event.user_id,
 #                     jira_account_id=event.account_id,

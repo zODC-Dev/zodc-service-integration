@@ -1,11 +1,12 @@
-from datetime import datetime
-from typing import Any, Dict
+from datetime import datetime, timezone
+from typing import Any, Dict, List
 
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JIRA_STATUS_ID_MAPPING, JiraIssueStatus, JiraIssueType
-from src.domain.models.jira_issue import JiraIssueCreateDTO
-from src.domain.models.jira_webhook import JiraWebhookPayload
+from src.domain.models.database.jira_issue import JiraIssueDBCreateDTO
+from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
+from src.domain.models.jira_sprint import JiraSprintModel
 
 
 class JiraWebhookMapper:
@@ -30,10 +31,12 @@ class JiraWebhookMapper:
     }
 
     @classmethod
-    def map_to_create_dto(cls, webhook_data: JiraWebhookPayload) -> JiraIssueCreateDTO:
-        """Map webhook data to JiraIssueCreateDTO"""
+    def map_to_create_dto(cls, webhook_data: JiraWebhookResponseDTO) -> JiraIssueDBCreateDTO:
+        """Map webhook data to JiraIssueDBCreateDTO"""
         try:
             issue = webhook_data.issue
+
+            log.info(f"Issue in map_to_create_dto: {issue}")
             fields = issue.fields
 
             # Xử lý status theo mapping
@@ -64,16 +67,36 @@ class JiraWebhookMapper:
             else:
                 issue_type = JiraIssueType.TASK
 
-            # Tạo link URL cho issue - sử dụng format URL mới
+            # Map sprints from customfield_10020
+            sprints: List[JiraSprintModel] = []
+            if fields.sprints and len(fields.sprints) > 0:
+                log.info(f"Found sprint data: {fields.sprints}")
+                for sprint_data in fields.sprints:
+                    try:
+                        sprint = JiraSprintModel(
+                            jira_sprint_id=sprint_data.id,
+                            name=sprint_data.name,
+                            state=sprint_data.state,
+                            start_date=cls._parse_datetime(sprint_data.start_date) if sprint_data.start_date else None,
+                            end_date=cls._parse_datetime(sprint_data.end_date) if sprint_data.end_date else None,
+                            goal=sprint_data.goal or "",
+                            board_id=sprint_data.board_id,
+                            project_key=fields.project.key,
+                            created_at=datetime.now(timezone.utc)
+                        )
+                        sprints.append(sprint)
+                    except Exception as e:
+                        log.error(f"Error mapping sprint data: {str(e)}")
+                        continue
+
+            # Create link URL
             jira_base_url = settings.JIRA_DASHBOARD_URL
             project_key = fields.project.key
             issue_key = issue.key
-            current_sprint_id = 3
-            # Format URL theo định dạng Jira dashboard
-            link_url = f"{jira_base_url}/jira/software/projects/{project_key}/boards/{current_sprint_id}?selectedIssue={issue_key}" if current_sprint_id else None
-            log.info(f"link_url: {link_url}")
+            current_sprint_id = sprints[0].board_id if sprints else 3
+            link_url = f"{jira_base_url}/jira/software/projects/{project_key}/boards/{current_sprint_id}?selectedIssue={issue_key}"
 
-            return JiraIssueCreateDTO(
+            return JiraIssueDBCreateDTO(
                 jira_issue_id=issue.id,
                 key=issue.key,
                 project_key=fields.project.key,
@@ -85,7 +108,9 @@ class JiraWebhookMapper:
                 reporter_id=fields.reporter.account_id if fields.reporter else None,
                 created_at=cls._parse_datetime(fields.created),
                 updated_at=cls._parse_datetime(fields.updated),
-                estimate_point=fields.estimate_point,
+                estimate_point=getattr(fields, 'customfield_10016', None),
+                actual_point=getattr(fields, 'customfield_10017', None),
+                sprints=sprints,  # Add sprints to DTO
                 link_url=link_url
             )
         except Exception as e:
@@ -93,7 +118,7 @@ class JiraWebhookMapper:
             raise
 
     @classmethod
-    def map_to_update_dto(cls, webhook_data: JiraWebhookPayload) -> Dict[str, Any]:
+    def map_to_update_dto(cls, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:
         """Map webhook data to update dictionary based on changelog"""
         try:
             update_data: Dict[str, Any] = {}
@@ -186,9 +211,10 @@ class JiraWebhookMapper:
                     return 0
 
             elif field_id_or_name == "customfield_10020" or field_id_or_name == "Sprint":
-                # Use the dedicated sprint mapper
-                from src.app.mappers.jira_mapper import JiraSprintMapper
-                return JiraSprintMapper.from_webhook_list(value)
+                if not value:
+                    return []
+
+                return cls._map_sprints(value)
 
             # Nếu không thuộc các trường hợp đặc biệt, trả về giá trị nguyên gốc
             return value
@@ -214,10 +240,10 @@ class JiraWebhookMapper:
         else:
             # Nếu không có trong ID mapping, thử dùng tên
             try:
-                return JiraIssueType(value)
+                return JiraIssueType(value).value
             except ValueError:
                 log.warning(f"Invalid issue type value: {value}, defaulting to TASK")
-                return JiraIssueType.TASK
+                return JiraIssueType.TASK.value
 
     @staticmethod
     def _map_status(value: Any) -> str:
@@ -229,12 +255,19 @@ class JiraWebhookMapper:
 
         # Nếu không có trong ID mapping, thử dùng tên
         try:
-            return JiraIssueStatus(value)
+            return JiraIssueStatus(value).value
         except ValueError:
             # Fallback: dùng from_str để tìm kiếm theo cách không phân biệt hoa thường
             try:
                 log.info(f"Trying to map status name {value} using from_str")
-                return JiraIssueStatus.from_str(value)
+                return JiraIssueStatus.from_str(value).value
             except ValueError:
                 log.warning(f"Invalid status value: {value}, defaulting to TO_DO")
-                return JiraIssueStatus.TO_DO
+                return JiraIssueStatus.TO_DO.value
+
+    @staticmethod
+    def _map_sprints(value: Any) -> List[JiraSprintModel]:
+        """Map sprints to list of JiraSprintModel"""
+        if not value:
+            return []
+        return [JiraSprintModel(jira_sprint_id=sprint.id, name=sprint.name, state=sprint.state) for sprint in value]
