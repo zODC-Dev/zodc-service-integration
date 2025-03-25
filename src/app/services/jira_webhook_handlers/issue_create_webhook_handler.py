@@ -33,7 +33,16 @@ class IssueCreateWebhookHandler(JiraWebhookHandler):
         """Handle the issue creation webhook"""
         issue_id = webhook_data.issue.id
 
-        # Log the webhook sync first
+        # Get latest issue data from Jira API
+        issue_data = await self.get_latest_issue_data(issue_id)
+        if not issue_data:
+            return {"error": "Failed to fetch issue data", "issue_id": issue_id}
+
+        # Create in database
+        create_dto = JiraIssueConverter._convert_to_create_dto(issue_data)
+        await self.jira_issue_repository.create(create_dto)
+
+        # Log sync
         await self.sync_log_repository.create_sync_log(
             SyncLogDBCreateDTO(
                 entity_type=EntityType.ISSUE,
@@ -46,15 +55,6 @@ class IssueCreateWebhookHandler(JiraWebhookHandler):
                 sender=None
             )
         )
-
-        # Get issue data from Jira API
-        issue_data = await self.jira_issue_api_service.get_issue_with_system_user(issue_id)
-        if not issue_data:
-            return {"error": "Failed to fetch issue data", "issue_id": issue_id}
-
-        # Create in database
-        create_dto = JiraIssueConverter._convert_to_create_dto(issue_data)
-        await self.jira_issue_repository.create(create_dto)
 
         log.info(f"Successfully created issue {issue_id} from webhook")
 
