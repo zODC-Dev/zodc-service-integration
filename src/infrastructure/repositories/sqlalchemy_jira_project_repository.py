@@ -15,8 +15,6 @@ class SQLAlchemyJiraProjectRepository(IJiraProjectRepository):
         self.session = session
 
     def _to_domain(self, entity: JiraProjectEntity) -> JiraProjectModel:
-        if not entity:
-            return None
         model = JiraProjectModel(
             id=entity.id,
             jira_project_id=entity.jira_project_id,

@@ -8,9 +8,9 @@ from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
+from src.domain.models.jira.webhooks.mappers.jira_webhook import JiraWebhookMapper
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
-from src.infrastructure.mappers.jira_webhook_mapper import JiraWebhookMapper
 
 
 class IssueUpdateWebhookHandler(JiraWebhookHandler):

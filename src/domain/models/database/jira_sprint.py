@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -14,7 +14,7 @@ class JiraSprintDBCreateDTO(BaseModel):
     project_key: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    def model_dump(self) -> dict:
+    def model_dump(self) -> Dict[str, Any]:
         data = super().model_dump()
         # Ensure all datetime fields have timezone info
         datetime_fields = ['start_date', 'end_date', 'complete_date', 'created_at']

@@ -19,11 +19,11 @@ class NATSEventService(INATSEventService):
 
     async def start(self) -> None:
         """Start all message and request handlers"""
-        for subject, handler in self.message_handlers.items():
-            await self.register_message_handler(subject, handler)
+        for message_subject, message_handler in self.message_handlers.items():
+            await self.register_message_handler(message_subject, message_handler)
 
-        for subject, handler in self.request_handlers.items():
-            await self.register_request_handler(subject, handler)
+        for request_subject, request_handler in self.request_handlers.items():
+            await self.register_request_handler(request_subject, request_handler)
 
     async def register_message_handler(
         self,

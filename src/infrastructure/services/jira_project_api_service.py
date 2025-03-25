@@ -1,9 +1,12 @@
 from typing import List, Optional
 
-from src.app.mappers.jira_mapper import JiraSprintMapper, JiraUserMapper
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.jira import JiraIssueType
+from src.domain.models.jira.apis.mappers.jira_issue import JiraIssueMapper
+from src.domain.models.jira.apis.mappers.jira_project import JiraProjectMapper
+from src.domain.models.jira.apis.mappers.jira_sprint import JiraSprintMapper
+from src.domain.models.jira.apis.mappers.jira_user import JiraUserMapper
 from src.domain.models.jira.apis.responses.jira_issue import JiraIssueAPIGetResponseDTO
 from src.domain.models.jira.apis.responses.jira_project import JiraProjectAPIGetResponseDTO
 from src.domain.models.jira.apis.responses.jira_sprint import JiraSprintAPIGetResponseDTO
@@ -14,8 +17,6 @@ from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
-from src.infrastructure.mappers.jira_issue_mapper import JiraIssueMapper
-from src.infrastructure.mappers.jira_project_mapper import JiraProjectMapper
 from src.infrastructure.services.jira_service import JiraAPIClient
 
 
@@ -54,9 +55,9 @@ class JiraProjectAPIService(IJiraProjectAPIService):
             error_msg=f"Lỗi khi lấy danh sách người dùng cho dự án {project_key}"
         )
 
-        users = []
+        users: List[JiraUserModel] = []
         for user_data in response_data:
-            user = await self.client.map_to_domain(
+            user: JiraUserModel = await self.client.map_to_domain(
                 user_data,
                 JiraUserAPIGetResponseDTO,
                 JiraUserMapper
@@ -87,9 +88,9 @@ class JiraProjectAPIService(IJiraProjectAPIService):
             error_msg=f"Lỗi khi lấy sprints cho board {board_id}"
         )
 
-        sprints = []
+        sprints: List[JiraSprintModel] = []
         for sprint_data in sprint_response.get("values", []):
-            sprint = await self.client.map_to_domain(
+            sprint: JiraSprintModel = await self.client.map_to_domain(
                 sprint_data,
                 JiraSprintAPIGetResponseDTO,
                 JiraSprintMapper
@@ -106,9 +107,9 @@ class JiraProjectAPIService(IJiraProjectAPIService):
             error_msg="Lỗi khi lấy danh sách dự án"
         )
 
-        projects = []
+        projects: List[JiraProjectModel] = []
         for project_data in response_data:
-            project = await self.client.map_to_domain(
+            project: JiraProjectModel = await self.client.map_to_domain(
                 project_data,
                 JiraProjectAPIGetResponseDTO,
                 JiraProjectMapper
@@ -154,9 +155,9 @@ class JiraProjectAPIService(IJiraProjectAPIService):
             error_msg=f"Lỗi khi tìm kiếm issues cho dự án {project_key}"
         )
 
-        issues = []
+        issues: List[JiraIssueModel] = []
         for issue_data in response_data.get("issues", []):
-            issue = await self.client.map_to_domain(
+            issue: JiraIssueModel = await self.client.map_to_domain(
                 issue_data,
                 JiraIssueAPIGetResponseDTO,
                 JiraIssueMapper
@@ -202,9 +203,9 @@ class JiraProjectAPIService(IJiraProjectAPIService):
             error_msg="Lỗi khi tìm kiếm issues với JQL"
         )
 
-        issues = []
+        issues: List[JiraIssueModel] = []
         for issue_data in response_data.get("issues", []):
-            issue = await self.client.map_to_domain(
+            issue: JiraIssueModel = await self.client.map_to_domain(
                 issue_data,
                 JiraIssueAPIGetResponseDTO,
                 JiraIssueMapper
@@ -222,11 +223,13 @@ class JiraProjectAPIService(IJiraProjectAPIService):
                 error_msg=f"Lỗi khi lấy thông tin sprint {sprint_id}"
             )
 
-            return await self.client.map_to_domain(
+            sprint: JiraSprintModel = await self.client.map_to_domain(
                 response_data,
                 JiraSprintAPIGetResponseDTO,
                 JiraSprintMapper
             )
+
+            return sprint
         except Exception as e:
             log.error(f"Lỗi khi lấy sprint {sprint_id}: {str(e)}")
             return None

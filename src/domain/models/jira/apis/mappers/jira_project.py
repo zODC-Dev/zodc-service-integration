@@ -1,13 +1,10 @@
-import logging
-
+from src.configs.logger import log
 from src.domain.models.jira.apis.responses.jira_project import JiraProjectAPIGetResponseDTO
 from src.domain.models.jira.apis.responses.jira_sprint import JiraSprintAPIGetResponseDTO
 from src.domain.models.jira.apis.responses.jira_user import JiraUserAPIGetResponseDTO
 from src.domain.models.jira_project import JiraProjectModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
-
-log = logging.getLogger(__name__)
 
 
 class JiraProjectMapper:

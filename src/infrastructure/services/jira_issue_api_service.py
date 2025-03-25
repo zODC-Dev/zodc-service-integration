@@ -2,12 +2,12 @@ from typing import Any, Dict, List, Optional, Union
 
 from src.configs.logger import log
 from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JiraIssueStatus, JiraIssueType
+from src.domain.models.jira.apis.mappers.jira_issue import JiraIssueMapper
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
 from src.domain.models.jira.apis.responses.jira_issue import JiraIssueAPIGetResponseDTO
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
-from src.infrastructure.mappers.jira_issue_mapper import JiraIssueMapper
 from src.infrastructure.services.jira_service import JiraAPIClient
 
 
@@ -78,7 +78,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         )
 
         # Get new created issue
-        created_issue_id = response_data.get("id")
+        created_issue_id: str = response_data.get("id")
         created_issue = await self.get_issue(user_id, created_issue_id)
 
         # Handle initial status if specified

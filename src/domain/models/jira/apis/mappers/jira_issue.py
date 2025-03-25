@@ -102,7 +102,7 @@ class JiraIssueMapper:
         return JiraIssuePriorityModel(
             id=api_priority.id,
             name=api_priority.name,
-            icon_url=api_priority.icon_url
+            icon_url=api_priority.iconUrl
         )
 
     @staticmethod
