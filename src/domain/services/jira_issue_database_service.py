@@ -8,7 +8,7 @@ from src.domain.models.jira_issue import JiraIssueModel
 
 class IJiraIssueDatabaseService(ABC):
     @abstractmethod
-    async def get_issue(self, user_id: int, issue_id: str) -> JiraIssueModel:
+    async def get_issue(self, user_id: int, issue_id: str) -> Optional[JiraIssueModel]:
         pass
 
     @abstractmethod

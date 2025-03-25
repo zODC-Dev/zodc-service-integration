@@ -1,7 +1,10 @@
+import asyncio
 from typing import Any, Dict, List, Optional, Union
 
 from src.configs.logger import log
+from src.configs.settings import settings
 from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JiraIssueStatus, JiraIssueType
+from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.jira.apis.mappers.jira_issue import JiraIssueMapper
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
 from src.domain.models.jira.apis.responses.jira_issue import JiraIssueAPIGetResponseDTO
@@ -14,30 +17,70 @@ from src.infrastructure.services.jira_service import JiraAPIClient
 class JiraIssueAPIService(IJiraIssueAPIService):
     """Service to interact with Jira Issue API"""
 
-    def __init__(
-        self,
-        jira_api_client: JiraAPIClient,
-        user_repository: IJiraUserRepository
-    ):
-        self.client = jira_api_client
+    def __init__(self, client: JiraAPIClient, user_repository: IJiraUserRepository):
+        self.client = client
         self.user_repository = user_repository
+        self.retry_attempts = 3
+        self.retry_delay = 1  # seconds
+        self.system_user_id = settings.JIRA_SYSTEM_USER_ID  # ID của service account
 
-    async def get_issue(self, user_id: int, issue_id: str) -> JiraIssueModel:
-        """Get issue information from Jira API"""
-        response_data = await self.client.get(
-            f"/rest/api/3/issue/{issue_id}",
-            user_id,
-            params={"fields": "summary,description,status,assignee,reporter,priority,issuetype,created,updated,customfield_10016,customfield_10017,customfield_10020"},
-            error_msg=f"Error when getting issue {issue_id}"
-        )
+    async def get_issue_with_system_user(self, issue_id: str) -> Optional[JiraIssueModel]:
+        """Get issue using system user account"""
+        return await self.get_issue(self.system_user_id, issue_id)
 
-        log.info(f"Issue response from Get Issue: {response_data}")
+    async def get_issue(self, user_id: int, issue_id: str) -> Optional[JiraIssueModel]:
+        """Get issue from Jira API with retry logic"""
+        for attempt in range(self.retry_attempts):
+            try:
+                response_data = await self.client.get(
+                    f"/rest/api/3/issue/{issue_id}",
+                    user_id,
+                    params={
+                        "fields": [
+                            "summary",
+                            "description",
+                            "status",
+                            "assignee",
+                            "reporter",
+                            "priority",
+                            "issuetype",
+                            "created",
+                            "updated",
+                            "customfield_10016",  # story points
+                            "customfield_10017",  # actual points
+                            "customfield_10020",  # sprint
+                            # Add any other needed fields
+                        ]
+                    },
+                    error_msg=f"Error fetching issue {issue_id}"
+                )
 
-        return await self.client.map_to_domain(
-            response_data,
-            JiraIssueAPIGetResponseDTO,
-            JiraIssueMapper
-        )
+                # Map response to domain model
+                issue: JiraIssueModel = await self.client.map_to_domain(
+                    response_data,
+                    JiraIssueAPIGetResponseDTO,
+                    JiraIssueMapper
+                )
+
+                return issue
+
+            except JiraRequestError as e:
+                if e.status_code == 404:
+                    log.warning(f"Issue {issue_id} not found in Jira")
+                    return None
+                elif attempt < self.retry_attempts - 1:
+                    wait_time = self.retry_delay * (2 ** attempt)  # exponential backoff
+                    log.warning(f"Retrying get_issue after {wait_time}s (attempt {attempt + 1})")
+                    await asyncio.sleep(wait_time)
+                else:
+                    log.error(f"Failed to fetch issue {issue_id} after {self.retry_attempts} attempts")
+                    return None
+
+            except Exception as e:
+                log.error(f"Unexpected error fetching issue {issue_id}: {str(e)}")
+                return None
+
+        return None
 
     async def create_issue(self, user_id: int, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
         """Create new issue in Jira"""

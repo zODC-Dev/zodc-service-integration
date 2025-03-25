@@ -6,9 +6,10 @@ from src.domain.constants.jira import JiraWebhookEvent
 from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
-from src.domain.models.jira.webhooks.mappers.jira_webhook import JiraWebhookMapper
+from src.domain.models.jira.webhooks.mappers.jira_issue_converter import JiraIssueConverter
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
+from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 
 
 class IssueCreateWebhookHandler(JiraWebhookHandler):
@@ -17,10 +18,12 @@ class IssueCreateWebhookHandler(JiraWebhookHandler):
     def __init__(
         self,
         jira_issue_repository: IJiraIssueRepository,
-        sync_log_repository: ISyncLogRepository
+        sync_log_repository: ISyncLogRepository,
+        jira_issue_api_service: IJiraIssueAPIService
     ):
         self.jira_issue_repository = jira_issue_repository
         self.sync_log_repository = sync_log_repository
+        self.jira_issue_api_service = jira_issue_api_service
 
     async def can_handle(self, webhook_event: str) -> bool:
         """Check if this handler can process the given webhook event"""
@@ -44,11 +47,14 @@ class IssueCreateWebhookHandler(JiraWebhookHandler):
             )
         )
 
-        # Map webhook data to DTO
-        issue_create_dto = JiraWebhookMapper.map_to_create_dto(webhook_data)
+        # Get issue data from Jira API
+        issue_data = await self.jira_issue_api_service.get_issue_with_system_user(issue_id)
+        if not issue_data:
+            return {"error": "Failed to fetch issue data", "issue_id": issue_id}
 
-        # Save to database with transaction
-        await self.jira_issue_repository.create(issue_create_dto)
+        # Create in database
+        create_dto = JiraIssueConverter._convert_to_create_dto(issue_data)
+        await self.jira_issue_repository.create(create_dto)
 
         log.info(f"Successfully created issue {issue_id} from webhook")
 

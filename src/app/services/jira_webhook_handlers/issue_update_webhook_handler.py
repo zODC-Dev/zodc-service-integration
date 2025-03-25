@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Any, Dict
 
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
@@ -8,9 +7,10 @@ from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
-from src.domain.models.jira.webhooks.mappers.jira_webhook import JiraWebhookMapper
+from src.domain.models.jira.webhooks.mappers.jira_issue_converter import JiraIssueConverter
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
+from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 
 
 class IssueUpdateWebhookHandler(JiraWebhookHandler):
@@ -19,10 +19,12 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
     def __init__(
         self,
         jira_issue_repository: IJiraIssueRepository,
-        sync_log_repository: ISyncLogRepository
+        sync_log_repository: ISyncLogRepository,
+        jira_issue_api_service: IJiraIssueAPIService
     ):
         self.jira_issue_repository = jira_issue_repository
         self.sync_log_repository = sync_log_repository
+        self.jira_issue_api_service = jira_issue_api_service
 
     async def can_handle(self, webhook_event: str) -> bool:
         """Check if this handler can process the given webhook event"""
@@ -46,32 +48,14 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
             )
         )
 
-        # Get existing issue
-        issue = await self.jira_issue_repository.get_by_jira_issue_id(issue_id)
-        if not issue:
-            log.warning(f"Issue {issue_id} not found in database")
-            return {"error": "Issue not found", "issue_id": issue_id}
+        # Get latest issue data from Jira API using system user
+        issue_data = await self.jira_issue_api_service.get_issue_with_system_user(issue_id)
+        if not issue_data:
+            return {"error": "Failed to fetch issue data", "issue_id": issue_id}
 
-        # Map webhook data to update dict
-        update_data = JiraWebhookMapper.map_to_update_dto(webhook_data)
-
-        # Check for conflicts
-        updated_at: datetime = update_data.get("updated_at")
-        if issue.updated_locally and updated_at > issue.last_synced_at:
-            await self._handle_conflict(issue_id, updated_at, issue.last_synced_at)
-
-        # Update if there are changes
-        updated_issue = None
-        if update_data:
-            updated_issue = await self.jira_issue_repository.update(
-                issue_id,
-                JiraIssueDBUpdateDTO(**update_data)
-            )
-
-        # Update sync status
-        await self._update_sync_status(issue_id, update_data["updated_at"])
-
-        log.info(f"Successfully processed issue update webhook for issue {issue_id}")
+        # Update in database
+        update_dto = JiraIssueConverter._convert_to_update_dto(issue_data)
+        updated_issue = await self.jira_issue_repository.update(issue_id, update_dto)
 
         return {
             "issue_id": issue_id,

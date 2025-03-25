@@ -47,12 +47,12 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         )
 
     async def get_project_users(self, user_id: int, project_key: str) -> List[JiraUserModel]:
-        """Lấy danh sách người dùng có thể gán cho dự án từ Jira API"""
+        """Get all users in a project from Jira API"""
         response_data = await self.client.get(
             "/rest/api/3/user/assignable/search",
             user_id,
             params={"project": project_key},
-            error_msg=f"Lỗi khi lấy danh sách người dùng cho dự án {project_key}"
+            error_msg=f"Error fetching users for project {project_key}"
         )
 
         users: List[JiraUserModel] = []
@@ -67,13 +67,13 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         return users
 
     async def get_project_sprints(self, user_id: int, project_key: str) -> List[JiraSprintModel]:
-        """Lấy danh sách sprints của dự án từ Jira API"""
-        # Trước tiên lấy board ID cho dự án
+        """Get all sprints for a project from Jira API"""
+        # First get board ID for the project
         board_response = await self.client.get(
             "/rest/agile/1.0/board",
             user_id,
             params={"projectKeyOrId": project_key},
-            error_msg=f"Lỗi khi lấy board cho dự án {project_key}"
+            error_msg=f"Error fetching board for project {project_key}"
         )
 
         if not board_response.get("values"):
@@ -85,7 +85,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         sprint_response = await self.client.get(
             f"/rest/agile/1.0/board/{board_id}/sprint",
             user_id,
-            error_msg=f"Lỗi khi lấy sprints cho board {board_id}"
+            error_msg=f"Error fetching sprints for board {board_id}"
         )
 
         sprints: List[JiraSprintModel] = []
@@ -100,11 +100,11 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         return sprints
 
     async def get_accessible_projects(self, user_id: int) -> List[JiraProjectModel]:
-        """Lấy tất cả dự án mà người dùng có quyền truy cập"""
+        """Get all projects that the user has access to"""
         response_data = await self.client.get(
             "/rest/api/3/project",
             user_id,
-            error_msg="Lỗi khi lấy danh sách dự án"
+            error_msg="Error fetching projects"
         )
 
         projects: List[JiraProjectModel] = []
@@ -129,8 +129,8 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         limit: int = 50,
         start_at: int = 0
     ) -> List[JiraIssueModel]:
-        """Lấy danh sách issues của dự án từ Jira API với phân trang"""
-        # Xây dựng JQL query
+        """Get all issues for a project from Jira API with pagination"""
+        # Build JQL query
         jql_parts = [f"project = {project_key}"]
         if sprint_id:
             jql_parts.append(f"sprint = {sprint_id}")
@@ -152,7 +152,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
                 "maxResults": limit,
                 "fields": "summary,description,status,assignee,priority,issuetype,created,updated,customfield_10016,customfield_10017,customfield_10020"
             },
-            error_msg=f"Lỗi khi tìm kiếm issues cho dự án {project_key}"
+            error_msg=f"Error searching issues for project {project_key}"
         )
 
         issues: List[JiraIssueModel] = []
@@ -173,8 +173,8 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         issue_type: Optional[JiraIssueType] = None,
         limit: int = 50
     ) -> List[JiraIssueModel]:
-        """Lấy danh sách issues trong một sprint cụ thể"""
-        # Xây dựng JQL query
+        """Get all issues in a specific sprint"""
+        # Build JQL query
         jql_parts = [f"sprint = {sprint_id}"]
         if issue_type:
             jql_parts.append(f"issuetype = {issue_type.value}")
@@ -190,7 +190,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         start_at: int = 0,
         limit: int = 50
     ) -> List[JiraIssueModel]:
-        """Tìm kiếm issues với JQL"""
+        """Search issues with JQL"""
         response_data = await self.client.post(
             "/rest/api/3/search",
             user_id,
@@ -200,7 +200,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
                 "maxResults": limit,
                 "fields": "summary,description,status,assignee,priority,issuetype,created,updated,customfield_10016,customfield_10017,customfield_10020"
             },
-            error_msg="Lỗi khi tìm kiếm issues với JQL"
+            error_msg="Error searching issues with JQL"
         )
 
         issues: List[JiraIssueModel] = []

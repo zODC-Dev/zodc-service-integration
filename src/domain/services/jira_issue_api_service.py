@@ -19,5 +19,10 @@ class IJiraIssueAPIService(ABC):
         pass
 
     @abstractmethod
+    async def get_issue_with_system_user(self, issue_id: str) -> JiraIssueModel:
+        """Get issue using system user account"""
+        pass
+
+    @abstractmethod
     async def search_issues(self, user_id: int, jql: str, start_at: int = 0, max_results: int = 50, fields: Optional[List[str]] = None) -> List[JiraIssueModel]:
         pass

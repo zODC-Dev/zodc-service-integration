@@ -102,7 +102,7 @@ class JiraIssueDBUpdateDTO(BaseModel):
     is_system_linked: Optional[bool] = None
     assignee_id: Optional[str] = None
     reporter_id: Optional[str] = None
-    sprint_id: Optional[str] = None
+    sprints: Optional[List[JiraSprintModel]] = None
     is_deleted: Optional[bool] = None
     type: Optional[Union[JiraIssueType, str]] = None
 
@@ -144,4 +144,5 @@ class JiraIssueDBUpdateDTO(BaseModel):
             is_system_linked=domain.is_system_linked,
             is_deleted=domain.is_deleted,
             type=domain.type,
+            sprints=domain.sprints,
         )

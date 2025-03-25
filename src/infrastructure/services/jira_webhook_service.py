@@ -8,6 +8,7 @@ from src.configs.logger import log
 from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
+from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 
 
 class JiraWebhookService:
@@ -16,21 +17,23 @@ class JiraWebhookService:
     def __init__(
         self,
         jira_issue_repository: IJiraIssueRepository,
-        sync_log_repository: ISyncLogRepository
+        sync_log_repository: ISyncLogRepository,
+        jira_issue_api_service: IJiraIssueAPIService
     ):
         self.handlers: List[JiraWebhookHandler] = []
-        self._init_handlers(jira_issue_repository, sync_log_repository)
+        self.jira_issue_repository = jira_issue_repository
+        self.sync_log_repository = sync_log_repository
+        self.jira_issue_api_service = jira_issue_api_service
+        self._init_handlers()
 
-    def _init_handlers(
-        self,
-        jira_issue_repository: IJiraIssueRepository,
-        sync_log_repository: ISyncLogRepository
-    ):
+    def _init_handlers(self):
         """Initialize webhook handlers"""
         self.handlers = [
-            IssueCreateWebhookHandler(jira_issue_repository, sync_log_repository),
-            IssueUpdateWebhookHandler(jira_issue_repository, sync_log_repository),
-            IssueDeleteWebhookHandler(jira_issue_repository, sync_log_repository)
+            IssueCreateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
+                                      self.jira_issue_api_service),
+            IssueUpdateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
+                                      self.jira_issue_api_service),
+            IssueDeleteWebhookHandler(self.jira_issue_repository, self.sync_log_repository)
             # Add more handlers as needed
         ]
 

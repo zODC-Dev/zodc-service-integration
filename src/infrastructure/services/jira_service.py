@@ -155,7 +155,8 @@ class JiraAPIClient:
     async def map_to_domain(self, response_data: Dict[str, Any], model_class: Type[U], mapper: Any) -> T:
         """Map API response to domain model"""
         api_model = await self.parse_response_with_model(response_data, model_class)
-        return mapper.to_domain(api_model)
+        domain_model = mapper.to_domain(api_model)
+        return domain_model
 
     async def map_list_to_domain(self, response_data: List[Dict[str, Any]], model_class: Type[U], mapper: Any) -> List[T]:
         """Map list of API responses to domain models"""

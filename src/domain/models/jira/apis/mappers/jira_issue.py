@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from src.configs.logger import log
 from src.configs.settings import settings
@@ -11,10 +11,11 @@ from src.domain.models.jira.apis.responses.jira_user import JiraUserAPIGetRespon
 from src.domain.models.jira_issue import JiraIssueModel, JiraIssuePriorityModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
-from src.infrastructure.entities.jira_issue import JiraIssueEntity
 
 
 class JiraIssueMapper:
+    """Mapper for Jira issue API responses to domain models"""
+
     @staticmethod
     def _map_user(user_response: JiraUserAPIGetResponseDTO) -> Optional[JiraUserModel]:
         if not user_response:
@@ -43,14 +44,44 @@ class JiraIssueMapper:
             )
 
     @staticmethod
-    def to_domain_issue(api_response: JiraIssueAPIGetResponseDTO) -> JiraIssueModel:
+    def _convert_adf_to_text(adf_data: Union[str, Dict[str, Any], None]) -> Optional[str]:
+        """Convert Atlassian Document Format to plain text"""
+        if adf_data is None:
+            return None
+
+        if isinstance(adf_data, str):
+            return adf_data
+
+        try:
+            # Xử lý ADF object
+            if isinstance(adf_data, dict):
+                text_parts = []
+
+                # Lấy text từ content
+                if "content" in adf_data:
+                    for content in adf_data["content"]:
+                        if content.get("type") == "paragraph":
+                            for text_node in content.get("content", []):
+                                if text_node.get("type") == "text":
+                                    text_parts.append(text_node.get("text", ""))
+
+                return "\n".join(text_parts) if text_parts else None
+
+            return str(adf_data)
+
+        except Exception as e:
+            log.error(f"Error converting ADF to text: {str(e)}")
+            return None
+
+    @staticmethod
+    def to_domain(api_response: JiraIssueAPIGetResponseDTO) -> JiraIssueModel:
         try:
             fields = api_response.fields
             now = datetime.now(timezone.utc)
 
             # Đảm bảo truy cập các field từ fields object
             summary = fields.summary if hasattr(fields, 'summary') else ""
-            description = fields.description if hasattr(fields, 'description') else None
+            description = JiraIssueMapper._convert_adf_to_text(fields.description)
 
             # Map user data
             assignee = None
@@ -85,12 +116,13 @@ class JiraIssueMapper:
                 status=JiraIssueStatus(fields.status.name) if hasattr(fields, 'status') else JiraIssueStatus.TO_DO,
                 assignee_id=assignee_id,
                 reporter_id=reporter_id,
-                estimate_point=getattr(fields, 'customfield_10016', None),
-                actual_point=getattr(fields, 'customfield_10017', None),
-                created_at=JiraIssueMapper._parse_datetime(fields.created) if hasattr(fields, 'created') else now,
-                updated_at=JiraIssueMapper._parse_datetime(fields.updated) if hasattr(fields, 'updated') else now,
+                estimate_point=fields.customfield_10016 or 0,
+                actual_point=fields.customfield_10017 or 0,
+                created_at=fields.created if hasattr(fields, 'created') else now,
+                updated_at=fields.updated if hasattr(fields, 'updated') else now,
                 sprints=sprints,
                 link_url=link_url,
+                last_synced_at=now,
                 assignee=assignee
             )
         except Exception as e:
@@ -130,62 +162,8 @@ class JiraIssueMapper:
         return [JiraIssueMapper._map_sprint(sprint) for sprint in api_sprints if sprint]
 
     @staticmethod
-    def to_entity(model: JiraIssueModel) -> JiraIssueEntity:
-        return JiraIssueEntity(
-            jira_issue_id=model.jira_issue_id,
-            key=model.key,
-            summary=model.summary,
-            description=model.description,
-            status=model.status.value,
-            type=model.type.value,
-            priority_id=model.priority.id if model.priority else None,
-            estimate_point=model.estimate_point,
-            actual_point=model.actual_point,
-            project_key=model.project_key,
-            reporter_id=model.reporter_id,  # Ensure reporter_id is passed
-            assignee_id=model.assignee_id,  # Use assignee_id directly
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-            last_synced_at=model.last_synced_at,
-            updated_locally=model.updated_locally,
-            link_url=model.link_url,
-            sprints=[]
-        )
-
-    @staticmethod
-    def to_domain(entity: JiraIssueEntity) -> JiraIssueModel:
-        return JiraIssueModel(
-            id=entity.id,
-            key=entity.key,
-            summary=entity.summary,
-            description=entity.description,
-            status=JiraIssueStatus(entity.status),
-            type=JiraIssueType(entity.type),
-            priority=None,  # Will be set by repository if needed
-            estimate_point=entity.estimate_point,
-            actual_point=entity.actual_point,
-            project_key=entity.project_key,
-            reporter_id=entity.reporter_id,
-            assignee=None,  # Will be set by repository if needed
-            sprints=[
-                JiraSprintModel(
-                    jira_sprint_id=sprint.jira_sprint_id,
-                    name=sprint.name,
-                    state=sprint.state,
-                    start_date=sprint.start_date,
-                    end_date=sprint.end_date,
-                    complete_date=sprint.complete_date,
-                    goal=sprint.goal,
-                    created_at=sprint.created_at,
-                    updated_at=sprint.updated_at,
-                    project_key=sprint.project_key
-                ) for sprint in entity.sprints
-            ],
-            created_at=entity.created_at,
-            updated_at=entity.updated_at,
-            last_synced_at=entity.last_synced_at,
-            jira_issue_id=entity.jira_issue_id,
-            updated_locally=entity.updated_locally
-        )
-
-    # Add other mapping methods as needed
+    def _parse_datetime(dt_str: str) -> datetime:
+        """Parse datetime string from Jira"""
+        if dt_str.endswith('Z'):
+            dt_str = dt_str.replace('Z', '+00:00')
+        return datetime.fromisoformat(dt_str)

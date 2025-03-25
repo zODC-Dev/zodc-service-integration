@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
-from typing import Any, Callable, List, Optional, TypeVar
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueType
@@ -176,7 +176,7 @@ class JiraProjectApplicationService:
             # Check if project exists
             existing_project = await session.project_repository.get_project_by_key(project_key)
 
-            if existing_project:
+            if existing_project and existing_project.id:
                 # Update existing project
                 update_dto = JiraProjectDBUpdateDTO(
                     name=project_details.name,
@@ -262,7 +262,7 @@ class JiraProjectApplicationService:
         project_key: str,
         session: IJiraSyncSession
     ) -> dict[int, int]:
-        sprint_id_mapping = {}
+        sprint_id_mapping: Dict[int, int] = {}
         sprints = await self.jira_project_api_service.get_project_sprints(user_id, project_key)
 
         for sprint in sprints:
@@ -281,7 +281,7 @@ class JiraProjectApplicationService:
                     project_key=project_key
                 )
 
-                if existing_sprint:
+                if existing_sprint and existing_sprint.id:
                     # Update if exists
                     updated_sprint = await session.sprint_repository.update_sprint(
                         existing_sprint.id,

@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     # Jira dashboard URL
     JIRA_DASHBOARD_URL: str = "https://vphoa.atlassian.net"
 
+    JIRA_SYSTEM_USER_ID: int = 2  # ID của service account
+
     class Config:
         """Configuration settings."""
 

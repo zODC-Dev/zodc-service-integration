@@ -1,12 +1,18 @@
 import asyncio
 from contextlib import asynccontextmanager
 import time
-from typing import Dict, Set
+from typing import Dict, List, Optional, Set
 
 from src.configs.database import AsyncSessionLocal
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
+from src.domain.constants.sync import EntityType, OperationType, SourceType
+from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
+from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
+from src.domain.models.jira.webhooks.mappers.jira_issue_converter import JiraIssueConverter
+from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
 from src.infrastructure.services.jira_webhook_service import JiraWebhookService
@@ -15,7 +21,7 @@ from src.infrastructure.services.jira_webhook_service import JiraWebhookService
 class JiraWebhookQueueService:
     """Service xử lý hàng đợi webhook từ Jira với isolate sessions"""
 
-    def __init__(self):
+    def __init__(self, jira_issue_api_service: IJiraIssueAPIService):
         # Dùng PriorityQueue để đảm bảo xử lý theo thứ tự ưu tiên
         self.queues: Dict[str, asyncio.PriorityQueue] = {}
         self.processing: Set[str] = set()
@@ -33,6 +39,10 @@ class JiraWebhookQueueService:
 
         # Bắt đầu worker xử lý retry
         self._start_retry_worker()
+
+        # Thêm các thuộc tính mới
+        self.jira_issue_api_service = jira_issue_api_service
+        self.DEBOUNCE_TIME = 0.5  # 500ms để gom nhóm các webhooks
 
     def _start_retry_worker(self) -> None:
         """Khởi động worker xử lý retry queue"""
@@ -106,48 +116,91 @@ class JiraWebhookQueueService:
         try:
             queue = self.queues[issue_id]
 
-            # Nếu có webhook created, đợi một lúc để tất cả webhook đến
-            if issue_id in self.last_created_webhooks:
-                elapsed = time.time() - self.last_created_webhooks[issue_id]
-                if elapsed < 0.5:  # 500ms
-                    wait_time = 0.5 - elapsed
-                    log.info(f"Waiting {wait_time:.2f}s for more webhooks for issue {issue_id}")
-                    await asyncio.sleep(wait_time)
+            # Đợi một khoảng thời gian để gom nhóm các webhooks
+            await asyncio.sleep(self.DEBOUNCE_TIME)
 
-            # Xử lý queue theo thứ tự ưu tiên
+            # Thu thập tất cả webhooks trong queue
+            webhooks = []
+            highest_priority = float('inf')
+
             while not queue.empty():
-                # Lấy webhook có ưu tiên cao nhất
                 priority, _, webhook = await queue.get()
-
-                log.info(f"Processing {webhook.webhook_event} (priority {priority}) for issue {issue_id}")
-
-                # Xử lý webhook với session mới và độc lập
-                success = await self._process_webhook_with_new_session(webhook)
-
-                # Đánh dấu đã xử lý
+                webhooks.append(webhook)
+                highest_priority = min(highest_priority, priority)
                 queue.task_done()
 
-                # Nếu xử lý thất bại và cần retry
-                if not success and webhook.webhook_event == JiraWebhookEvent.ISSUE_UPDATED:
-                    # Đưa vào retry queue nếu cần
-                    await self._maybe_add_to_retry_queue(webhook, 0)
+            if not webhooks:
+                return
 
-                # Đợi giữa các webhook để giảm tải
-                await asyncio.sleep(0.1)
+            # Xử lý với session mới
+            async with self._get_webhook_service() as webhook_service:
+                # Nếu là delete event, xử lý riêng
+                if any(w.webhook_event == JiraWebhookEvent.ISSUE_DELETED for w in webhooks):
+                    await self._handle_delete_webhook(webhook_service, webhooks)
+                    return
 
-            # Dọn dẹp sau khi xử lý xong
-            if issue_id in self.last_created_webhooks:
-                del self.last_created_webhooks[issue_id]
+                # Lấy issue data mới nhất từ Jira API
+                try:
+                    issue_data = await self._get_latest_issue_data(issue_id)
+                    if not issue_data:
+                        # Xử lý retry nếu không lấy được data
+                        await self._handle_retry(webhooks, highest_priority)
+                        return
 
-            if queue.empty():
-                del self.queues[issue_id]
+                    # Cập nhật database với data mới nhất
+                    await self._update_database_with_issue_data(webhook_service, issue_data, webhooks[0])
 
-            log.info(f"Finished processing all webhooks for issue {issue_id}")
+                except Exception as e:
+                    log.error(f"Error processing webhooks for issue {issue_id}: {str(e)}")
+                    await self._handle_retry(webhooks, highest_priority)
 
-        except Exception as e:
-            log.error(f"Error processing queue for issue {issue_id}: {str(e)}")
         finally:
             self.processing.remove(issue_id)
+            if issue_id in self.queues and self.queues[issue_id].empty():
+                del self.queues[issue_id]
+
+    async def _get_latest_issue_data(self, issue_id: str) -> Optional[JiraIssueModel]:
+        """Lấy data mới nhất của issue từ Jira API"""
+        try:
+            # Lấy issue từ Jira API
+            issue = await self.jira_issue_api_service.get_issue_with_system_user(issue_id)
+            return issue
+        except Exception as e:
+            log.error(f"Error fetching issue {issue_id} from Jira API: {str(e)}")
+            return None
+
+    async def _update_database_with_issue_data(
+        self,
+        webhook_service: JiraWebhookService,
+        issue_data: JiraIssueModel,
+        original_webhook: JiraWebhookResponseDTO
+    ):
+        """Cập nhật database với data mới nhất"""
+        # Kiểm tra issue có tồn tại trong DB không
+        existing_issue = await webhook_service.jira_issue_repository.get_by_jira_issue_id(issue_data.jira_issue_id)
+
+        if not existing_issue:
+            # Tạo mới nếu chưa tồn tại
+            create_dto = JiraIssueConverter._convert_to_create_dto(issue_data)
+            await webhook_service.jira_issue_repository.create(create_dto)
+        else:
+            # Cập nhật nếu đã tồn tại
+            update_dto = JiraIssueConverter._convert_to_update_dto(issue_data)
+            await webhook_service.jira_issue_repository.update(issue_data.jira_issue_id, update_dto)
+
+        # Log webhook sync
+        await webhook_service.sync_log_repository.create_sync_log(
+            SyncLogDBCreateDTO(
+                entity_type=EntityType.ISSUE,
+                entity_id=issue_data.jira_issue_id,
+                operation=OperationType.SYNC,
+                request_payload=original_webhook.to_json_serializable(),
+                response_status=200,
+                response_body={},
+                source=SourceType.WEBHOOK,
+                sender=None
+            )
+        )
 
     async def _maybe_add_to_retry_queue(self, webhook: JiraWebhookResponseDTO, retry_count: int) -> None:
         """Đưa một webhook vào retry queue nếu chưa vượt quá số lần retry tối đa"""
@@ -227,7 +280,7 @@ class JiraWebhookQueueService:
             sync_log_repo = SQLAlchemySyncLogRepository(session)
 
             # Tạo webhook service
-            webhook_service = JiraWebhookService(issue_repo, sync_log_repo)
+            webhook_service = JiraWebhookService(issue_repo, sync_log_repo, self.jira_issue_api_service)
 
             try:
                 yield webhook_service
@@ -266,3 +319,60 @@ class JiraWebhookQueueService:
         except Exception as e:
             log.error(f"Exception processing webhook: {str(e)}")
             return False
+
+    async def _handle_retry(self, webhooks: List[JiraWebhookResponseDTO], highest_priority: int) -> None:
+        """Xử lý retry cho các webhooks thất bại"""
+        for webhook in webhooks:
+            # Chỉ retry cho các webhook update, vì create và delete không cần retry
+            if webhook.webhook_event == JiraWebhookEvent.ISSUE_UPDATED:
+                log.info(f"Adding webhook for issue {webhook.issue.id} to retry queue")
+                await self._maybe_add_to_retry_queue(webhook, 0)
+            else:
+                log.warning(
+                    f"Skipping retry for {webhook.webhook_event} webhook on issue {webhook.issue.id}"
+                )
+
+        # Nếu có webhook create trong danh sách, log cảnh báo
+        if any(w.webhook_event == JiraWebhookEvent.ISSUE_CREATED for w in webhooks):
+            log.warning(
+                f"Failed to process create webhook for issue {webhooks[0].issue.id}. "
+                "This might cause issues with subsequent updates."
+            )
+
+    async def _handle_delete_webhook(self, webhook_service: JiraWebhookService, webhooks: List[JiraWebhookResponseDTO]) -> None:
+        """Handle delete webhooks for an issue"""
+        try:
+            # Get the issue ID from the first webhook
+            issue_id = webhooks[0].issue.id
+
+            # Check if the issue exists in the database
+            existing_issue = await webhook_service.jira_issue_repository.get_by_jira_issue_id(issue_id)
+
+            if existing_issue:
+                # Mark the issue as deleted in the database
+                await webhook_service.jira_issue_repository.update(
+                    issue_id,
+                    JiraIssueDBUpdateDTO(is_deleted=True)
+                )
+
+                # Log the delete operation
+                await webhook_service.sync_log_repository.create_sync_log(
+                    SyncLogDBCreateDTO(
+                        entity_type=EntityType.ISSUE,
+                        entity_id=issue_id,
+                        operation=OperationType.DELETE,
+                        request_payload=webhooks[0].to_json_serializable(),
+                        response_status=200,
+                        response_body={},
+                        source=SourceType.WEBHOOK,
+                        sender=None
+                    )
+                )
+
+                log.info(f"Successfully marked issue {issue_id} as deleted")
+            else:
+                log.warning(f"Attempted to delete non-existent issue {issue_id}")
+
+        except Exception as e:
+            log.error(f"Error handling delete webhook: {str(e)}")
+            raise
