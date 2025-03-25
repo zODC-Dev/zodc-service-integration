@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from src.configs.logger import log
 from src.configs.settings import settings
@@ -130,8 +130,10 @@ class JiraWebhookMapper:
                     field_name = change.field
                     field_id = change.field_id
 
-                    db_field = None
-                    if field_id and field_id in cls.FIELD_ID_MAPPING:
+                    db_field: Optional[str] = None
+                    if field_id and field_id == "customfield_10020":
+                        db_field = "sprint_id"
+                    elif field_id and field_id in cls.FIELD_ID_MAPPING:
                         db_field = cls.FIELD_ID_MAPPING[field_id]
                     elif field_name in cls.FIELD_NAME_MAPPING:
                         db_field = cls.FIELD_NAME_MAPPING[field_name]
@@ -267,7 +269,7 @@ class JiraWebhookMapper:
 
     @staticmethod
     def _map_sprints(value: Any) -> List[JiraSprintModel]:
-        """Map sprints to list of JiraSprintModel"""
+        """Value will be sprint_id (str), need to get sprint from database"""
         if not value:
             return []
         return [JiraSprintModel(jira_sprint_id=sprint.id, name=sprint.name, state=sprint.state) for sprint in value]
