@@ -5,7 +5,11 @@ from src.configs.logger import log
 from src.domain.constants.jira import JiraActionType, JiraIssueStatus, JiraIssueType
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
 from src.domain.models.nats.replies.jira_issue import JiraIssueSyncNATSReplyDTO
-from src.domain.models.nats.requests.jira_issue import JiraIssueBatchSyncNATSRequestDTO, JiraIssueSyncNATSRequestDTO
+from src.domain.models.nats.requests.jira_issue import (
+    JiraIssueBatchLinkNATSRequestDTO,
+    JiraIssueBatchSyncNATSRequestDTO,
+    JiraIssueSyncNATSRequestDTO,
+)
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
@@ -150,3 +154,44 @@ class JiraIssueApplicationService:
                 issue_id=request.issue_id,
                 error_message=str(e)
             )
+
+    async def handle_link_request(
+        self,
+        request: JiraIssueBatchLinkNATSRequestDTO
+    ) -> List[JiraIssueSyncNATSReplyDTO]:
+        """Handle multiple issue link request"""
+        results = []
+
+        for link in request.links:
+            try:
+                # Create link between two issues
+                success = await self.jira_issue_api_service.create_issue_link(
+                    user_id=request.user_id,
+                    source_issue_id=link.source_issue_id,
+                    target_issue_id=link.target_issue_id,
+                    relationship="relates to"  # Fixed relationship
+                )
+
+                if success:
+                    results.append(JiraIssueSyncNATSReplyDTO(
+                        success=True,
+                        action_type=JiraActionType.UPDATE,
+                        issue_id=link.source_issue_id
+                    ))
+                else:
+                    results.append(JiraIssueSyncNATSReplyDTO(
+                        success=False,
+                        action_type=JiraActionType.UPDATE,
+                        issue_id=link.source_issue_id,
+                        error_message="Cannot create link"
+                    ))
+            except Exception as e:
+                log.error(f"Error linking issue {link.source_issue_id} with {link.target_issue_id}: {str(e)}")
+                results.append(JiraIssueSyncNATSReplyDTO(
+                    success=False,
+                    action_type=JiraActionType.UPDATE,
+                    issue_id=link.source_issue_id,
+                    error_message=str(e)
+                ))
+
+        return results

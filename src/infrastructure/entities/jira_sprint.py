@@ -22,6 +22,7 @@ class JiraSprintEntity(BaseEntityWithTimestamps, table=True):
     end_date: Optional[datetime] = Field(sa_column=Column(DateTime(timezone=True)))
     complete_date: Optional[datetime] = Field(sa_column=Column(DateTime(timezone=True)))
     goal: Optional[str] = None
+    board_id: Optional[int] = None
 
     # Foreign key to project
     project_key: str = Field(foreign_key="jira_projects.key")

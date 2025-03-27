@@ -22,6 +22,16 @@ class JiraAPIIssueStatusResponse(JiraAPIResponseBase):
     status_category: Dict[str, Any] = Field(alias="statusCategory")
 
 
+class JiraAPIProjectResponse(JiraAPIResponseBase):
+    self: str
+    id: str
+    key: str
+    name: str
+    projectTypeKey: str
+    simplified: bool
+    avatarUrls: Dict[str, str]
+
+
 class JiraAPIIssueFieldsResponse(JiraAPIFieldsBase):
     summary: str
     description: Optional[Dict[str, Any]]
@@ -29,6 +39,7 @@ class JiraAPIIssueFieldsResponse(JiraAPIFieldsBase):
     assignee: Optional[JiraUserAPIGetResponseDTO]
     reporter: Optional[JiraUserAPIGetResponseDTO]
     priority: Optional[JiraAPIIssuePriorityResponse]
+    project: Optional[JiraAPIProjectResponse]
     issuetype: JiraAPIIssueTypeResponse
     created: datetime
     updated: datetime

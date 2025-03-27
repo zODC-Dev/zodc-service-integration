@@ -80,3 +80,5 @@ class JiraWebhookEvent(str, Enum):
     SPRINT_CREATED = "jira:sprint_created"
     SPRINT_UPDATED = "jira:sprint_updated"
     PROJECT_UPDATED = "jira:project_updated"
+    SPRINT_STARTED = "jira:sprint_started"
+    SPRINT_CLOSED = "jira:sprint_closed"

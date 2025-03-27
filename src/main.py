@@ -16,6 +16,7 @@ from src.app.routers.util_router import router as util_router
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.nats_event_service import NATSEventService
+from src.app.services.nats_handlers.jira_issue_link_handler import JiraIssueLinkRequestHandler
 from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueSyncRequestHandler
 from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
 from src.app.services.nats_handlers.jira_project_sync_handler import JiraProjectSyncRequestHandler
@@ -136,7 +137,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     request_handlers = {
         NATSSubscribeTopic.JIRA_ISSUES_SYNC.value: JiraIssueSyncRequestHandler(jira_issue_application_service),
         NATSSubscribeTopic.JIRA_PROJECT_SYNC.value: JiraProjectSyncRequestHandler(
-            jira_project_application_service, sync_log_repository)
+            jira_project_application_service, sync_log_repository),
+        NATSSubscribeTopic.JIRA_ISSUE_LINK.value: JiraIssueLinkRequestHandler(jira_issue_application_service)
     }
 
     # Initialize and start NATS Event Service

@@ -1,16 +1,19 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
-from src.domain.models.jira.apis.responses.base import JiraAPIResponseBase
+from pydantic import BaseModel, Field
 
 
-class JiraSprintAPIGetResponseDTO(JiraAPIResponseBase):
+class JiraSprintAPIGetResponseDTO(BaseModel):
+    """DTO for sprint response from Jira API"""
     id: int
     name: str
     state: str
-    startDate: Optional[datetime] = None
-    endDate: Optional[datetime] = None
-    completeDate: Optional[datetime] = None
+    start_date: Optional[str] = Field(None, alias="startDate")
+    end_date: Optional[str] = Field(None, alias="endDate")
+    complete_date: Optional[str] = Field(None, alias="completeDate")
+    created_date: Optional[str] = Field(None, alias="createdDate")
+    origin_board_id: Optional[int] = Field(None, alias="originBoardId")
     goal: Optional[str] = None
 
     class Config:
@@ -18,21 +21,3 @@ class JiraSprintAPIGetResponseDTO(JiraAPIResponseBase):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
-
-    def ensure_timezone(self, dt: Optional[datetime]) -> Optional[datetime]:
-        """Ensure datetime has timezone info"""
-        if dt and dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
-        return dt
-
-    @property
-    def start_date(self) -> Optional[datetime]:
-        return self.ensure_timezone(self.startDate)
-
-    @property
-    def end_date(self) -> Optional[datetime]:
-        return self.ensure_timezone(self.endDate)
-
-    @property
-    def complete_date(self) -> Optional[datetime]:
-        return self.ensure_timezone(self.completeDate)

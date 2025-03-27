@@ -20,3 +20,7 @@ class JiraIssueSyncNATSReplyDTO(BaseModel):
 
 class JiraIssueBatchSyncNATSReplyDTO(BaseModel):
     results: List[JiraIssueSyncNATSReplyDTO]
+
+
+class JiraIssueBatchLinkNATSReplyDTO(BaseModel):
+    results: List[JiraIssueSyncNATSReplyDTO]

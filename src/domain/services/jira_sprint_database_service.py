@@ -15,7 +15,15 @@ class IJiraSprintDatabaseService(ABC):
         pass
 
     @abstractmethod
+    async def update_sprint_by_jira_sprint_id(self, jira_sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
+        pass
+
+    @abstractmethod
     async def get_sprint_by_id(self, sprint_id: int) -> Optional[JiraSprintModel]:
+        pass
+
+    @abstractmethod
+    async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int) -> Optional[JiraSprintModel]:
         pass
 
     @abstractmethod

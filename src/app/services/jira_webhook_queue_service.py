@@ -1,16 +1,19 @@
 import asyncio
 from contextlib import asynccontextmanager
 import time
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Union
 
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.database import AsyncSessionLocal
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
-from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
+from src.domain.models.jira.webhooks.jira_webhook import (
+    BaseJiraWebhookDTO,
+)
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
+from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQLAlchemyJiraSprintRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
 from src.infrastructure.services.jira_webhook_service import JiraWebhookService
 
@@ -43,8 +46,10 @@ class JiraWebhookQueueService:
 
         # Thêm các thuộc tính mới
         self.jira_issue_api_service = jira_issue_api_service
-        self.DEBOUNCE_TIME = 0.5  # 500ms để gom nhóm các webhooks
+        self.DEBOUNCE_TIME = 1.0  # seconds
         self.webhook_handlers = webhook_handlers
+        self.retry_counts: Dict[str, int] = {}
+        self.RETRY_DELAYS = [5, 30, 300]  # Retry delays in seconds: 5s, 30s, 5min
 
     def _start_retry_worker(self) -> None:
         """Khởi động worker xử lý retry queue"""
@@ -64,31 +69,67 @@ class JiraWebhookQueueService:
         if not task.cancelled() and task.exception():
             log.error(f"Task failed with exception: {task.exception()}")
 
-    async def add_webhook_to_queue(self, webhook_data: JiraWebhookResponseDTO) -> bool:
+    async def add_webhook_to_queue(self, webhook_data: Union[Dict[str, Any], BaseJiraWebhookDTO]) -> bool:
         """Thêm webhook vào hàng đợi và xử lý theo thứ tự ưu tiên"""
         try:
-            issue_id = webhook_data.issue.id
+            # Kiểm tra kiểu dữ liệu và phân tích nếu cần
+            parsed_webhook = None
 
-            # Tạo queue cho issue nếu chưa có
-            if issue_id not in self.queues:
-                self.queues[issue_id] = asyncio.PriorityQueue()
-                log.info(f"Created new priority queue for issue {issue_id}")
+            # Nếu dữ liệu là dictionary (dữ liệu thô), thử phân tích
+            if isinstance(webhook_data, dict):
+                log.info("Received raw webhook data, parsing...")
+                try:
+                    parsed_webhook = BaseJiraWebhookDTO.parse_webhook(webhook_data)
+                    log.info(f"Successfully parsed raw webhook as {type(parsed_webhook).__name__}")
+                except Exception as e:
+                    log.error(f"Failed to parse webhook: {str(e)}")
+                    return False
+            else:
+                # Đã là DTO, sử dụng trực tiếp
+                parsed_webhook = webhook_data
 
-            # Tính toán độ ưu tiên (số thấp = ưu tiên cao)
-            priority = self._calculate_priority(webhook_data)
+            # Kiểm tra webhook có hợp lệ không
+            if not parsed_webhook or not hasattr(parsed_webhook, 'webhook_event'):
+                log.error("Invalid webhook: missing webhook_event")
+                return False
+
+            # Xác định entity ID (issue hoặc sprint)
+            entity_id = None
+            entity_type = None
+
+            # Kiểm tra nếu là issue webhook
+            if hasattr(parsed_webhook, 'issue') and parsed_webhook.issue and hasattr(parsed_webhook.issue, 'id'):
+                entity_id = parsed_webhook.issue.id
+                entity_type = "issue"
+            # Kiểm tra nếu là sprint webhook
+            elif hasattr(parsed_webhook, 'sprint') and parsed_webhook.sprint and hasattr(parsed_webhook.sprint, 'id'):
+                entity_id = f"sprint_{parsed_webhook.sprint.id}"  # Prefix để phân biệt với issue IDs
+                entity_type = "sprint"
+            else:
+                log.warning(
+                    f"Webhook {parsed_webhook.webhook_event} does not contain identifiable issue or sprint data")
+                return False
+
+            # Tạo queue cho entity nếu chưa có
+            if entity_id not in self.queues:
+                self.queues[entity_id] = asyncio.PriorityQueue()
+                log.info(f"Created new priority queue for {entity_type} {entity_id}")
+
+            # Tính toán độ ưu tiên
+            priority = self._calculate_priority(parsed_webhook)
 
             # Thêm timestamp để giữ thứ tự FIFO khi cùng ưu tiên
             timestamp = time.time()
 
             # Thêm webhook vào queue với (ưu tiên, timestamp, webhook)
-            await self.queues[issue_id].put((priority, timestamp, webhook_data))
+            await self.queues[entity_id].put((priority, timestamp, parsed_webhook))
 
             log.info(
-                f"Added webhook event {webhook_data.webhook_event} for issue {issue_id} to queue with priority {priority}")
+                f"Added webhook event {parsed_webhook.webhook_event} for {entity_type} {entity_id} to queue with priority {priority}")
 
             # Bắt đầu xử lý queue nếu chưa có worker nào đang xử lý
-            if issue_id not in self.processing:
-                process_task = asyncio.create_task(self._process_issue_queue(issue_id))
+            if entity_id not in self.processing:
+                process_task = asyncio.create_task(self._process_entity_queue(entity_id))
                 self._track_task(process_task)
 
             return True
@@ -96,27 +137,37 @@ class JiraWebhookQueueService:
             log.error(f"Error adding webhook to queue: {str(e)}")
             return False
 
-    def _calculate_priority(self, webhook_data: JiraWebhookResponseDTO) -> int:
+    def _calculate_priority(self, webhook_data: BaseJiraWebhookDTO) -> int:
         """Tính toán độ ưu tiên của webhook (thấp = ưu tiên cao)"""
-        event = webhook_data.webhook_event
+        # Sử dụng normalized_event để đảm bảo nhất quán
+        event = webhook_data.normalized_event
 
-        # Lưu thời gian của webhook created
+        # Ưu tiên cho issue events
         if event == JiraWebhookEvent.ISSUE_CREATED:
-            self.last_created_webhooks[webhook_data.issue.id] = time.time()
+            if hasattr(webhook_data, 'issue') and webhook_data.issue:
+                self.last_created_webhooks[webhook_data.issue.id] = time.time()
             return 0  # Ưu tiên cao nhất
         elif event == JiraWebhookEvent.ISSUE_UPDATED:
             return 1
         elif event == JiraWebhookEvent.ISSUE_DELETED:
             return 2
+
+        # Ưu tiên cho sprint events
+        elif event in [JiraWebhookEvent.SPRINT_CREATED, JiraWebhookEvent.SPRINT_STARTED]:
+            return 1  # Ưu tiên cao
+        elif event in [JiraWebhookEvent.SPRINT_UPDATED, JiraWebhookEvent.SPRINT_CLOSED]:
+            return 2
+
+        # Default priority
         else:
             return 3
 
-    async def _process_issue_queue(self, issue_id: str) -> None:
-        """Process issue queue with appropriate handler"""
-        self.processing.add(issue_id)
+    async def _process_entity_queue(self, entity_id: str) -> None:
+        """Process entity queue with appropriate handler"""
+        self.processing.add(entity_id)
 
         try:
-            queue = self.queues[issue_id]
+            queue = self.queues[entity_id]
             await asyncio.sleep(self.DEBOUNCE_TIME)
 
             webhooks = []
@@ -131,29 +182,45 @@ class JiraWebhookQueueService:
             if not webhooks:
                 return
 
-            handler = await self._get_handler(webhooks[-1].webhook_event)
+            # Get the last webhook
+            last_webhook = webhooks[-1]
+
+            # Tìm handler phù hợp
+            handler = await self._get_handler(last_webhook.normalized_event)
+
             if not handler:
-                log.error(f"No handler found for event {webhooks[-1].webhook_event}")
+                log.error(f"No handler found for event {last_webhook.webhook_event}")
+                await self._handle_retry(webhooks, highest_priority)
                 return
 
             try:
-                result = await handler.handle(webhooks[-1])
-                if result and "error" in result:
-                    await self._handle_retry(webhooks, highest_priority)
+                # Xử lý với session mới
+                async with AsyncSessionLocal() as session:
+                    async with session.begin():
+                        result = await handler.process(last_webhook)
+                        if result and "error" in result:
+                            log.warning(f"Error processing webhook: {result['error']}")
+                            await self._handle_retry(webhooks, highest_priority)
             except Exception as e:
                 log.error(f"Error processing webhooks: {str(e)}")
                 await self._handle_retry(webhooks, highest_priority)
 
         finally:
-            self.processing.remove(issue_id)
-            if issue_id in self.queues and self.queues[issue_id].empty():
-                del self.queues[issue_id]
+            self.processing.remove(entity_id)
+            if entity_id in self.queues and self.queues[entity_id].empty():
+                del self.queues[entity_id]
 
     async def _get_handler(self, webhook_event: str) -> Optional[JiraWebhookHandler]:
         """Get appropriate handler for webhook event"""
+        # Dùng đúng tên event đã được chuẩn hóa
+        log.info(f"Finding handler for event: {webhook_event}")
+
         for handler in self.webhook_handlers:
             if await handler.can_handle(webhook_event):
+                log.info(f"Found handler {handler.__class__.__name__} for event {webhook_event}")
                 return handler
+
+        log.warning(f"No handler found for event {webhook_event}")
         return None
 
     async def _get_latest_issue_data(self, issue_id: str) -> Optional[JiraIssueModel]:
@@ -166,107 +233,118 @@ class JiraWebhookQueueService:
             log.error(f"Error fetching issue {issue_id} from Jira API: {str(e)}")
             return None
 
-    # async def _update_database_with_issue_data(
-    #     self,
-    #     webhook_service: JiraWebhookService,
-    #     issue_data: JiraIssueModel,
-    #     original_webhook: JiraWebhookResponseDTO
-    # ):
-    #     """Cập nhật database với data mới nhất"""
-    #     # Kiểm tra issue có tồn tại trong DB không
-    #     existing_issue = await webhook_service.jira_issue_repository.get_by_jira_issue_id(issue_data.jira_issue_id)
-
-    #     if not existing_issue:
-    #         # Tạo mới nếu chưa tồn tại
-    #         create_dto = JiraIssueConverter._convert_to_create_dto(issue_data)
-    #         await webhook_service.jira_issue_repository.create(create_dto)
-    #     else:
-    #         # Cập nhật nếu đã tồn tại
-    #         update_dto = JiraIssueConverter._convert_to_update_dto(issue_data)
-    #         await webhook_service.jira_issue_repository.update(issue_data.jira_issue_id, update_dto)
-
-    #     # Log webhook sync
-    #     await webhook_service.sync_log_repository.create_sync_log(
-    #         SyncLogDBCreateDTO(
-    #             entity_type=EntityType.ISSUE,
-    #             entity_id=issue_data.jira_issue_id,
-    #             operation=OperationType.SYNC,
-    #             request_payload=original_webhook.to_json_serializable(),
-    #             response_status=200,
-    #             response_body={},
-    #             source=SourceType.WEBHOOK,
-    #             sender=None
-    #         )
-    #     )
-
-    async def _maybe_add_to_retry_queue(self, webhook: JiraWebhookResponseDTO, retry_count: int) -> None:
-        """Đưa một webhook vào retry queue nếu chưa vượt quá số lần retry tối đa"""
-        if retry_count < self.max_retries:
-            # Tăng thời gian chờ theo số lần retry (exponential backoff)
-            delay = 2 ** retry_count  # 1s, 2s, 4s, ...
-            process_time = time.time() + delay
-
-            log.info(
-                f"Scheduling retry #{retry_count+1} for {webhook.webhook_event} "
-                f"on issue {webhook.issue.id} after {delay}s"
-            )
-
-            # Đặt vào retry queue với (thời gian xử lý, webhook, số lần retry)
-            await self.retry_queue.put((process_time, webhook, retry_count + 1))
-        else:
-            log.warning(
-                f"Abandoning {webhook.webhook_event} for issue {webhook.issue.id} "
-                f"after {retry_count} retries"
-            )
-
-    async def _process_retry_queue(self):
-        """Process the retry queue"""
+    async def _process_retry_queue(self) -> None:
+        """Process the retry queue periodically"""
         while True:
             try:
-                # Kiểm tra nếu queue rỗng
-                if self.retry_queue.empty():
-                    await asyncio.sleep(self.RETRY_INTERVAL)
-                    continue
+                if not self.retry_queue.empty():
+                    priority, timestamp, webhook = await self.retry_queue.get()
 
-                # Lấy webhook từ queue
-                process_time, webhook_data, retry_count = await self.retry_queue.get()
-                current_time = time.time()
+                    # Get retry count for this webhook
+                    webhook_key = self._get_webhook_key(webhook)
+                    retry_count = self.retry_counts.get(webhook_key, 0)
 
-                # Kiểm tra xem đã đến thời gian xử lý chưa
-                if current_time < process_time:
-                    # Nếu chưa đến thời gian, đưa lại vào queue và đợi
-                    await self.retry_queue.put((process_time, webhook_data, retry_count))
-                    await asyncio.sleep(min(process_time - current_time, self.RETRY_INTERVAL))
-                    continue
-
-                try:
-                    # Xử lý webhook với session mới
-                    async with self._get_webhook_service() as webhook_service:
-                        result = await webhook_service.handle_webhook(webhook_data)
-
-                        if result and "error" in result:
-                            error_msg = result.get("error", "Unknown error")
-                            if "Issue not found" in error_msg:
-                                # Nếu vẫn chưa tìm thấy issue và chưa vượt quá số lần retry
-                                await self._maybe_add_to_retry_queue(webhook_data, retry_count)
+                    if retry_count < self.max_retries:
+                        try:
+                            # Find appropriate handler
+                            handler = await self._get_handler(webhook.normalized_event)
+                            if handler:
+                                result = await handler.process(webhook)
+                                if result and "error" not in result:
+                                    # Success - clear retry count
+                                    self.retry_counts.pop(webhook_key, None)
+                                    log.info(
+                                        f"Successfully processed webhook {webhook_key} on retry #{retry_count + 1}")
+                                else:
+                                    # Failed - schedule next retry
+                                    self.retry_counts[webhook_key] = retry_count + 1
+                                    delay = self.RETRY_DELAYS[min(retry_count, len(self.RETRY_DELAYS) - 1)]
+                                    await asyncio.sleep(delay)
+                                    await self.retry_queue.put((priority + 1, time.time(), webhook))
+                                    log.warning(
+                                        f"Retry #{retry_count + 1} failed for {webhook_key}, scheduling next retry in {delay}s")
                             else:
-                                log.error(f"Failed to process webhook after {retry_count} retries: {error_msg}")
-                        else:
-                            log.info(
-                                f"Successfully processed webhook for issue {webhook_data.issue.id} on retry #{retry_count}")
+                                log.error(f"No handler found for webhook {webhook_key}")
+                                self.retry_counts[webhook_key] = retry_count + 1
+                        except Exception as e:
+                            log.error(f"Error processing webhook {webhook_key}: {str(e)}")
+                            # Schedule next retry
+                            self.retry_counts[webhook_key] = retry_count + 1
+                            if retry_count < self.max_retries - 1:
+                                delay = self.RETRY_DELAYS[retry_count]
+                                await asyncio.sleep(delay)
+                                await self.retry_queue.put((priority + 1, time.time(), webhook))
+                                log.warning(f"Scheduled retry #{retry_count + 2} for {webhook_key} in {delay}s")
+                    else:
+                        log.error(f"Failed to process webhook after {self.max_retries} retries: {webhook}")
+                        # Clear retry count for failed webhook
+                        self.retry_counts.pop(webhook_key, None)
 
-                except Exception as e:
-                    log.error(f"Error processing webhook in retry queue: {str(e)}")
-                    # Thử lại nếu chưa vượt quá số lần retry
-                    await self._maybe_add_to_retry_queue(webhook_data, retry_count)
-
-                finally:
-                    # Đánh dấu task này đã được xử lý
                     self.retry_queue.task_done()
 
-            except Exception as e:
-                log.error(f"Error in retry queue processor: {str(e)}")
+                # Sleep before checking queue again
                 await asyncio.sleep(self.RETRY_INTERVAL)
+
+            except Exception as e:
+                log.error(f"Error in retry queue processing: {str(e)}")
+                await asyncio.sleep(5)  # Wait before retrying
+
+    def _get_webhook_key(self, webhook: BaseJiraWebhookDTO) -> str:
+        """Generate a unique key for webhook to track retry counts"""
+        try:
+            components = []
+
+            # Add basic webhook info
+            if hasattr(webhook, 'webhook_event'):
+                components.append(str(webhook.webhook_event))
+
+            if hasattr(webhook, 'timestamp'):
+                components.append(str(webhook.timestamp))
+
+            # Add entity specific info
+            if hasattr(webhook, 'issue') and webhook.issue and webhook.issue.id:
+                components.append(f"issue_{webhook.issue.id}")
+            elif hasattr(webhook, 'sprint') and webhook.sprint and webhook.sprint.id:
+                components.append(f"sprint_{webhook.sprint.id}")
+
+            # Fallback if no components
+            if not components:
+                components.append(str(time.time()))
+
+            return "_".join(components)
+        except Exception as e:
+            log.error(f"Error generating webhook key: {str(e)}")
+            # Fallback to timestamp if error
+            return str(time.time())
+
+    async def _handle_retry(self, webhooks: List[BaseJiraWebhookDTO], priority: float) -> None:
+        """Handle retry with fixed delays"""
+        for webhook in webhooks:
+            try:
+                webhook_key = self._get_webhook_key(webhook)
+                retry_count = self.retry_counts.get(webhook_key, 0)
+
+                if retry_count < self.max_retries:
+                    # Use predefined delay
+                    delay = self.RETRY_DELAYS[min(retry_count, len(self.RETRY_DELAYS) - 1)]
+
+                    # Increment retry count
+                    self.retry_counts[webhook_key] = retry_count + 1
+
+                    # Add to retry queue with increased priority
+                    new_priority = priority + retry_count + 1
+
+                    # Schedule retry after delay
+                    await asyncio.sleep(delay)
+                    await self.retry_queue.put((new_priority, time.time(), webhook))
+
+                    log.info(f"Scheduled retry #{retry_count + 1} for webhook {webhook_key} after {delay}s")
+                else:
+                    log.error(f"Failed to process webhook {webhook_key} after {self.max_retries} retries")
+                    # Clear retry count
+                    self.retry_counts.pop(webhook_key, None)
+            except Exception as e:
+                log.error(f"Error handling retry for webhook: {str(e)}")
 
     @asynccontextmanager
     async def _get_webhook_service(self):
@@ -275,9 +353,11 @@ class JiraWebhookQueueService:
             # Tạo repositories với session mới
             issue_repo = SQLAlchemyJiraIssueRepository(session)
             sync_log_repo = SQLAlchemySyncLogRepository(session)
+            sprint_repo = SQLAlchemyJiraSprintRepository(session)
 
             # Tạo webhook service
-            webhook_service = JiraWebhookService(issue_repo, sync_log_repo, self.jira_issue_api_service)
+            webhook_service = JiraWebhookService(
+                issue_repo, sync_log_repo, self.jira_issue_api_service, self.jira_sprint_api_service, sprint_repo)
 
             try:
                 yield webhook_service
@@ -289,7 +369,7 @@ class JiraWebhookQueueService:
             finally:
                 await session.close()
 
-    async def _process_webhook_with_new_session(self, webhook_data: JiraWebhookResponseDTO) -> bool:
+    async def _process_webhook_with_new_session(self, webhook_data: BaseJiraWebhookDTO) -> bool:
         """Xử lý webhook với một session database mới và độc lập"""
         try:
             # Sử dụng context manager để đảm bảo session được đóng đúng cách
@@ -317,59 +397,24 @@ class JiraWebhookQueueService:
             log.error(f"Exception processing webhook: {str(e)}")
             return False
 
-    async def _handle_retry(self, webhooks: List[JiraWebhookResponseDTO], highest_priority: int) -> None:
-        """Xử lý retry cho các webhooks thất bại"""
-        for webhook in webhooks:
-            # Chỉ retry cho các webhook update, vì create và delete không cần retry
-            if webhook.webhook_event == JiraWebhookEvent.ISSUE_UPDATED:
-                log.info(f"Adding webhook for issue {webhook.issue.id} to retry queue")
-                await self._maybe_add_to_retry_queue(webhook, 0)
-            else:
-                log.warning(
-                    f"Skipping retry for {webhook.webhook_event} webhook on issue {webhook.issue.id}"
-                )
+    # Cleanup method để xóa các retry counts cũ
+    async def cleanup_retry_counts(self) -> None:
+        """Clean up old retry counts periodically"""
+        while True:
+            await asyncio.sleep(3600)  # Run every hour
+            current_webhooks = set()
 
-        # Nếu có webhook create trong danh sách, log cảnh báo
-        if any(w.webhook_event == JiraWebhookEvent.ISSUE_CREATED for w in webhooks):
-            log.warning(
-                f"Failed to process create webhook for issue {webhooks[0].issue.id}. "
-                "This might cause issues with subsequent updates."
-            )
+            # Collect all current webhook keys
+            for queue in self.queues.values():
+                while not queue.empty():
+                    _, _, webhook = queue.get_nowait()
+                    current_webhooks.add(self._get_webhook_key(webhook))
 
-    # async def _handle_delete_webhook(self, webhook_service: JiraWebhookService, webhooks: List[JiraWebhookResponseDTO]) -> None:
-    #     """Handle delete webhooks for an issue"""
-    #     try:
-    #         # Get the issue ID from the first webhook
-    #         issue_id = webhooks[0].issue.id
+            # Remove retry counts for webhooks that are no longer in any queue
+            keys_to_remove = []
+            for webhook_key in self.retry_counts:
+                if webhook_key not in current_webhooks:
+                    keys_to_remove.append(webhook_key)
 
-    #         # Check if the issue exists in the database
-    #         existing_issue = await webhook_service.jira_issue_repository.get_by_jira_issue_id(issue_id)
-
-    #         if existing_issue:
-    #             # Mark the issue as deleted in the database
-    #             await webhook_service.jira_issue_repository.update(
-    #                 issue_id,
-    #                 JiraIssueDBUpdateDTO(is_deleted=True)
-    #             )
-
-    #             # Log the delete operation
-    #             await webhook_service.sync_log_repository.create_sync_log(
-    #                 SyncLogDBCreateDTO(
-    #                     entity_type=EntityType.ISSUE,
-    #                     entity_id=issue_id,
-    #                     operation=OperationType.DELETE,
-    #                     request_payload=webhooks[0].to_json_serializable(),
-    #                     response_status=200,
-    #                     response_body={},
-    #                     source=SourceType.WEBHOOK,
-    #                     sender=None
-    #                 )
-    #             )
-
-    #             log.info(f"Successfully marked issue {issue_id} as deleted")
-    #         else:
-    #             log.warning(f"Attempted to delete non-existent issue {issue_id}")
-
-    #     except Exception as e:
-    #         log.error(f"Error handling delete webhook: {str(e)}")
-    #         raise
+            for key in keys_to_remove:
+                self.retry_counts.pop(key, None)

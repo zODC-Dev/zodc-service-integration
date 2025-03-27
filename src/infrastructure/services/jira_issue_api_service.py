@@ -42,6 +42,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                             "status",
                             "assignee",
                             "reporter",
+                            "project",
                             "priority",
                             "issuetype",
                             "created",
@@ -54,6 +55,8 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                     },
                     error_msg=f"Error fetching issue {issue_id}"
                 )
+
+                log.info(f"Response data when get issue: {response_data}")
 
                 # Map response to domain model
                 issue: JiraIssueModel = await self.client.map_to_domain(
@@ -429,3 +432,46 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 }
             ]
         }
+
+    async def create_issue_link(self, user_id: int, source_issue_id: str, target_issue_id: str, relationship: str) -> bool:
+        """Create link between two issues in Jira
+
+        Args:
+            user_id: ID of the user performing the action
+            source_issue_id: ID of the source issue
+            target_issue_id: ID of the target issue
+            relationship: Relationship type ("relates to")
+
+        Returns:
+            True if the link is created successfully, False otherwise
+        """
+        try:
+            # Prepare payload for Jira API
+            payload = {
+                "type": {
+                    "name": relationship
+                },
+                "inwardIssue": {
+                    "key": source_issue_id
+                },
+                "outwardIssue": {
+                    "key": target_issue_id
+                }
+            }
+
+            log.info(f"Creating link '{relationship}' between {source_issue_id} and {target_issue_id}")
+
+            # Call Jira API to create link
+            await self.client.post(
+                "/rest/api/3/issueLink",
+                user_id,
+                payload,
+                error_msg=f"Error creating link between {source_issue_id} and {target_issue_id}"
+            )
+
+            log.info(f"Created link '{relationship}' between {source_issue_id} and {target_issue_id}")
+            return True
+
+        except Exception as e:
+            log.error(f"Error creating issue link: {str(e)}")
+            return False

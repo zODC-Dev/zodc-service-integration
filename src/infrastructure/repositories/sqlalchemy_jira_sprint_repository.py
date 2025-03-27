@@ -43,6 +43,11 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             log.error(f"Error creating sprint: {str(e)}")
             raise
 
+    async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int) -> Optional[JiraSprintModel]:
+        result = await self.session.exec(select(JiraSprintEntity).where(JiraSprintEntity.jira_sprint_id == jira_sprint_id))
+        sprint = result.first()
+        return self._to_domain(sprint) if sprint else None
+
     async def get_sprint_by_id(self, sprint_id: int) -> Optional[JiraSprintModel]:
         sprint = await self.session.get(JiraSprintEntity, sprint_id)
         return self._to_domain(sprint) if sprint else None
@@ -69,6 +74,25 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
         except Exception as e:
             await self.session.rollback()
             log.error(f"Error updating sprint {sprint_id}: {str(e)}")
+            raise
+
+    async def update_sprint_by_jira_sprint_id(self, jira_sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> Optional[JiraSprintModel]:
+        try:
+            result = await self.session.exec(select(JiraSprintEntity).where(JiraSprintEntity.jira_sprint_id == jira_sprint_id))
+            sprint = result.first()
+            if not sprint:
+                return None
+
+            data = self._prepare_data(sprint_data.model_dump())
+            for key, value in data.items():
+                setattr(sprint, key, value)
+
+            await self.session.commit()
+            await self.session.refresh(sprint)
+            return self._to_domain(sprint)
+        except Exception as e:
+            await self.session.rollback()
+            log.error(f"Error updating sprint {jira_sprint_id}: {str(e)}")
             raise
 
     async def get_by_jira_sprint_id(self, jira_sprint_id: int) -> Optional[JiraSprintModel]:

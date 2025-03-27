@@ -26,3 +26,7 @@ class IJiraIssueAPIService(ABC):
     @abstractmethod
     async def search_issues(self, user_id: int, jql: str, start_at: int = 0, max_results: int = 50, fields: Optional[List[str]] = None) -> List[JiraIssueModel]:
         pass
+
+    @abstractmethod
+    async def create_issue_link(self, user_id: int, source_issue_id: str, target_issue_id: str, relationship: str) -> bool:
+        pass

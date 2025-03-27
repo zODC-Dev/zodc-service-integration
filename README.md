@@ -34,3 +34,7 @@ ruff check src --fix
 ```bash
 mypy src --show-traceback --explicit-package-base
 ```
+
+# To do
+
+- Fix bug when jira create task but no link_url in database

@@ -88,6 +88,8 @@ class JiraIssueMapper:
             assignee_id = None
             reporter_id = None
 
+            project_key = api_response.fields.project.key if hasattr(fields, 'project') else ""
+
             if hasattr(fields, 'assignee') and fields.assignee:
                 assignee_id = fields.assignee.accountId
                 assignee = JiraIssueMapper._map_user(fields.assignee)
@@ -98,12 +100,13 @@ class JiraIssueMapper:
             # Map sprints
             sprints = []
             if hasattr(fields, 'customfield_10020') and fields.customfield_10020:
-                sprints = JiraIssueMapper._map_sprints(fields.customfield_10020)
+                sprints = JiraIssueMapper._map_sprints(fields.customfield_10020, project_key)
 
             # Create link URL
             jira_base_url = settings.JIRA_DASHBOARD_URL
-            project_key = api_response.key.split("-")[0]
+            # project_key = api_response.key.split("-")[0]
             current_sprint_id = sprints[0].board_id if sprints else 3
+            current_sprint_id = 3
             link_url = f"{jira_base_url}/jira/software/projects/{project_key}/boards/{current_sprint_id}?selectedIssue={api_response.key}"
 
             return JiraIssueModel(
@@ -138,32 +141,35 @@ class JiraIssueMapper:
         )
 
     @staticmethod
-    def _map_sprint(api_sprint: JiraSprintAPIGetResponseDTO) -> Optional[JiraSprintModel]:
+    def _map_sprint(api_sprint: JiraSprintAPIGetResponseDTO, project_key: str) -> Optional[JiraSprintModel]:
         try:
             now = datetime.now(timezone.utc)
             return JiraSprintModel(
                 jira_sprint_id=api_sprint.id,
                 name=api_sprint.name,
                 state=api_sprint.state,
-                start_date=api_sprint.startDate and api_sprint.startDate.replace(tzinfo=timezone.utc),
-                end_date=api_sprint.endDate and api_sprint.endDate.replace(tzinfo=timezone.utc),
-                complete_date=api_sprint.completeDate and api_sprint.completeDate.replace(tzinfo=timezone.utc),
+                start_date=JiraIssueMapper._parse_datetime(api_sprint.start_date),
+                end_date=JiraIssueMapper._parse_datetime(api_sprint.end_date),
+                complete_date=JiraIssueMapper._parse_datetime(api_sprint.complete_date),
                 goal=api_sprint.goal,
                 created_at=now,
+                project_key=project_key
             )
         except Exception as e:
             log.error(f"Error mapping sprint: {str(e)}")
             return None
 
     @staticmethod
-    def _map_sprints(api_sprints: List[JiraSprintAPIGetResponseDTO]) -> List[JiraSprintModel]:
+    def _map_sprints(api_sprints: List[JiraSprintAPIGetResponseDTO], project_key: str) -> List[JiraSprintModel]:
         if not api_sprints:
             return []
-        return [JiraIssueMapper._map_sprint(sprint) for sprint in api_sprints if sprint]
+        return [JiraIssueMapper._map_sprint(sprint, project_key) for sprint in api_sprints if sprint]
 
     @staticmethod
-    def _parse_datetime(dt_str: str) -> datetime:
+    def _parse_datetime(dt_str: Optional[str]) -> Optional[datetime]:
         """Parse datetime string from Jira"""
+        if dt_str is None:
+            return None
         if dt_str.endswith('Z'):
             dt_str = dt_str.replace('Z', '+00:00')
         return datetime.fromisoformat(dt_str)

@@ -17,8 +17,14 @@ class JiraSprintDatabaseService(IJiraSprintDatabaseService):
     async def update_sprint(self, sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
         return await self.sprint_repository.update_sprint(sprint_id, sprint_data)
 
+    async def update_sprint_by_jira_sprint_id(self, jira_sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
+        return await self.sprint_repository.update_sprint_by_jira_sprint_id(jira_sprint_id, sprint_data)
+
     async def get_sprint_by_id(self, sprint_id: int) -> Optional[JiraSprintModel]:
         return await self.sprint_repository.get_sprint_by_id(sprint_id)
+
+    async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int) -> Optional[JiraSprintModel]:
+        return await self.sprint_repository.get_sprint_by_jira_sprint_id(jira_sprint_id)
 
     async def get_project_sprints(self, project_key: str) -> List[JiraSprintModel]:
         log.info(f"Getting sprints for project {project_key}")

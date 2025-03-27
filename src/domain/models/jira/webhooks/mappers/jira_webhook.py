@@ -72,6 +72,8 @@ class JiraWebhookMapper:
             if fields.sprints and len(fields.sprints) > 0:
                 log.info(f"Found sprint data: {fields.sprints}")
                 for sprint_data in fields.sprints:
+                    if not sprint_data:
+                        continue
                     try:
                         sprint = JiraSprintModel(
                             jira_sprint_id=sprint_data.id,
@@ -93,7 +95,8 @@ class JiraWebhookMapper:
             jira_base_url = settings.JIRA_DASHBOARD_URL
             project_key = fields.project.key
             issue_key = issue.key
-            current_sprint_id = sprints[0].board_id if sprints else 3
+            # current_sprint_id = sprints[0].board_id if sprints else 3
+            current_sprint_id = 3
             link_url = f"{jira_base_url}/jira/software/projects/{project_key}/boards/{current_sprint_id}?selectedIssue={issue_key}"
 
             return JiraIssueDBCreateDTO(
