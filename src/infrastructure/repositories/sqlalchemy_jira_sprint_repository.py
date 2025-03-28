@@ -44,7 +44,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             raise
 
     async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int) -> Optional[JiraSprintModel]:
-        result = await self.session.exec(select(JiraSprintEntity).where(JiraSprintEntity.jira_sprint_id == jira_sprint_id))
+        result = await self.session.exec(select(JiraSprintEntity).where(col(JiraSprintEntity.jira_sprint_id) == jira_sprint_id))
         sprint = result.first()
         return self._to_domain(sprint) if sprint else None
 
@@ -54,7 +54,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
 
     async def get_sprints_by_project_key(self, project_key: str) -> List[JiraSprintModel]:
         result = await self.session.exec(
-            select(JiraSprintEntity).where(JiraSprintEntity.project_key == project_key))
+            select(JiraSprintEntity).where(col(JiraSprintEntity.project_key) == project_key))
         sprints = result.all()
         return [self._to_domain(sprint) for sprint in sprints]
 
@@ -78,7 +78,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
 
     async def update_sprint_by_jira_sprint_id(self, jira_sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> Optional[JiraSprintModel]:
         try:
-            result = await self.session.exec(select(JiraSprintEntity).where(JiraSprintEntity.jira_sprint_id == jira_sprint_id))
+            result = await self.session.exec(select(JiraSprintEntity).where(col(JiraSprintEntity.jira_sprint_id) == jira_sprint_id))
             sprint = result.first()
             if not sprint:
                 return None
@@ -95,17 +95,12 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             log.error(f"Error updating sprint {jira_sprint_id}: {str(e)}")
             raise
 
-    async def get_by_jira_sprint_id(self, jira_sprint_id: int) -> Optional[JiraSprintModel]:
-        result = await self.session.exec(select(JiraSprintEntity).where(JiraSprintEntity.jira_sprint_id == jira_sprint_id))
-        sprint = result.first()
-        return self._to_domain(sprint) if sprint else None
-
     async def get_project_sprints(self, project_key: str) -> List[JiraSprintModel]:
         """Get all sprints for a specific project"""
         log.info(f"Getting sprints for project {project_key}")
         result = await self.session.exec(
             select(JiraSprintEntity).where(
-                JiraSprintEntity.project_key == project_key
+                col(JiraSprintEntity.project_key) == project_key
             )
         )
         sprints = result.all()

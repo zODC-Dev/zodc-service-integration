@@ -56,7 +56,7 @@ class JiraSprintMapper:
     @classmethod
     def from_webhook_list(cls, sprint_data: Any) -> Optional[List[JiraSprintModel]]:
         """Map sprint data from webhook to domain models"""
-        sprints = []
+        sprints: List[JiraSprintModel] = []
 
         # Handle case when input is None
         if sprint_data is None:
@@ -90,7 +90,7 @@ class JiraSprintMapper:
             if sprint:
                 sprints.append(sprint)
 
-        return sprints if sprints else None
+        return sprints
 
     @classmethod
     def _parse_sprint_item(cls, item: Any) -> Optional[JiraSprintModel]:
@@ -136,9 +136,9 @@ class JiraSprintMapper:
                     jira_sprint_id=sprint_id,
                     name=getattr(item, 'name', f"Sprint {sprint_id}"),
                     state=JiraSprintState.from_str(getattr(item, 'state', 'active')),
-                    start_date=cls._parse_datetime(getattr(item, 'startDate', None)),
-                    end_date=cls._parse_datetime(getattr(item, 'endDate', None)),
-                    complete_date=cls._parse_datetime(getattr(item, 'completeDate', None)),
+                    start_date=cls._parse_datetime(getattr(item, 'start_date', None)),
+                    end_date=cls._parse_datetime(getattr(item, 'end_date', None)),
+                    complete_date=cls._parse_datetime(getattr(item, 'complete_date', None)),
                     goal=getattr(item, 'goal', None),
                     created_at=datetime.now(timezone.utc)
                 )

@@ -53,26 +53,29 @@ async def get_sprint_create_webhook_handler(
 
 async def get_sprint_update_webhook_handler(
     sprint_database_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service),
-    sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository)
+    sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository),
+    jira_sprint_api_service: IJiraSprintAPIService = Depends(get_jira_sprint_api_service)
 ) -> JiraWebhookHandler:
     """Get the sprint update webhook handler"""
-    return SprintUpdateWebhookHandler(sprint_database_service, sync_log_repository)
+    return SprintUpdateWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service)
 
 
 async def get_sprint_start_webhook_handler(
     sprint_database_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service),
-    sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository)
+    sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository),
+    jira_sprint_api_service: IJiraSprintAPIService = Depends(get_jira_sprint_api_service)
 ) -> JiraWebhookHandler:
     """Get the sprint start webhook handler"""
-    return SprintStartWebhookHandler(sprint_database_service, sync_log_repository)
+    return SprintStartWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service)
 
 
 async def get_sprint_close_webhook_handler(
     sprint_database_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service),
-    sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository)
+    sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository),
+    jira_sprint_api_service: IJiraSprintAPIService = Depends(get_jira_sprint_api_service)
 ) -> JiraWebhookHandler:
     """Get the sprint close webhook handler"""
-    return SprintCloseWebhookHandler(sprint_database_service, sync_log_repository)
+    return SprintCloseWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service)
 
 
 async def get_sprint_webhook_handlers(

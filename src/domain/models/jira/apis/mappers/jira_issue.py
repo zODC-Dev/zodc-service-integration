@@ -18,27 +18,26 @@ class JiraIssueMapper:
 
     @staticmethod
     def _map_user(user_response: JiraUserAPIGetResponseDTO) -> Optional[JiraUserModel]:
-        if not user_response:
-            return None
         try:
             avatar_url = ""
-            if isinstance(user_response.avatarUrls, dict):
-                avatar_url = user_response.avatarUrls.get("48x48", "")
+            if isinstance(user_response.avatar_urls, dict):
+                avatar_url = user_response.avatar_urls.get("48x48", "")
 
             return JiraUserModel(
-                jira_account_id=user_response.accountId,
-                email=getattr(user_response, 'emailAddress', '') or '',
-                name=user_response.displayName,
+                jira_account_id=user_response.account_id,
+                email=user_response.email_address or '',
+                name=user_response.display_name,
                 avatar_url=avatar_url,
-                is_system_user=False
+                is_system_user=False,
+                is_active=user_response.active
             )
         except Exception as e:
             log.error(f"Error mapping user response to domain: {str(e)}")
             # Return minimal valid model
             return JiraUserModel(
-                jira_account_id=user_response.accountId,
+                jira_account_id=user_response.account_id,
                 email='',
-                name=user_response.displayName or '',
+                name=user_response.display_name or '',
                 avatar_url='',
                 is_system_user=False
             )
@@ -91,14 +90,14 @@ class JiraIssueMapper:
             project_key = api_response.fields.project.key if hasattr(fields, 'project') else ""
 
             if hasattr(fields, 'assignee') and fields.assignee:
-                assignee_id = fields.assignee.accountId
+                assignee_id = fields.assignee.account_id
                 assignee = JiraIssueMapper._map_user(fields.assignee)
 
             if hasattr(fields, 'reporter') and fields.reporter:
-                reporter_id = fields.reporter.accountId
+                reporter_id = fields.reporter.account_id
 
             # Map sprints
-            sprints = []
+            sprints: List[JiraSprintModel] = []
             if hasattr(fields, 'customfield_10020') and fields.customfield_10020:
                 sprints = JiraIssueMapper._map_sprints(fields.customfield_10020, project_key)
 

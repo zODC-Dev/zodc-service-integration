@@ -3,7 +3,6 @@ from typing import Callable, Optional, Type
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.domain.services.redis_service import IRedisService
 from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
 from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
@@ -13,9 +12,8 @@ from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAl
 
 
 class SQLAlchemyJiraSyncSession(IJiraSyncSession):
-    def __init__(self, session_maker: Callable[[], AsyncSession], redis_service: IRedisService):
+    def __init__(self, session_maker: Callable[[], AsyncSession]):
         self._session_maker = session_maker
-        self.redis_service = redis_service
 
     async def __aenter__(self):
         """Enter context manager"""
@@ -25,7 +23,7 @@ class SQLAlchemyJiraSyncSession(IJiraSyncSession):
         self.project_repository = SQLAlchemyJiraProjectRepository(self.session)
         self.issue_repository = SQLAlchemyJiraIssueRepository(self.session)
         self.sprint_repository = SQLAlchemyJiraSprintRepository(self.session)
-        self.user_repository = SQLAlchemyJiraUserRepository(self.session, self.redis_service)
+        self.user_repository = SQLAlchemyJiraUserRepository(self.session)
         self.sync_log_repository = SQLAlchemySyncLogRepository(self.session)
 
         # Start transaction

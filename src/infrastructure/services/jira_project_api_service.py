@@ -55,6 +55,8 @@ class JiraProjectAPIService(IJiraProjectAPIService):
             error_msg=f"Error fetching users for project {project_key}"
         )
 
+        log.info(f"Response data via get_project_users: {response_data}")
+
         users: List[JiraUserModel] = []
         for user_data in response_data:
             user: JiraUserModel = await self.client.map_to_domain(
@@ -62,6 +64,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
                 JiraUserAPIGetResponseDTO,
                 JiraUserMapper
             )
+            log.info(f"User via get_project_users: {user}")
             users.append(user)
 
         return users
@@ -130,27 +133,49 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         start_at: int = 0
     ) -> List[JiraIssueModel]:
         """Get all issues for a project from Jira API with pagination"""
-        # Build JQL query
-        jql_parts = [f"project = {project_key}"]
-        if sprint_id:
-            jql_parts.append(f"sprint = {sprint_id}")
-        if is_backlog is not None:
-            jql_parts.append("sprint is EMPTY" if is_backlog else "sprint is not EMPTY")
-        if issue_type:
-            jql_parts.append(f"issuetype = {issue_type.value}")
-        if search:
-            jql_parts.append(f'(summary ~ "{search}" OR description ~ "{search}")')
+        # # Build JQL query
+        # jql_parts = [f"project = {project_key}"]
+        # if sprint_id:
+        #     jql_parts.append(f"sprint = {sprint_id}")
+        # if is_backlog is not None:
+        #     jql_parts.append("sprint is EMPTY" if is_backlog else "sprint is not EMPTY")
+        # if issue_type:
+        #     jql_parts.append(f"issuetype = {issue_type.value}")
+        # if search:
+        #     jql_parts.append(f'(summary ~ "{search}" OR description ~ "{search}")')
 
-        jql = " AND ".join(jql_parts)
+        # jql = " AND ".join(jql_parts)
+
+        # Build JQL query
+        jql_conditions = [f"project = {project_key}"]
+
+        # Handle sprint/backlog filter
+        if sprint_id:
+            jql_conditions.append(f"sprint = {sprint_id}")
+        elif is_backlog:
+            jql_conditions.append("sprint is EMPTY")
+
+        # Handle issue type filter
+        if issue_type:
+            jql_conditions.append(f"issuetype = '{issue_type.value}'")
+
+        # Handle search - only using trailing wildcard
+        if search:
+            # Escape special characters in search term
+            escaped_search = search.replace('"', '\\"')
+            search_condition = f'(summary ~ "{escaped_search}*" OR description ~ "{escaped_search}*")'
+            jql_conditions.append(search_condition)
+
+        jql = " AND ".join(jql_conditions)
 
         response_data = await self.client.post(
             "/rest/api/3/search",
             user_id,
             {
                 "jql": jql,
-                "startAt": start_at,
+                # "startAt": start_at,
                 "maxResults": limit,
-                "fields": "summary,description,status,assignee,priority,issuetype,created,updated,customfield_10016,customfield_10017,customfield_10020"
+                # "fields": "summary,description,status,assignee,priority,issuetype,created,updated,customfield_10016,customfield_10017,customfield_10020"
             },
             error_msg=f"Error searching issues for project {project_key}"
         )

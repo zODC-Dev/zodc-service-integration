@@ -51,7 +51,7 @@ class JiraIssueDatabaseService(IJiraIssueDatabaseService):
         current_issue.updated_at = datetime.now(timezone.utc)
         # current_issue.needs_sync = True  # Mark as needing sync with Jira
 
-        return await self.issue_repository.update(issue_id, JiraIssueDBUpdateDTO(**current_issue))
+        return await self.issue_repository.update(issue_id, JiraIssueDBUpdateDTO.model_validate(current_issue))
 
     async def get_project_issues(
         self,

@@ -28,9 +28,9 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
                 update(RefreshTokenEntity)
                 .where(
                     and_(
-                        RefreshTokenEntity.user_id == refresh_token_dto.user_id,
-                        RefreshTokenEntity.token_type == refresh_token_dto.token_type,
-                        RefreshTokenEntity.is_revoked == False  # noqa: E712
+                        col(RefreshTokenEntity.user_id) == refresh_token_dto.user_id,
+                        col(RefreshTokenEntity.token_type) == refresh_token_dto.token_type,
+                        col(RefreshTokenEntity.is_revoked) == False  # noqa: E712
                     )
                 )
                 .values(is_revoked=True)
@@ -60,14 +60,14 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
 
     async def get_by_token(self, token: str) -> Optional[RefreshTokenModel]:
         result = await self.session.exec(
-            select(RefreshTokenEntity).where(RefreshTokenEntity.token == token)
+            select(RefreshTokenEntity).where(col(RefreshTokenEntity.token) == token)
         )
         db_token = result.first()
         return self._to_domain(db_token) if db_token else None
 
     async def revoke_token(self, token: str) -> None:
         result = await self.session.exec(
-            select(RefreshTokenEntity).where(RefreshTokenEntity.token == token)
+            select(RefreshTokenEntity).where(col(RefreshTokenEntity.token) == token)
         )
         db_token = result.first()
         if db_token:
@@ -79,8 +79,8 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
         result = await self.session.exec(
             select(RefreshTokenEntity).where(
                 and_(
-                    RefreshTokenEntity.user_id == user_id,
-                    RefreshTokenEntity.token_type == token_type
+                    col(RefreshTokenEntity.user_id) == user_id,
+                    col(RefreshTokenEntity.token_type) == token_type
                 )
             ).order_by(col(RefreshTokenEntity.created_at).desc())
         )
@@ -93,9 +93,9 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
             update(RefreshTokenEntity)
             .where(
                 and_(
-                    RefreshTokenEntity.user_id == user_id,
-                    RefreshTokenEntity.token_type == token_type,
-                    RefreshTokenEntity.is_revoked == False  # noqa: E712
+                    col(RefreshTokenEntity.user_id) == user_id,
+                    col(RefreshTokenEntity.token_type) == token_type,
+                    col(RefreshTokenEntity.is_revoked) == False  # noqa: E712
                 )
             )
             .values(is_revoked=True)
@@ -110,8 +110,8 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
             update(RefreshTokenEntity)
             .where(
                 and_(
-                    RefreshTokenEntity.expires_at < now_utc,
-                    RefreshTokenEntity.is_revoked == False  # noqa: E712
+                    col(RefreshTokenEntity.expires_at) < now_utc,
+                    col(RefreshTokenEntity.is_revoked) == False  # noqa: E712
                 )
             )
             .values(is_revoked=True)

@@ -11,7 +11,7 @@ class IJiraSprintRepository(ABC):
         pass
 
     @abstractmethod
-    async def update_sprint(self, sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
+    async def update_sprint(self, sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> Optional[JiraSprintModel]:
         pass
 
     @abstractmethod
@@ -19,7 +19,7 @@ class IJiraSprintRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_by_jira_sprint_id(self, jira_sprint_id: int) -> Optional[JiraSprintModel]:
+    async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int) -> Optional[JiraSprintModel]:
         pass
 
     @abstractmethod
@@ -29,4 +29,8 @@ class IJiraSprintRepository(ABC):
     @abstractmethod
     async def get_project_sprints(self, project_key: str) -> List[JiraSprintModel]:
         """Get all sprints for a specific project"""
+        pass
+
+    @abstractmethod
+    async def update_sprint_by_jira_sprint_id(self, jira_sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> Optional[JiraSprintModel]:
         pass

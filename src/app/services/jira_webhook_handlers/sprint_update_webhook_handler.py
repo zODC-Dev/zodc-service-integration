@@ -7,7 +7,7 @@ from src.domain.constants.jira import JiraWebhookEvent
 from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.models.database.jira_sprint import JiraSprintDBUpdateDTO
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
-from src.domain.models.jira.webhooks.jira_webhook import JiraSprintWebhookDTO, JiraWebhookResponseDTO
+from src.domain.models.jira.webhooks.jira_webhook import JiraSprintWebhookDTO
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService

@@ -12,9 +12,11 @@ from src.domain.models.jira.webhooks.jira_webhook import (
 )
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
+from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
 from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQLAlchemyJiraSprintRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
+from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
 from src.infrastructure.services.jira_webhook_service import JiraWebhookService
 
 
@@ -24,6 +26,7 @@ class JiraWebhookQueueService:
     def __init__(
         self,
         jira_issue_api_service: IJiraIssueAPIService,
+        jira_sprint_api_service: IJiraSprintAPIService,
         webhook_handlers: List[JiraWebhookHandler]
     ):
         # Dùng PriorityQueue để đảm bảo xử lý theo thứ tự ưu tiên
@@ -46,6 +49,7 @@ class JiraWebhookQueueService:
 
         # Thêm các thuộc tính mới
         self.jira_issue_api_service = jira_issue_api_service
+        self.jira_sprint_api_service = jira_sprint_api_service
         self.DEBOUNCE_TIME = 1.0  # seconds
         self.webhook_handlers = webhook_handlers
         self.retry_counts: Dict[str, int] = {}
@@ -93,46 +97,48 @@ class JiraWebhookQueueService:
                 log.error("Invalid webhook: missing webhook_event")
                 return False
 
-            # Xác định entity ID (issue hoặc sprint)
+            # Xác định entity ID (issue, sprint hoặc user)
             entity_id = None
             entity_type = None
 
             # Kiểm tra nếu là issue webhook
             if hasattr(parsed_webhook, 'issue') and parsed_webhook.issue and hasattr(parsed_webhook.issue, 'id'):
-                entity_id = parsed_webhook.issue.id
-                entity_type = "issue"
+                entity_id = str(parsed_webhook.issue.id)
+                entity_type = 'issue'
             # Kiểm tra nếu là sprint webhook
             elif hasattr(parsed_webhook, 'sprint') and parsed_webhook.sprint and hasattr(parsed_webhook.sprint, 'id'):
-                entity_id = f"sprint_{parsed_webhook.sprint.id}"  # Prefix để phân biệt với issue IDs
-                entity_type = "sprint"
+                entity_id = str(parsed_webhook.sprint.id)
+                entity_type = 'sprint'
+            # Kiểm tra nếu là user webhook
+            elif hasattr(parsed_webhook, 'user') and parsed_webhook.user and hasattr(parsed_webhook.user, 'account_id'):
+                entity_id = parsed_webhook.user.account_id
+                entity_type = 'user'
             else:
-                log.warning(
-                    f"Webhook {parsed_webhook.webhook_event} does not contain identifiable issue or sprint data")
+                log.error(f"Cannot determine entity ID from webhook event {parsed_webhook.webhook_event}")
                 return False
 
-            # Tạo queue cho entity nếu chưa có
+            log.info(f"Determined entity type: {entity_type}, entity ID: {entity_id}")
+
+            # Tính độ ưu tiên cho webhook này
+            priority = self._calculate_priority(parsed_webhook)
+            log.info(f"Calculated priority {priority} for webhook {parsed_webhook.webhook_event}")
+
+            # Lấy hoặc tạo queue cho entity này
             if entity_id not in self.queues:
                 self.queues[entity_id] = asyncio.PriorityQueue()
-                log.info(f"Created new priority queue for {entity_type} {entity_id}")
 
-            # Tính toán độ ưu tiên
-            priority = self._calculate_priority(parsed_webhook)
+            # Thêm webhook vào hàng đợi
+            await self.queues[entity_id].put((priority, time.time(), parsed_webhook))
+            log.info(f"Added webhook to queue for entity {entity_id}")
 
-            # Thêm timestamp để giữ thứ tự FIFO khi cùng ưu tiên
-            timestamp = time.time()
-
-            # Thêm webhook vào queue với (ưu tiên, timestamp, webhook)
-            await self.queues[entity_id].put((priority, timestamp, parsed_webhook))
-
-            log.info(
-                f"Added webhook event {parsed_webhook.webhook_event} for {entity_type} {entity_id} to queue with priority {priority}")
-
-            # Bắt đầu xử lý queue nếu chưa có worker nào đang xử lý
+            # Khởi động worker mới nếu entity này chưa đang được xử lý
             if entity_id not in self.processing:
-                process_task = asyncio.create_task(self._process_entity_queue(entity_id))
-                self._track_task(process_task)
+                entity_task = asyncio.create_task(self._process_entity_queue(entity_id))
+                self._track_task(entity_task)
+                log.info(f"Started processing task for entity {entity_id}")
 
             return True
+
         except Exception as e:
             log.error(f"Error adding webhook to queue: {str(e)}")
             return False
@@ -158,9 +164,17 @@ class JiraWebhookQueueService:
         elif event in [JiraWebhookEvent.SPRINT_UPDATED, JiraWebhookEvent.SPRINT_CLOSED]:
             return 2
 
+        # Ưu tiên cho user events
+        elif event == JiraWebhookEvent.USER_CREATED:
+            return 1  # Ưu tiên cao cho việc tạo user
+        elif event == JiraWebhookEvent.USER_UPDATED:
+            return 2
+        elif event == JiraWebhookEvent.USER_DELETED:
+            return 3  # Ưu tiên thấp cho delete
+
         # Default priority
         else:
-            return 3
+            return 5
 
     async def _process_entity_queue(self, entity_id: str) -> None:
         """Process entity queue with appropriate handler"""
@@ -354,10 +368,11 @@ class JiraWebhookQueueService:
             issue_repo = SQLAlchemyJiraIssueRepository(session)
             sync_log_repo = SQLAlchemySyncLogRepository(session)
             sprint_repo = SQLAlchemyJiraSprintRepository(session)
+            sprint_database_service = JiraSprintDatabaseService(sprint_repo)
 
             # Tạo webhook service
             webhook_service = JiraWebhookService(
-                issue_repo, sync_log_repo, self.jira_issue_api_service, self.jira_sprint_api_service, sprint_repo)
+                issue_repo, sync_log_repo, self.jira_issue_api_service, self.jira_sprint_api_service, sprint_database_service)
 
             try:
                 yield webhook_service
@@ -379,16 +394,7 @@ class JiraWebhookQueueService:
 
                 # Kiểm tra kết quả
                 if result and "error" in result:
-                    error_msg = result.get("error", "Unknown error")
-                    if "Issue not found" in error_msg and webhook_data.webhook_event == JiraWebhookEvent.ISSUE_UPDATED:
-                        # Đây là lỗi có thể retry
-                        log.warning(
-                            f"Issue not found for update webhook (issue_id={webhook_data.issue.id}), will retry")
-                        return False
-                    else:
-                        # Lỗi khác
-                        log.error(f"Error processing webhook: {error_msg}")
-                        return False
+                    return False
 
                 log.info(f"Successfully processed {webhook_data.webhook_event} for issue {webhook_data.issue.id}")
                 return True

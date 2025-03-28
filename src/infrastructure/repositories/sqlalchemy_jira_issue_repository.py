@@ -22,11 +22,11 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         self.session = session
 
     async def get_by_jira_issue_id(self, jira_issue_id: str, include_deleted: bool = False) -> Optional[JiraIssueModel]:
-        query = select(JiraIssueEntity).where(JiraIssueEntity.jira_issue_id == jira_issue_id)
+        query = select(JiraIssueEntity).where(col(JiraIssueEntity.jira_issue_id) == jira_issue_id)
 
         # Filter out deleted issues unless explicitly requested
         if not include_deleted:
-            query = query.where(JiraIssueEntity.is_deleted == False)  # noqa: E712
+            query = query.where(col(JiraIssueEntity.is_deleted) == False)  # noqa: E712
 
         result = await self.session.exec(query)
         entity = result.first()
@@ -68,7 +68,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             # Fetch existing issue
             result = await self.session.exec(
                 select(JiraIssueEntity).where(
-                    JiraIssueEntity.jira_issue_id == issue_id
+                    col(JiraIssueEntity.jira_issue_id) == issue_id
                 )
             )
             issue_entity = result.first()
@@ -146,7 +146,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         # Try to get existing sprint
         result = await self.session.exec(
             select(JiraSprintEntity).where(
-                JiraSprintEntity.jira_sprint_id == sprint.jira_sprint_id
+                col(JiraSprintEntity.jira_sprint_id) == sprint.jira_sprint_id
             )
         )
         sprint_entity = result.first()
@@ -176,7 +176,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
         # Filter out deleted issues unless explicitly requested
         if not include_deleted:
-            query = query.where(JiraIssueEntity.is_deleted == False)  # noqa: E712
+            query = query.where(col(JiraIssueEntity.is_deleted) == False)  # noqa: E712
 
         result = await self.session.exec(query)
         entities = result.all()
@@ -279,7 +279,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
             # Filter out deleted issues unless explicitly requested
             if not include_deleted:
-                query = query.where(JiraIssueEntity.is_deleted == False)  # noqa: E712
+                query = query.where(col(JiraIssueEntity.is_deleted) == False)  # noqa: E712
 
             # Add sprint filter
             if sprint_id or is_backlog is not None:

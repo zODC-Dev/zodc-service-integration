@@ -130,6 +130,11 @@ class JiraProjectApplicationService:
                 log.info("Syncing project details...")
                 project = await self._sync_project_details(request.user_id, request.project_key, session)
 
+                # Sync project users
+                log.info("Syncing project users...")
+                users = await self._sync_project_users(request.user_id, request.project_key, session)
+                log.info(f"Successfully synced {len(users)} users")
+
                 # Sync sprints
                 log.info("Syncing project sprints...")
                 sprint_id_mapping = await self._sync_project_sprints(request.user_id, request.project_key, session)
@@ -217,27 +222,35 @@ class JiraProjectApplicationService:
                 project_key=project_key
             )
 
+            log.info(f"Jira users: {jira_users}")
+
             synced_users = []
             for jira_user in jira_users:
                 try:
                     # Check if user exists by jira_account_id
-                    existing_user = await session.user_repository.get_user_by_account_id(
+                    existing_user = await session.user_repository.get_user_by_jira_account_id(
                         jira_user.jira_account_id
                     )
                     log.info(f"Existing user: {existing_user} {jira_user.jira_account_id}")
 
-                    if existing_user:
+                    if existing_user and existing_user.jira_account_id:
                         # Update existing user if needed
                         update_dto = JiraUserDBUpdateDTO(
-                            email=jira_user.email,
-                            avatar_url=jira_user.avatar_url
+                            # email=jira_user.email,
+                            avatar_url=jira_user.avatar_url,
+                            is_active=jira_user.is_active,
                         )
-                        await session.user_repository.update_user(update_dto)
+                        await session.user_repository.update_user_by_jira_account_id(
+                            existing_user.jira_account_id,
+                            update_dto
+                        )
                         synced_users.append(existing_user)
                     else:
                         # Create new user only if they don't exist
                         create_dto = JiraUserDBCreateDTO(
                             jira_account_id=jira_user.jira_account_id,
+                            name=jira_user.name,
+                            is_active=jira_user.is_active,
                             email=jira_user.email,
                             avatar_url=jira_user.avatar_url,
                             is_system_user=False
@@ -268,7 +281,7 @@ class JiraProjectApplicationService:
         for sprint in sprints:
             try:
                 # Check if sprint exists by jira_sprint_id
-                existing_sprint = await session.sprint_repository.get_by_jira_sprint_id(sprint.jira_sprint_id)
+                existing_sprint = await session.sprint_repository.get_sprint_by_jira_sprint_id(sprint.jira_sprint_id)
 
                 sprint_data = JiraSprintDBCreateDTO(
                     jira_sprint_id=sprint.jira_sprint_id,
@@ -278,7 +291,8 @@ class JiraProjectApplicationService:
                     end_date=sprint.end_date,
                     complete_date=sprint.complete_date,
                     goal=sprint.goal,
-                    project_key=project_key
+                    project_key=project_key,
+                    board_id=sprint.board_id
                 )
 
                 if existing_sprint and existing_sprint.id:
@@ -287,12 +301,13 @@ class JiraProjectApplicationService:
                         existing_sprint.id,
                         JiraSprintDBUpdateDTO(**sprint_data.model_dump())
                     )
-                    if updated_sprint:
+                    if updated_sprint and updated_sprint.id:
                         sprint_id_mapping[sprint.jira_sprint_id] = updated_sprint.id
                 else:
                     # Create new if not exists
                     new_sprint = await session.sprint_repository.create_sprint(sprint_data)
-                    sprint_id_mapping[sprint.jira_sprint_id] = new_sprint.id
+                    if new_sprint and new_sprint.id:
+                        sprint_id_mapping[sprint.jira_sprint_id] = new_sprint.id
 
                 log.info(f"Successfully synced sprint {sprint.name} for project {project_key}")
 

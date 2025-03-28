@@ -240,9 +240,9 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             error_msg="Error when searching issues"
         )
 
-        issues = []
+        issues: List[JiraIssueModel] = []
         for issue_data in response_data.get("issues", []):
-            issue = await self.client.map_to_domain(
+            issue: JiraIssueModel = await self.client.map_to_domain(
                 issue_data,
                 JiraIssueAPIGetResponseDTO,
                 JiraIssueMapper

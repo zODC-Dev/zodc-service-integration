@@ -199,10 +199,10 @@ class BaseJiraWebhookDTO(BaseModel):
     def parse_webhook(cls, data: Dict[str, Any]) -> "BaseJiraWebhookDTO":
         """Factory method để tạo đúng loại DTO dựa trên webhook_event"""
         log.info(f"Parsing webhook data: {data}")
-        if not data and ("webhookEvent" not in data or "webhook_event" not in data):
+        if not data or ("webhookEvent" not in data and "webhook_event" not in data):
             raise ValueError("Invalid webhook payload: missing webhookEvent field")
 
-        webhook_event = data["webhookEvent"] if "webhookEvent" in data else data["webhook_event"]
+        webhook_event = data.get("webhookEvent") or data.get("webhook_event")
 
         # Chuẩn hóa event name
         normalized_event = webhook_event
@@ -218,6 +218,13 @@ class BaseJiraWebhookDTO(BaseModel):
             normalized_event = "jira:sprint_started"
         elif webhook_event == "sprint_closed":
             normalized_event = "jira:sprint_closed"
+        # Thêm các điều kiện cho user events
+        elif webhook_event == "user_created":
+            normalized_event = "jira:user_created"
+        elif webhook_event == "user_updated":
+            normalized_event = "jira:user_updated"
+        elif webhook_event == "user_deleted":
+            normalized_event = "jira:user_deleted"
 
         # Tìm DTO phù hợp
         dto_class = cls.webhook_registry.get(normalized_event)
@@ -225,11 +232,10 @@ class BaseJiraWebhookDTO(BaseModel):
         if dto_class:
             try:
                 dto = dto_class.model_validate(data)
-                # Thiết lập normalized_event
                 dto.normalized_event = normalized_event
                 return dto
             except Exception as e:
-                # Thử dùng exclude_unset để bỏ qua các trường không có trong payload
+                log.error(f"Failed to parse {webhook_event} webhook: {str(e)}")
                 try:
                     dto = dto_class.model_validate(data)
                     dto.normalized_event = normalized_event
@@ -283,6 +289,28 @@ class JiraSprintWebhookDTO(BaseJiraWebhookDTO):
                     pass  # Pydantic should handle ISO format conversions
 
         return values
+
+
+class JiraUserDTO(BaseModel):
+    """DTO for user object in Jira webhook"""
+    account_id: str = Field(alias="accountId")
+    account_type: str = Field(alias="accountType")
+    active: bool
+    display_name: str = Field(alias="displayName")
+    email_address: Optional[str] = Field(None, alias="emailAddress")
+    avatar_urls: Optional[Dict[str, str]] = Field(None, alias="avatarUrls")
+
+    class Config:
+        populate_by_name = True
+
+
+class JiraUserWebhookDTO(BaseJiraWebhookDTO):
+    """DTO for Jira user webhooks"""
+    event_types: ClassVar[List[str]] = ["jira:user_created", "jira:user_updated", "jira:user_deleted"]
+    user: JiraUserDTO
+
+    class Config:
+        populate_by_name = True
 
 
 # Backward compatibility for existing code

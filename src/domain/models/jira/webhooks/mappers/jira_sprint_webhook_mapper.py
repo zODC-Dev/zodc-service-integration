@@ -1,8 +1,7 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from src.configs.logger import log
-from src.domain.models.database.jira_sprint import JiraSprintDBUpdateDTO
 from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
 
 
@@ -20,25 +19,25 @@ class JiraSprintWebhookMapper:
             log.error(f"Error parsing datetime {dt_str}: {str(e)}")
             return None
 
-    @classmethod
-    def map_to_update_dto(cls, webhook_data: JiraWebhookResponseDTO) -> JiraSprintDBUpdateDTO:
-        """Map webhook data to JiraSprintDBUpdateDTO for update operations"""
-        try:
-            sprint = webhook_data.sprint
-            update_dto = JiraSprintDBUpdateDTO(
-                state=sprint.state,
-                name=sprint.name,
-                start_date=cls._parse_datetime(sprint.startDate if hasattr(sprint, 'startDate') else None),
-                end_date=cls._parse_datetime(sprint.endDate if hasattr(sprint, 'endDate') else None),
-                complete_date=cls._parse_datetime(sprint.completeDate if hasattr(sprint, 'completeDate') else None),
-                goal=sprint.goal if hasattr(sprint, 'goal') else None,
-                updated_at=datetime.now(timezone.utc)
-            )
+    # @classmethod
+    # def map_to_update_dto(cls, webhook_data: JiraWebhookResponseDTO) -> JiraSprintDBUpdateDTO:
+    #     """Map webhook data to JiraSprintDBUpdateDTO for update operations"""
+    #     try:
+    #         sprint = webhook_data.sprint
+    #         update_dto = JiraSprintDBUpdateDTO(
+    #             state=sprint.state,
+    #             name=sprint.name,
+    #             start_date=cls._parse_datetime(sprint.start_date if hasattr(sprint, 'start_date') else None),
+    #             end_date=cls._parse_datetime(sprint.end_date if hasattr(sprint, 'end_date') else None),
+    #             complete_date=cls._parse_datetime(sprint.complete_date if hasattr(sprint, 'complete_date') else None),
+    #             goal=sprint.goal if hasattr(sprint, 'goal') else None,
+    #             updated_at=datetime.now(timezone.utc)
+    #         )
 
-            return update_dto
-        except Exception as e:
-            log.error(f"Error mapping sprint update data: {str(e)}")
-            raise
+    #         return update_dto
+    #     except Exception as e:
+    #         log.error(f"Error mapping sprint update data: {str(e)}")
+    #         raise
 
     @classmethod
     def extract_changes_from_changelog(cls, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:

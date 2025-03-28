@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
+
+from src.domain.constants.jira import JiraSprintState
 
 
 class JiraSprintDBCreateDTO(BaseModel):
@@ -16,6 +18,10 @@ class JiraSprintDBCreateDTO(BaseModel):
     project_key: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_serializer('state')
+    def serialize_state(self, state: str) -> str:
+        return JiraSprintState.from_str(state).value
 
     def model_dump(self) -> Dict[str, Any]:
         data = super().model_dump()
@@ -37,7 +43,11 @@ class JiraSprintDBUpdateDTO(BaseModel):
     board_id: Optional[int] = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    def model_dump(self) -> dict:
+    @field_serializer('state')
+    def serialize_state(self, state: Optional[str]) -> Optional[str]:
+        return JiraSprintState.from_str(state).value if state else None
+
+    def model_dump(self) -> Dict[str, Any]:
         data = super().model_dump()
         # Ensure all datetime fields have timezone info
         for field in ['start_date', 'end_date', 'complete_date', 'updated_at']:

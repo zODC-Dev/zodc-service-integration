@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, List
 
 from src.configs.logger import log
 from src.configs.settings import settings
@@ -120,67 +120,67 @@ class JiraWebhookMapper:
             log.error(f"Error mapping webhook data to create DTO: {str(e)}")
             raise
 
-    @classmethod
-    def map_to_update_dto(cls, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:
-        """Map webhook data to update dictionary based on changelog"""
-        try:
-            update_data: Dict[str, Any] = {}
+    # @classmethod
+    # def map_to_update_dto(cls, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:
+    #     """Map webhook data to update dictionary based on changelog"""
+    #     try:
+    #         update_data: Dict[str, Any] = {}
 
-            # Nếu có changelog, chỉ update các field đã thay đổi
-            if webhook_data.changelog and webhook_data.changelog.items:
-                for change in webhook_data.changelog.items:
-                    log.info(f"change: {change}")
-                    field_name = change.field
-                    field_id = change.field_id
+    #         # Nếu có changelog, chỉ update các field đã thay đổi
+    #         if webhook_data.changelog and webhook_data.changelog.items:
+    #             for change in webhook_data.changelog.items:
+    #                 log.info(f"change: {change}")
+    #                 field_name = change.field
+    #                 field_id = change.field_id
 
-                    db_field: Optional[str] = None
-                    if field_id and field_id == "customfield_10020":
-                        db_field = "sprint_id"
-                    elif field_id and field_id in cls.FIELD_ID_MAPPING:
-                        db_field = cls.FIELD_ID_MAPPING[field_id]
-                    elif field_name in cls.FIELD_NAME_MAPPING:
-                        db_field = cls.FIELD_NAME_MAPPING[field_name]
+    #                 db_field: Optional[str] = None
+    #                 if field_id and field_id == "customfield_10020":
+    #                     db_field = "sprint_id"
+    #                 elif field_id and field_id in cls.FIELD_ID_MAPPING:
+    #                     db_field = cls.FIELD_ID_MAPPING[field_id]
+    #                 elif field_name in cls.FIELD_NAME_MAPPING:
+    #                     db_field = cls.FIELD_NAME_MAPPING[field_name]
 
-                    if db_field:
-                        # Sử dụng field_id nếu có, nếu không thì dùng field_name
-                        source_field = field_id or field_name
+    #                 if db_field:
+    #                     # Sử dụng field_id nếu có, nếu không thì dùng field_name
+    #                     source_field = field_id or field_name
 
-                        # Ưu tiên dùng to_string cho status và issuetype
-                        if field_name == "status" or field_name == "issuetype":
-                            log.info(f"Processing {field_name} change: {change.to} (ID) -> {change.to_string} (Name)")
+    #                     # Ưu tiên dùng to_string cho status và issuetype
+    #                     if field_name == "status" or field_name == "issuetype":
+    #                         log.info(f"Processing {field_name} change: {change.to} (ID) -> {change.to_string} (Name)")
 
-                            # Ưu tiên dùng ID nếu có trong mapping
-                            if change.to and str(change.to) in (JIRA_STATUS_ID_MAPPING if field_name == "status" else JIRA_ISSUE_TYPE_ID_MAPPING):
-                                value_to_transform = change.to
-                            else:
-                                # Nếu không có ID trong mapping, dùng tên hiển thị
-                                value_to_transform = change.to_string
-                        else:
-                            value_to_transform = change.to or change.to_string
+    #                         # Ưu tiên dùng ID nếu có trong mapping
+    #                         if change.to and str(change.to) in (JIRA_STATUS_ID_MAPPING if field_name == "status" else JIRA_ISSUE_TYPE_ID_MAPPING):
+    #                             value_to_transform = change.to
+    #                         else:
+    #                             # Nếu không có ID trong mapping, dùng tên hiển thị
+    #                             value_to_transform = change.to_string
+    #                     else:
+    #                         value_to_transform = change.to or change.to_string
 
-                        # Transform value
-                        new_value = cls._transform_field_value(source_field, value_to_transform)
+    #                     # Transform value
+    #                     new_value = cls._transform_field_value(source_field, value_to_transform)
 
-                        # Chỉ thêm vào update_data nếu giá trị không phải None
-                        if new_value is not None:
-                            update_data[db_field] = new_value
-                            log.info(
-                                f"Updating field {db_field} with value {new_value} (from {source_field}, original: {value_to_transform})")
-                        else:
-                            log.info(f"Skipping field {source_field} with None value")
-                    else:
-                        log.info(f"Unmapped field: {field_id or field_name}")
+    #                     # Chỉ thêm vào update_data nếu giá trị không phải None
+    #                     if new_value is not None:
+    #                         update_data[db_field] = new_value
+    #                         log.info(
+    #                             f"Updating field {db_field} with value {new_value} (from {source_field}, original: {value_to_transform})")
+    #                     else:
+    #                         log.info(f"Skipping field {source_field} with None value")
+    #                 else:
+    #                     log.info(f"Unmapped field: {field_id or field_name}")
 
-            # Luôn cập nhật updated_at
-            fields = webhook_data.issue.fields
-            update_data["updated_at"] = cls._parse_datetime(fields.updated)
+    #         # Luôn cập nhật updated_at
+    #         fields = webhook_data.issue.fields
+    #         update_data["updated_at"] = cls._parse_datetime(fields.updated)
 
-            log.info(f"Mapped update data: {update_data}")
-            return update_data
+    #         log.info(f"Mapped update data: {update_data}")
+    #         return update_data
 
-        except Exception as e:
-            log.error(f"Error mapping webhook data to update dict: {str(e)}")
-            raise
+    #     except Exception as e:
+    #         log.error(f"Error mapping webhook data to update dict: {str(e)}")
+    #         raise
 
     @classmethod
     def _transform_field_value(cls, field_id_or_name: str, value: Any) -> Any:

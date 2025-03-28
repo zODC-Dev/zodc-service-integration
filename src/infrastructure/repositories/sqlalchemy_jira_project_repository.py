@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.domain.exceptions.project_exceptions import ProjectNotFoundError
@@ -31,7 +31,8 @@ class SQLAlchemyJiraProjectRepository(IJiraProjectRepository):
             key=project_data.key,
             name=project_data.name,
             description=project_data.description,
-            avatar_url=project_data.avatar_url
+            avatar_url=project_data.avatar_url,
+            user_id=project_data.user_id
         )
         self.session.add(project)
         await self.session.flush()
@@ -43,7 +44,7 @@ class SQLAlchemyJiraProjectRepository(IJiraProjectRepository):
 
     async def get_project_by_key(self, key: str) -> Optional[JiraProjectModel]:
         result = await self.session.exec(
-            select(JiraProjectEntity).where(JiraProjectEntity.key ==
+            select(JiraProjectEntity).where(col(JiraProjectEntity.key) ==
                                             key.upper())
         )
         project = result.first()
@@ -79,7 +80,7 @@ class SQLAlchemyJiraProjectRepository(IJiraProjectRepository):
     async def get_by_jira_project_id(self, jira_project_id: str) -> Optional[JiraProjectModel]:
         """Get project by Jira project ID"""
         result = await self.session.exec(
-            select(JiraProjectEntity).where(JiraProjectEntity.jira_project_id == jira_project_id)
+            select(JiraProjectEntity).where(col(JiraProjectEntity.jira_project_id) == jira_project_id)
         )
         project = result.first()
         return self._to_domain(project) if project else None
@@ -88,7 +89,7 @@ class SQLAlchemyJiraProjectRepository(IJiraProjectRepository):
         """Get all projects for a specific user"""
         result = await self.session.exec(
             select(JiraProjectEntity).where(
-                JiraProjectEntity.user_id == user_id
+                col(JiraProjectEntity.user_id) == user_id
             )
         )
         projects = result.all()

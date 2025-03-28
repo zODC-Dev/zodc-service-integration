@@ -4,8 +4,8 @@ from typing import Any, Dict
 from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
 from src.domain.models.database.jira_user import JiraUserDBCreateDTO
+from src.domain.models.database.refresh_token import RefreshTokenDBCreateDTO
 from src.domain.models.nats.subscribes.jira_user import MicrosoftUserLoginNATSSubscribeDTO
-from src.domain.models.refresh_token import RefreshTokenModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.domain.services.nats_message_handler import INATSMessageHandler
@@ -28,7 +28,7 @@ class MicrosoftLoginMessageHandler(INATSMessageHandler):
             event = MicrosoftUserLoginNATSSubscribeDTO(**message)
 
             # Check if user exists
-            user = await self.user_repository.get_user_by_email(event.email)
+            user = await self.user_repository.get_user_by_id(event.user_id)
             if not user:
                 new_user = JiraUserDBCreateDTO(
                     email=event.email,
@@ -39,7 +39,7 @@ class MicrosoftLoginMessageHandler(INATSMessageHandler):
 
             # Store refresh token
             expires_at = datetime.now(timezone.utc) + timedelta(seconds=event.expires_in * 2)
-            refresh_token = RefreshTokenModel(
+            refresh_token = RefreshTokenDBCreateDTO(
                 token=event.refresh_token,
                 user_id=event.user_id,
                 token_type=TokenType.MICROSOFT,

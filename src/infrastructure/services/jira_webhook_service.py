@@ -30,7 +30,7 @@ class JiraWebhookService:
         sync_log_repository: ISyncLogRepository,
         jira_issue_api_service: IJiraIssueAPIService,
         jira_sprint_api_service: IJiraSprintAPIService,
-        sprint_database_service: Optional[IJiraSprintDatabaseService] = None
+        sprint_database_service: IJiraSprintDatabaseService
     ):
         self.handlers: List[JiraWebhookHandler] = []
         self.jira_issue_repository = jira_issue_repository

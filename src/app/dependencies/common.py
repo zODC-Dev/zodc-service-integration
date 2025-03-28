@@ -40,10 +40,9 @@ async def get_nats_service():
 
 def get_jira_user_repository(
     session=Depends(get_db),
-    redis_service: IRedisService = Depends(get_redis_service)
 ) -> IJiraUserRepository:
     """Get the user repository."""
-    return SQLAlchemyJiraUserRepository(session=session, redis_service=redis_service)
+    return SQLAlchemyJiraUserRepository(session=session)
 
 
 def get_refresh_token_repository(

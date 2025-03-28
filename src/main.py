@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_generator = get_db()
     db = await anext(db_generator)
 
-    user_repository = SQLAlchemyJiraUserRepository(db, redis_service)
+    user_repository = SQLAlchemyJiraUserRepository(db)
     refresh_token_repository = SQLAlchemyRefreshTokenRepository(db)
     project_repository = SQLAlchemyJiraProjectRepository(db)
     sync_log_repository = SQLAlchemySyncLogRepository(db)
@@ -103,7 +103,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     jira_issue_application_service = JiraIssueApplicationService(
         jira_issue_database_service, jira_issue_api_service, jira_issue_repository, project_repository, nats_service, sync_log_repository)
 
-    sync_session = SQLAlchemyJiraSyncSession(session_maker, redis_service)
+    sync_session = SQLAlchemyJiraSyncSession(session_maker)
 
     jira_project_api_service = JiraProjectAPIService(jira_api_client, user_repository)
     jira_project_database_service = JiraProjectDatabaseService(project_repository)
@@ -175,7 +175,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             db_generator = get_db()
             db = await anext(db_generator)
             try:
-                user_repository = SQLAlchemyJiraUserRepository(db, redis_service)
+                user_repository = SQLAlchemyJiraUserRepository(db)
                 refresh_token_repository = SQLAlchemyRefreshTokenRepository(db)
                 token_refresh_service = TokenRefreshService(
                     redis_service,

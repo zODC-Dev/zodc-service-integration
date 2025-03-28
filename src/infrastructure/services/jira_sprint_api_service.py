@@ -23,11 +23,11 @@ class JiraSprintAPIService(IJiraSprintAPIService):
         self.retry_delay = 1  # seconds
         self.system_user_id = settings.JIRA_SYSTEM_USER_ID
 
-    async def get_sprint_by_id_with_system_user(self, sprint_id: str) -> Optional[JiraSprintModel]:
+    async def get_sprint_by_id_with_system_user(self, sprint_id: int) -> Optional[JiraSprintModel]:
         """Get sprint using system user account"""
         return await self.get_sprint_by_id(self.system_user_id, sprint_id)
 
-    async def get_sprint_by_id(self, user_id: int, sprint_id: str) -> Optional[JiraSprintModel]:
+    async def get_sprint_by_id(self, user_id: int, sprint_id: int) -> Optional[JiraSprintModel]:
         """Get sprint from Jira API with retry logic"""
         for attempt in range(self.retry_attempts):
             try:
@@ -92,9 +92,9 @@ class JiraSprintAPIService(IJiraSprintAPIService):
                 error_msg=f"Error fetching sprints for board {board_id}"
             )
 
-            sprints = []
+            sprints: List[JiraSprintModel] = []
             for sprint_data in sprints_response.get("values", []):
-                sprint = await self.client.map_to_domain(
+                sprint: JiraSprintModel = await self.client.map_to_domain(
                     sprint_data,
                     JiraSprintAPIGetResponseDTO,
                     JiraSprintMapper

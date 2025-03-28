@@ -82,7 +82,7 @@ class TokenRefreshService(ITokenRefreshService):
                         "grant_type": "refresh_token",
                         "client_id": settings.JIRA_CLIENT_ID,
                         "client_secret": settings.JIRA_CLIENT_SECRET,
-                        "refresh_token": refresh_token.token
+                        "refresh_token": refresh_token.token,
                     }
                 )
                 data: Dict[str, str] = await response.json()

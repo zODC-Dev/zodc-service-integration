@@ -38,8 +38,8 @@ class JiraProjectMapper:
                 jira_sprint_id=api_response.id,
                 name=api_response.name,
                 state=api_response.state,
-                start_date=api_response.startDate,
-                end_date=api_response.endDate,
+                start_date=api_response.start_date,
+                end_date=api_response.end_date,
                 goal=api_response.goal
             )
         except Exception as e:
@@ -54,13 +54,13 @@ class JiraProjectMapper:
     def to_domain_user(api_response: JiraUserAPIGetResponseDTO) -> JiraUserModel:
         avatar_url = ""
         try:
-            if isinstance(api_response.avatarUrls, dict):
-                avatar_url = api_response.avatarUrls.get("48x48", "")
+            if isinstance(api_response.avatar_urls, dict):
+                avatar_url = api_response.avatar_urls.get("48x48", "")
 
             return JiraUserModel(
-                jira_account_id=api_response.accountId,
-                email=api_response.emailAddress or "",
-                name=api_response.displayName,
+                jira_account_id=api_response.account_id,
+                email=api_response.email_address or "",
+                name=api_response.display_name,
                 avatar_url=avatar_url,
                 is_system_user=False
             )
@@ -68,9 +68,9 @@ class JiraProjectMapper:
             log.error(f"Error mapping user response to domain: {str(e)}")
             # Return minimal valid model
             return JiraUserModel(
-                jira_account_id=api_response.accountId,
-                email=api_response.emailAddress or "",
-                name=api_response.displayName,
+                jira_account_id=api_response.account_id,
+                email=api_response.email_address or "",
+                name=api_response.display_name,
                 avatar_url=avatar_url,
                 is_system_user=False
             )
