@@ -64,7 +64,12 @@ async def get_project_sprints(
     claims: JWTClaims = Depends(get_jwt_claims),
     controller: JiraProjectController = Depends(get_jira_project_controller),
 ) -> StandardResponse[List[GetJiraSprintResponse]]:
-    """Get all sprints from a specific Jira project"""
-    return await controller.get_project_sprints(
-        project_key=project_key
-    )
+    """Get all sprints from a specific Jira project
+
+    Returns a list of sprints with is_current flag indicating the current sprint.
+    Current sprint is determined by the following rules:
+    1. If there is an active sprint, it is the current sprint
+    2. If no active sprint exists but there are future sprints, the earliest created future sprint is current
+    3. If no active or future sprints exist, the most recently completed sprint is current
+    """
+    return await controller.get_project_sprints(project_key=project_key)

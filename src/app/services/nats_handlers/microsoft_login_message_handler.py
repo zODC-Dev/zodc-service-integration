@@ -3,7 +3,6 @@ from typing import Any, Dict
 
 from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.models.database.jira_user import JiraUserDBCreateDTO
 from src.domain.models.database.refresh_token import RefreshTokenDBCreateDTO
 from src.domain.models.nats.subscribes.jira_user import MicrosoftUserLoginNATSSubscribeDTO
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
@@ -30,12 +29,13 @@ class MicrosoftLoginMessageHandler(INATSMessageHandler):
             # Check if user exists
             user = await self.user_repository.get_user_by_id(event.user_id)
             if not user:
-                new_user = JiraUserDBCreateDTO(
-                    email=event.email,
-                    user_id=event.user_id,
-                )
-                await self.user_repository.create_user(new_user)
-                log.info(f"Created new user from Microsoft login for user {event.user_id}")
+                # new_user = JiraUserDBCreateDTO(
+                #     email=event.email,
+                #     user_id=event.user_id,
+                # )
+                # await self.user_repository.create_user(new_user)
+                log.warning(f"User not found for Microsoft login for user {event.user_id}")
+                return
 
             # Store refresh token
             expires_at = datetime.now(timezone.utc) + timedelta(seconds=event.expires_in * 2)
@@ -57,61 +57,3 @@ class MicrosoftLoginMessageHandler(INATSMessageHandler):
             log.info(f"Successfully processed Microsoft login for user {event.user_id}")
         except Exception as e:
             log.error(f"Error handling Microsoft login event: {str(e)}")
-
-
-# class JiraLoginHandler(INATSMessageHandler):
-#     def __init__(
-#         self,
-#         redis_service: IRedisService,
-#         user_repository: IJiraUserRepository,
-#         refresh_token_repository: IRefreshTokenRepository
-#     ):
-#         self.redis_service = redis_service
-#         self.user_repository = user_repository
-#         self.refresh_token_repository = refresh_token_repository
-
-#     async def handle(self, subject: str, message: Dict[str, Any]) -> None:
-#         try:
-#             event = JiraLoginEventDTO(**message)
-
-#             # Create or update user
-#             user = await self.user_repository.get_user_by_email(event.email)
-#             if not user:
-#                 new_user = JiraUserDBCreateDTO(
-#                     email=event.email,
-#                     user_id=event.user_id,
-#                     jira_account_id=event.account_id,
-#                     jira_site_url=event.site_url
-#                 )
-#                 await self.user_repository.create_user(new_user)
-#                 log.info(f"Created new user from Jira login for user {event.user_id}")
-#             else:
-#                 # Update existing user's Jira info
-#                 await self.user_repository.update_user_jira_info(
-#                     user.id,
-#                     event.account_id,
-#                     event.site_url
-#                 )
-#                 log.info(f"Updated Jira info for user {event.user_id}")
-
-#             # Store refresh token
-#             expires_at = datetime.now(timezone.utc) + timedelta(seconds=event.expires_in * 2)
-#             refresh_token = RefreshTokenModel(
-#                 token=event.refresh_token,
-#                 user_id=event.user_id,
-#                 token_type=TokenType.JIRA,
-#                 cloud_id=event.cloud_id,
-#                 scope=event.scope,
-#                 expires_at=expires_at
-#             )
-#             await self.refresh_token_repository.create_refresh_token(refresh_token)
-
-#             # Cache access token
-#             await self.redis_service.cache_jira_token(
-#                 user_id=event.user_id,
-#                 access_token=event.access_token
-#             )
-
-#             log.info(f"Successfully processed Jira login for user {event.user_id}")
-#         except Exception as e:
-#             log.error(f"Error handling Jira login event: {str(e)}")

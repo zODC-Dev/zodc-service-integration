@@ -17,6 +17,7 @@ from src.app.services.jira_webhook_handlers.issue_update_webhook_handler import 
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.app.services.jira_webhook_handlers.sprint_close_webhook_handler import SprintCloseWebhookHandler
 from src.app.services.jira_webhook_handlers.sprint_create_webhook_handler import SprintCreateWebhookHandler
+from src.app.services.jira_webhook_handlers.sprint_delete_webhook_handler import SprintDeleteWebhookHandler
 from src.app.services.jira_webhook_handlers.sprint_start_webhook_handler import SprintStartWebhookHandler
 from src.app.services.jira_webhook_handlers.sprint_update_webhook_handler import SprintUpdateWebhookHandler
 from src.app.services.jira_webhook_handlers.user_create_webhook_handler import UserCreateWebhookHandler
@@ -48,6 +49,7 @@ async def get_webhook_handlers(
         SprintUpdateWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service),
         SprintStartWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service),
         SprintCloseWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service),
+        SprintDeleteWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service),
 
         # User handlers
         UserCreateWebhookHandler(user_database_service, sync_log_repository, jira_user_api_service),

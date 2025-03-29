@@ -70,7 +70,7 @@ class JiraSprintMapper:
                 return [JiraSprintModel(
                     jira_sprint_id=sprint_id,
                     name=f"Sprint {sprint_id}",
-                    state=JiraSprintState.ACTIVE,
+                    state=JiraSprintState.ACTIVE.value,
                     created_at=datetime.now(timezone.utc)
                 )]
             except (ValueError, TypeError):
@@ -103,7 +103,7 @@ class JiraSprintMapper:
                     return JiraSprintModel(
                         jira_sprint_id=sprint_id,
                         name=f"Sprint {sprint_id}",
-                        state=JiraSprintState.ACTIVE,
+                        state=JiraSprintState.ACTIVE.value,
                         created_at=datetime.now(timezone.utc)
                     )
                 except ValueError:

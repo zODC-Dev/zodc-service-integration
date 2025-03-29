@@ -16,7 +16,7 @@ class JiraProjectMapper:
                 avatar_url = api_response.avatarUrls.get("48x48", "")
 
             return JiraProjectModel(
-                jira_project_id=api_response.id,    # ID từ Jira API
+                jira_project_id=str(api_response.id),    # ID từ Jira API
                 key=api_response.key,
                 name=api_response.name,
                 description=api_response.description or "",

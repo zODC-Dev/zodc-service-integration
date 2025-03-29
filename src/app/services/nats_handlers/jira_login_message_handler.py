@@ -37,8 +37,8 @@ class JiraLoginMessageHandler(INATSMessageHandler):
                     is_system_user=True,
                     user_id=event.user_id,
                 )
-                await self.user_repository.update_user(user.user_id, user_update)
-                log.info(f"Updated Jira link for existing user {user.user_id}")
+                await self.user_repository.update_user_by_jira_account_id(user.jira_account_id, user_update)
+                log.info(f"Updated Jira link for existing user {user.jira_account_id}")
 
             else:
                 log.error(f"User {event.user_id} not found")

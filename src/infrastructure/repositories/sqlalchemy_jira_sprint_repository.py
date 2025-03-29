@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlmodel import col, select
+from sqlalchemy import and_
+from sqlmodel import col, not_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
@@ -43,18 +44,36 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             log.error(f"Error creating sprint: {str(e)}")
             raise
 
-    async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int) -> Optional[JiraSprintModel]:
-        result = await self.session.exec(select(JiraSprintEntity).where(col(JiraSprintEntity.jira_sprint_id) == jira_sprint_id))
+    async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int, include_deleted: bool = False) -> Optional[JiraSprintModel]:
+        """Get sprint by Jira sprint ID"""
+        query = select(JiraSprintEntity).where(col(JiraSprintEntity.jira_sprint_id) == jira_sprint_id)
+
+        if not include_deleted:
+            query = query.where(col(JiraSprintEntity.is_deleted) == False)  # noqa: E712
+
+        result = await self.session.exec(query)
         sprint = result.first()
         return self._to_domain(sprint) if sprint else None
 
-    async def get_sprint_by_id(self, sprint_id: int) -> Optional[JiraSprintModel]:
-        sprint = await self.session.get(JiraSprintEntity, sprint_id)
+    async def get_sprint_by_id(self, sprint_id: int, include_deleted: bool = False) -> Optional[JiraSprintModel]:
+        """Get sprint by internal ID"""
+        query = select(JiraSprintEntity).where(JiraSprintEntity.id == sprint_id)
+
+        if not include_deleted:
+            query = query.where(col(JiraSprintEntity.is_deleted) == False)  # noqa: E712
+
+        result = await self.session.exec(query)
+        sprint = result.first()
         return self._to_domain(sprint) if sprint else None
 
-    async def get_sprints_by_project_key(self, project_key: str) -> List[JiraSprintModel]:
-        result = await self.session.exec(
-            select(JiraSprintEntity).where(col(JiraSprintEntity.project_key) == project_key))
+    async def get_sprints_by_project_key(self, project_key: str, include_deleted: bool = False) -> List[JiraSprintModel]:
+        """Get all sprints for a project"""
+        query = select(JiraSprintEntity).where(col(JiraSprintEntity.project_key) == project_key)
+
+        if not include_deleted:
+            query = query.where(col(JiraSprintEntity.is_deleted) == False)  # noqa: E712
+
+        result = await self.session.exec(query)
         sprints = result.all()
         return [self._to_domain(sprint) for sprint in sprints]
 
@@ -95,26 +114,32 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             log.error(f"Error updating sprint {jira_sprint_id}: {str(e)}")
             raise
 
-    async def get_project_sprints(self, project_key: str) -> List[JiraSprintModel]:
+    async def get_project_sprints(self, project_key: str, include_deleted: bool = False) -> List[JiraSprintModel]:
         """Get all sprints for a specific project"""
         log.info(f"Getting sprints for project {project_key}")
-        result = await self.session.exec(
-            select(JiraSprintEntity).where(
-                col(JiraSprintEntity.project_key) == project_key
+        query = select(JiraSprintEntity).where(
+            and_(
+                col(JiraSprintEntity.project_key) == project_key,
+                not_(col(JiraSprintEntity.is_deleted)) if not include_deleted else True
             )
         )
+
+        result = await self.session.exec(query)
         sprints = result.all()
-        log.info(f"Found {len(sprints)} sprints for project {project_key}")
+        log.info(f"Found {len(sprints)} active sprints for project {project_key}")
         return [self._to_domain(sprint) for sprint in sprints]
 
     async def get_current_sprint(self, project_key: str) -> Optional[JiraSprintModel]:
-        result = await self.session.exec(
-            select(JiraSprintEntity).where(
+        """Get current active sprint for a project"""
+        query = select(JiraSprintEntity).where(
+            and_(
                 col(JiraSprintEntity.project_key) == project_key,
-                col(JiraSprintEntity.state) == JiraSprintState.ACTIVE
+                col(JiraSprintEntity.state) == JiraSprintState.ACTIVE.value,
+                col(JiraSprintEntity.is_deleted) == False  # noqa: E712
             )
         )
 
+        result = await self.session.exec(query)
         sprint = result.first()
         return self._to_domain(sprint) if sprint else None
 

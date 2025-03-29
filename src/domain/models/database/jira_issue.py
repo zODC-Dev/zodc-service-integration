@@ -45,6 +45,7 @@ class JiraIssueDBCreateDTO(BaseModel):
             is_system_linked=False,
             is_deleted=False,
             link_url=entity.link_url,
+            sprints=entity.sprints,
         )
 
     @classmethod
@@ -63,6 +64,7 @@ class JiraIssueDBCreateDTO(BaseModel):
             created_at=domain.created_at,
             updated_at=domain.updated_at,
             link_url=domain.link_url,
+            sprints=domain.sprints,
         )
 
     @field_validator('status')

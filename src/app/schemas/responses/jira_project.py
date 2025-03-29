@@ -6,7 +6,7 @@ from src.domain.models.jira_sprint import JiraSprintModel
 
 
 class GetJiraProjectResponse(BaseResponse):
-    id: Optional[int] = None
+    id: Optional[str] = None
     key: str
     name: str
     description: Optional[str] = None
@@ -16,7 +16,7 @@ class GetJiraProjectResponse(BaseResponse):
     @classmethod
     def from_domain(cls, project: JiraProjectModel) -> "GetJiraProjectResponse":
         return cls(
-            id=project.id,
+            id=project.jira_project_id,
             key=project.key,
             name=project.name,
             description=project.description,
@@ -29,11 +29,13 @@ class GetJiraSprintResponse(BaseResponse):
     id: int
     name: str
     state: str  # active, closed, future
+    is_current: bool = False
 
     @classmethod
     def from_domain(cls, sprint: JiraSprintModel) -> "GetJiraSprintResponse":
         return cls(
             id=sprint.id,
             name=sprint.name,
-            state=sprint.state
+            state=sprint.state,
+            is_current=sprint.is_current
         )

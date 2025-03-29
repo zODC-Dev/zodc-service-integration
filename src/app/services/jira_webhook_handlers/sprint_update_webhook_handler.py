@@ -49,7 +49,8 @@ class SprintUpdateWebhookHandler(JiraWebhookHandler):
             end_date=sprint_data.end_date,
             complete_date=sprint_data.complete_date,
             goal=sprint_data.goal,
-            updated_at=datetime.now(timezone.utc)
+            updated_at=datetime.now(timezone.utc),
+            board_id=sprint_data.board_id
         )
 
         updated_sprint = await self.sprint_database_service.update_sprint_by_jira_sprint_id(sprint_id, update_dto)

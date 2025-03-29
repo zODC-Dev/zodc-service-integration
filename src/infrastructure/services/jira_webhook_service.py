@@ -6,6 +6,7 @@ from src.app.services.jira_webhook_handlers.issue_update_webhook_handler import 
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.app.services.jira_webhook_handlers.sprint_close_webhook_handler import SprintCloseWebhookHandler
 from src.app.services.jira_webhook_handlers.sprint_create_webhook_handler import SprintCreateWebhookHandler
+from src.app.services.jira_webhook_handlers.sprint_delete_webhook_handler import SprintDeleteWebhookHandler
 from src.app.services.jira_webhook_handlers.sprint_start_webhook_handler import SprintStartWebhookHandler
 from src.app.services.jira_webhook_handlers.sprint_update_webhook_handler import SprintUpdateWebhookHandler
 from src.configs.logger import log
@@ -62,7 +63,9 @@ class JiraWebhookService:
                 SprintStartWebhookHandler(self.sprint_database_service, self.sync_log_repository,
                                           self.jira_sprint_api_service),
                 SprintCloseWebhookHandler(self.sprint_database_service, self.sync_log_repository,
-                                          self.jira_sprint_api_service)
+                                          self.jira_sprint_api_service),
+                SprintDeleteWebhookHandler(self.sprint_database_service, self.sync_log_repository,
+                                           self.jira_sprint_api_service)
             ]
 
         # Combine all handlers

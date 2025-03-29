@@ -57,7 +57,7 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
                 create_dto = JiraSprintDBCreateDTO(
                     jira_sprint_id=sprint_id,
                     name=sprint_data.name,
-                    state=JiraSprintState.ACTIVE,  # Set as ACTIVE since it's a start event
+                    state=JiraSprintState.ACTIVE.value,  # Set as ACTIVE since it's a start event
                     start_date=sprint_data.start_date or datetime.now(timezone.utc),
                     end_date=sprint_data.end_date,
                     complete_date=None,
@@ -78,11 +78,12 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
                 log.info(f"Updating existing sprint {sprint_id}")
                 update_dto = JiraSprintDBUpdateDTO(
                     name=sprint_data.name,
-                    state=JiraSprintState.ACTIVE,  # Ensure state is ACTIVE
+                    state=JiraSprintState.ACTIVE.value,  # Ensure state is ACTIVE
                     start_date=sprint_data.start_date or datetime.now(timezone.utc),
                     end_date=sprint_data.end_date,
                     goal=sprint_data.goal,
-                    updated_at=datetime.now(timezone.utc)
+                    updated_at=datetime.now(timezone.utc),
+                    board_id=sprint_data.board_id
                 )
                 updated_sprint = await self.sprint_database_service.update_sprint_by_jira_sprint_id(sprint_id, update_dto)
                 if not updated_sprint:
@@ -94,12 +95,12 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
             # Log sync event
             await self.sync_log_repository.create_sync_log(
                 SyncLogDBCreateDTO(
-                    entity_type=EntityType.SPRINT,
+                    entity_type=EntityType.SPRINT.value,
                     entity_id=str(sprint_id),
                     operation=operation_type,
                     request_payload=webhook_data.model_dump(),
                     response_status=200,
-                    response_body={"state": JiraSprintState.ACTIVE},
+                    response_body={"state": JiraSprintState.ACTIVE.value},
                     source=SourceType.WEBHOOK,
                     sender=None
                 )

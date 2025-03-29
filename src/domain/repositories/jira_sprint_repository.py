@@ -15,11 +15,11 @@ class IJiraSprintRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_sprint_by_id(self, sprint_id: int) -> Optional[JiraSprintModel]:
+    async def get_sprint_by_id(self, sprint_id: int, include_deleted: bool = False) -> Optional[JiraSprintModel]:
         pass
 
     @abstractmethod
-    async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int) -> Optional[JiraSprintModel]:
+    async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int, include_deleted: bool = False) -> Optional[JiraSprintModel]:
         pass
 
     @abstractmethod
@@ -27,7 +27,12 @@ class IJiraSprintRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_project_sprints(self, project_key: str) -> List[JiraSprintModel]:
+    async def get_sprints_by_project_key(self, project_key: str, include_deleted: bool = False) -> List[JiraSprintModel]:
+        """Get all sprints for a project"""
+        pass
+
+    @abstractmethod
+    async def get_project_sprints(self, project_key: str, include_deleted: bool = False) -> List[JiraSprintModel]:
         """Get all sprints for a specific project"""
         pass
 

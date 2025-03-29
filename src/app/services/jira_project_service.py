@@ -128,7 +128,7 @@ class JiraProjectApplicationService:
             async with self.sync_session as session:
                 # Sync project details
                 log.info("Syncing project details...")
-                project = await self._sync_project_details(request.user_id, request.project_key, session)
+                project = await self._sync_project_details(request.user_id, request.project_key, request.project_id, session)
 
                 # Sync project users
                 log.info("Syncing project users...")
@@ -169,6 +169,7 @@ class JiraProjectApplicationService:
         self,
         user_id: int,
         project_key: str,
+        project_id: int,
         session: IJiraSyncSession
     ) -> JiraProjectModel:
         try:
@@ -184,9 +185,11 @@ class JiraProjectApplicationService:
             if existing_project and existing_project.id:
                 # Update existing project
                 update_dto = JiraProjectDBUpdateDTO(
+                    project_id=project_id,
                     name=project_details.name,
                     avatar_url=project_details.avatar_url,
-                    description=project_details.description
+                    description=project_details.description,
+                    is_system_linked=True
                 )
                 return await session.project_repository.update_project(
                     existing_project.id,
@@ -195,11 +198,13 @@ class JiraProjectApplicationService:
             else:
                 # Create new project
                 create_dto = JiraProjectDBCreateDTO(
+                    project_id=project_id,
                     jira_project_id=project_details.jira_project_id,
                     key=project_details.key,
                     name=project_details.name,
                     description=project_details.description,
                     avatar_url=project_details.avatar_url,
+                    is_system_linked=True,
                     user_id=user_id
                 )
                 return await session.project_repository.create_project(create_dto)
@@ -330,6 +335,7 @@ class JiraProjectApplicationService:
                 project_key=project_key,
                 limit=1000
             )
+            log.info(f"Jira issues: {jira_issues}")
 
             synced_issues = []
             for jira_issue in jira_issues:
@@ -343,6 +349,7 @@ class JiraProjectApplicationService:
                     )
 
                     if existing_issue:
+                        log.info(f"Existing issue: {existing_issue} 111111111")
                         if jira_issue.updated_at > existing_issue.last_synced_at:
                             # Update existing issue with new data
                             updated_issue = await session.issue_repository.update(
@@ -353,6 +360,7 @@ class JiraProjectApplicationService:
                     else:
                         # Create new issue
                         issue_create_dto = JiraIssueDBCreateDTO._from_domain(jira_issue)
+                        log.info(f"Issue create dto: {issue_create_dto} 222222222")
                         new_issue = await session.issue_repository.create(issue_create_dto)
                         synced_issues.append(new_issue)
 

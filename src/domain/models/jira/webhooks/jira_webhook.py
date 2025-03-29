@@ -202,7 +202,7 @@ class BaseJiraWebhookDTO(BaseModel):
         if not data or ("webhookEvent" not in data and "webhook_event" not in data):
             raise ValueError("Invalid webhook payload: missing webhookEvent field")
 
-        webhook_event = data.get("webhookEvent") or data.get("webhook_event")
+        webhook_event: str = data.get("webhookEvent") or data.get("webhook_event")
 
         # Chuẩn hóa event name
         normalized_event = webhook_event
@@ -218,6 +218,8 @@ class BaseJiraWebhookDTO(BaseModel):
             normalized_event = "jira:sprint_started"
         elif webhook_event == "sprint_closed":
             normalized_event = "jira:sprint_closed"
+        elif webhook_event == "sprint_deleted":
+            normalized_event = "jira:sprint_deleted"
         # Thêm các điều kiện cho user events
         elif webhook_event == "user_created":
             normalized_event = "jira:user_created"
@@ -265,8 +267,8 @@ class JiraIssueWebhookDTO(BaseJiraWebhookDTO):
 
 class JiraSprintWebhookDTO(BaseJiraWebhookDTO):
     """DTO for sprint-related webhooks"""
-    event_types: ClassVar[List[str]] = ["jira:sprint_created", "jira:sprint_updated", "jira:sprint_started", "jira:sprint_closed",
-                                        "sprint_created", "sprint_updated", "sprint_started", "sprint_closed"]
+    event_types: ClassVar[List[str]] = ["jira:sprint_created", "jira:sprint_updated", "jira:sprint_deleted", "jira:sprint_started", "jira:sprint_closed",
+                                        "sprint_created", "sprint_updated", "sprint_started", "sprint_closed", "sprint_deleted"]
 
     sprint: JiraSprint
     user: Optional[JiraUser] = None

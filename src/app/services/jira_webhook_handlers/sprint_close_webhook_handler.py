@@ -44,7 +44,7 @@ class SprintCloseWebhookHandler(JiraWebhookHandler):
         # Update sprint in database with latest data
         update_dto = JiraSprintDBUpdateDTO(
             name=sprint_data.name,
-            state=JiraSprintState.CLOSED,  # Ensure state is CLOSED
+            state=JiraSprintState.CLOSED.value,  # Ensure state is CLOSED
             start_date=sprint_data.start_date,
             end_date=sprint_data.end_date,
             complete_date=sprint_data.complete_date or datetime.now(timezone.utc),
@@ -64,7 +64,7 @@ class SprintCloseWebhookHandler(JiraWebhookHandler):
                 operation=OperationType.UPDATE,
                 request_payload=webhook_data.model_dump(),
                 response_status=200,
-                response_body={"state": JiraSprintState.CLOSED},
+                response_body={"state": JiraSprintState.CLOSED.value},
                 source=SourceType.WEBHOOK,
                 sender=None
             )
