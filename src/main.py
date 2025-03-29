@@ -10,6 +10,7 @@ from redis.asyncio import Redis
 
 from src.app.routers.jira_issue_router import router as jira_issue_router
 from src.app.routers.jira_project_router import router as jira_project_router
+from src.app.routers.jira_sprint_analytics_router import router as jira_sprint_analytics_router
 from src.app.routers.jira_webhook_router import router as jira_webhook_router
 from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
 from src.app.routers.util_router import router as util_router
@@ -281,6 +282,8 @@ app.include_router(jira_project_router, prefix=settings.API_V1_STR + "/jira/proj
 app.include_router(jira_issue_router, prefix=settings.API_V1_STR + "/jira/issues", tags=["jira_issues"])
 app.include_router(microsoft_calendar_router, prefix=settings.API_V1_STR + "/microsoft", tags=["microsoft"])
 app.include_router(jira_webhook_router, prefix=settings.API_V1_STR + "/jira-webhook", tags=["jira_webhook"])
+app.include_router(jira_sprint_analytics_router, prefix=settings.API_V1_STR +
+                   "/jira/sprint-analytics", tags=["jira_sprint_analytics"])
 
 if __name__ == "__main__":
     import uvicorn

@@ -239,7 +239,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
 
         return issues
 
-    async def get_sprint_by_id(self, user_id: int, sprint_id: str) -> Optional[JiraSprintModel]:
+    async def get_sprint_by_id(self, user_id: int, sprint_id: int) -> Optional[JiraSprintModel]:
         """Lấy thông tin chi tiết về một sprint cụ thể"""
         try:
             response_data = await self.client.get(
