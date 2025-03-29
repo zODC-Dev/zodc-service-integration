@@ -261,7 +261,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
     async def get_project_issues(
         self,
         project_key: str,
-        sprint_id: Optional[str] = None,
+        sprint_id: Optional[int] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
         search: Optional[str] = None,
@@ -283,13 +283,13 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
             # Add sprint filter
             if sprint_id or is_backlog is not None:
+                log.info(f"Sprint ID: {sprint_id}, Is backlog: {is_backlog}")
                 if sprint_id:
-                    sprint_number = int(sprint_id)
                     # Join with issue_sprint table to filter by sprint_id
                     query = query.join(
                         JiraIssueSprintEntity,
                         col(JiraIssueEntity.jira_issue_id) == col(JiraIssueSprintEntity.jira_issue_id)
-                    ).where(col(JiraIssueSprintEntity.jira_sprint_id) == sprint_number)
+                    ).where(col(JiraIssueSprintEntity.jira_sprint_id) == sprint_id)
                 elif is_backlog:
                     # Issues without any sprint are in backlog
                     query = query.outerjoin(
@@ -297,6 +297,12 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                         col(JiraIssueEntity.jira_issue_id) == col(JiraIssueSprintEntity.jira_issue_id)
                     ).where(col(JiraIssueSprintEntity.jira_sprint_id) == None)  # noqa: E711
 
+            else:
+                log.info("No sprint ID or is_backlog provided")
+                query = query.join(
+                    JiraIssueSprintEntity,
+                    col(JiraIssueEntity.jira_issue_id) == col(JiraIssueSprintEntity.jira_issue_id)
+                )
             # Add issue type filter
             if issue_type:
                 query = query.where(col(JiraIssueEntity.type) == issue_type.value)

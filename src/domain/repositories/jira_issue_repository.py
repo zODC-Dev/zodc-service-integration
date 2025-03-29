@@ -27,7 +27,7 @@ class IJiraIssueRepository(ABC):
     async def get_project_issues(
         self,
         project_key: str,
-        sprint_id: Optional[str] = None,
+        sprint_id: Optional[int] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
         search: Optional[str] = None,

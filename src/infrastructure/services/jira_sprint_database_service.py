@@ -66,3 +66,6 @@ class JiraSprintDatabaseService(IJiraSprintDatabaseService):
             sprint.is_current = sprint.id == current_sprint_id
 
         return sprints
+
+    async def get_current_sprint(self, project_key: str) -> Optional[JiraSprintModel]:
+        return await self.sprint_repository.get_current_sprint(project_key)

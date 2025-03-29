@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus
@@ -10,6 +10,7 @@ from src.domain.models.jira_sprint_analytics import (
     SprintAnalyticsBaseModel,
     SprintBurndownModel,
     SprintBurnupModel,
+    SprintScopeChange,
 )
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
@@ -121,8 +122,14 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
         # Tính tổng điểm ban đầu
         total_points_initial = sum(issue.estimate_point or 0 for issue in issues)
+
+        # Tính toán scope changes và tổng điểm hiện tại
+        scope_changes, daily_scope_points = self._calculate_scope_changes(
+            issues, start_date, end_date, sprint.id
+        )
+
         # Tổng điểm hiện tại (có thể thay đổi do scope changes)
-        total_points_current = total_points_initial
+        total_points_current = total_points_initial + sum(change.points_added for change in scope_changes)
 
         # Danh sách các ngày trong sprint
         days = []
@@ -138,15 +145,36 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
             progress_ratio = i / max(len(days) - 1, 1)  # Tránh chia cho 0
             ideal_remaining = total_points_initial * (1 - progress_ratio)
 
-            # Giả định: trong thực tế cần lấy trạng thái issue vào thời điểm ngày đó
-            # Ở đây đơn giản hóa bằng cách sử dụng trạng thái hiện tại
+            # Format ngày hiện tại để so sánh với daily_scope_points
+            day_str = day.strftime("%Y-%m-%d")
+
+            # Lấy số điểm được thêm vào cho ngày này
+            added_points = daily_scope_points.get(day_str, 0)
+
+            # Tính toán điểm hoàn thành dựa trên trạng thái và hạn của issues
+            # Filter issues có trong sprint tính đến ngày day
+            current_issues = [
+                issue for issue in issues
+                if self._is_issue_in_sprint_at_date(issue, sprint.id, day)
+            ]
+
+            log.info(f"Day: {day}, issues: {len(issues)}, current issues: {len(current_issues)}")
+
+            # Tính completed_points - những issues đã Done tính đến ngày day
             completed_points = sum(
                 (issue.estimate_point or 0)
-                for issue in issues
-                if issue.status == JiraIssueStatus.DONE
+                for issue in current_issues
+                if issue.status == JiraIssueStatus.DONE and
+                (issue.updated_at is None or issue.updated_at <= day)
             )
 
-            remaining_points = total_points_current - completed_points
+            # Tính total points cho đến ngày này
+            total_points_day = total_points_initial
+            for d in range(i + 1):
+                d_str = days[d].strftime("%Y-%m-%d")
+                total_points_day += daily_scope_points.get(d_str, 0)
+
+            remaining_points = total_points_day - completed_points
 
             # Tạo daily data
             daily_data.append(DailySprintData(
@@ -154,12 +182,8 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
                 remaining_points=remaining_points,
                 completed_points=completed_points,
                 ideal_points=ideal_remaining,
-                added_points=0  # Mặc định là 0, sẽ cập nhật nếu có scope changes
+                added_points=added_points
             ))
-
-        # Giả định: Trong thực tế cần truy vấn lịch sử thay đổi của issues để xác định scope changes
-        # Ở đây đơn giản hóa bằng cách giả định không có scope changes
-        scope_changes = []
 
         return SprintAnalyticsBaseModel(
             id=sprint.id,
@@ -172,3 +196,75 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
             daily_data=daily_data,
             scope_changes=scope_changes
         )
+
+    def _is_issue_in_sprint_at_date(self, issue: JiraIssueModel, sprint_id: int, date: datetime) -> bool:
+        """Kiểm tra xem issue có thuộc sprint vào một ngày cụ thể không"""
+        # Nếu issue không có sprint, return False
+        if not issue.sprints:
+            return False
+
+        # Kiểm tra nếu issue thuộc sprint và được tạo trước hoặc trong ngày đang xét
+        for sprint in issue.sprints:
+            if sprint and sprint.jira_sprint_id == sprint_id and issue.created_at <= date:
+                return True
+
+        return False
+
+    def _calculate_scope_changes(
+        self,
+        issues: List[JiraIssueModel],
+        start_date: datetime,
+        end_date: datetime,
+        sprint_id: int
+    ) -> Tuple[List[SprintScopeChange], Dict[str, float]]:
+        """Tính toán các thay đổi phạm vi dựa trên lịch sử issues"""
+        # Giả định: Trong thực tế cần truy vấn lịch sử thay đổi của issues để xác định scope changes chính xác
+
+        # Dictionary lưu trữ dữ liệu scope change theo ngày
+        daily_scope_points: Dict[str, float] = {}
+        scope_changes: List[SprintScopeChange] = []
+
+        # Mô phỏng phân tích scope changes dựa trên ngày tạo issues
+        # (Trong thực tế cần query lịch sử issue từ database)
+
+        # Group issues theo ngày được thêm vào sprint
+        issues_by_day: Dict[str, List[JiraIssueModel]] = {}
+
+        # Đơn giản hóa: coi ngày tạo issue là ngày được thêm vào sprint
+        # Nếu issue được tạo sau ngày sprint bắt đầu, coi như một scope change
+        for issue in issues:
+            # Bỏ qua các issue được tạo trước khi sprint bắt đầu (coi là phạm vi ban đầu)
+            if issue.created_at and issue.created_at > start_date:
+                # Format ngày tạo để gom nhóm
+                created_date_str = issue.created_at.strftime("%Y-%m-%d")
+
+                # Chỉ tính các ngày trong khoảng thời gian sprint
+                if start_date <= issue.created_at <= end_date:
+                    if created_date_str not in issues_by_day:
+                        issues_by_day[created_date_str] = []
+
+                    issues_by_day[created_date_str].append(issue)
+
+        # Tạo scope change entry cho mỗi ngày có issue mới
+        for date_str, day_issues in issues_by_day.items():
+            total_points = sum(issue.estimate_point or 0 for issue in day_issues)
+
+            # Chỉ tạo scope change nếu có điểm được thêm vào
+            if total_points > 0:
+                issue_keys = [issue.key for issue in day_issues]
+                date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+
+                # Tạo scope change object
+                scope_change = SprintScopeChange(
+                    date=date_obj,
+                    points_added=total_points,
+                    issue_keys=issue_keys
+                )
+
+                scope_changes.append(scope_change)
+                daily_scope_points[date_str] = total_points
+
+        # Sắp xếp scope changes theo ngày
+        scope_changes.sort(key=lambda x: x.date)
+
+        return scope_changes, daily_scope_points

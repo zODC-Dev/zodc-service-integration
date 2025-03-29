@@ -23,7 +23,7 @@ router = APIRouter()
 async def get_project_issues(
     project_key: str,
     claims: JWTClaims = Depends(get_jwt_claims),
-    sprint_id: Optional[str] = Query(
+    sprint_id: Optional[int | str] = Query(
         None, alias="sprintId", description="Filter by sprint number (use 'backlog' for backlog items)"),
     issue_type: Optional[JiraIssueType] = Query(
         None, alias="issueType", description="Filter by issue type (Bug, Task, Story, Epic)"),
@@ -36,6 +36,8 @@ async def get_project_issues(
     if sprint_id == "backlog":
         is_backlog = True
         sprint_id = None
+    elif sprint_id:
+        sprint_id = int(sprint_id)
 
     return await controller.get_project_issues(
         user_id=int(claims.sub),

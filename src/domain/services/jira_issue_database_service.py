@@ -35,7 +35,7 @@ class IJiraIssueDatabaseService(ABC):
         self,
         user_id: int,
         project_key: str,
-        sprint_id: Optional[str] = None,
+        sprint_id: Optional[int] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
         search: Optional[str] = None,

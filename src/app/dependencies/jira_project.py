@@ -76,7 +76,8 @@ def get_jira_project_application_service(
 
 def get_jira_project_controller(
     app_service: JiraProjectApplicationService = Depends(get_jira_project_application_service),
-    project_repository: IJiraProjectRepository = Depends(get_jira_project_repository)
+    project_repository: IJiraProjectRepository = Depends(get_jira_project_repository),
+    jira_sprint_db_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service)
 ) -> JiraProjectController:
     """Get Jira project controller instance."""
-    return JiraProjectController(app_service, project_repository)
+    return JiraProjectController(app_service, project_repository, jira_sprint_db_service)

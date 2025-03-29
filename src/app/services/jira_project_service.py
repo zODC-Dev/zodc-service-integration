@@ -51,13 +51,12 @@ class JiraProjectApplicationService:
         self,
         user_id: int,
         project_key: str,
-        sprint_id: Optional[str] = None,
+        sprint_id: Optional[int] = None,
         is_backlog: Optional[bool] = None,
         issue_type: Optional[JiraIssueType] = None,
         search: Optional[str] = None,
         limit: int = 50
     ) -> List[JiraIssueModel]:
-        # Thay vì gọi API service, gọi database service
         return await self.jira_issue_db_service.get_project_issues(
             user_id=user_id,
             project_key=project_key,

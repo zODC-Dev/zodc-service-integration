@@ -72,7 +72,7 @@ class GetJiraIssueResponse(BaseResponse):
     def from_domain(cls, issue: JiraIssueModel, sprint_number: Optional[int] = None) -> "GetJiraIssueResponse":
 
         current_sprint: Optional[JiraIssueSprintResponse] = None
-        if issue.sprints:
+        if issue.sprints and sprint_number:
             current_sprint = JiraIssueSprintResponse.from_domain(
                 next((sprint for sprint in issue.sprints if (
                     sprint and sprint.jira_sprint_id == sprint_number)), None)
