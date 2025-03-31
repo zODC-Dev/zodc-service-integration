@@ -7,6 +7,7 @@ from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JiraIssueStatu
 from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.jira.apis.mappers.jira_issue import JiraIssueMapper
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
+from src.domain.models.jira.apis.responses.jira_changelog import JiraIssueChangelogResponseDTO
 from src.domain.models.jira.apis.responses.jira_issue import JiraIssueAPIGetResponseDTO
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
@@ -475,3 +476,80 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         except Exception as e:
             log.error(f"Error creating issue link: {str(e)}")
             return False
+
+    async def get_issue_changelog(self, issue_id: str) -> JiraIssueChangelogResponseDTO:
+        """Lấy lịch sử thay đổi của issue từ Jira API"""
+        try:
+            # Endpoint cho changelog
+            url = f"/rest/api/3/issue/{issue_id}/changelog"
+
+            # Tham số mở rộng để lấy tất cả changelog (mặc định Jira giới hạn số lượng)
+            params = {
+                "maxResults": 100,  # Có thể điều chỉnh số lượng tùy theo nhu cầu
+                "startAt": 0
+            }
+
+            # Lấy tất cả changelog
+            all_changelogs = []
+            start_at = 0
+            max_results = 100
+            total = None
+
+            while True:
+                params["startAt"] = start_at
+                params["maxResults"] = max_results
+
+                response_data = await self.client.get(
+                    url,
+                    self.system_user_id,
+                    params=params,
+                    error_msg=f"Error getting changelog for issue {issue_id}"
+                )
+
+                log.info(f"Response data when get changelog: {response_data}")
+
+                if not response_data:
+                    break
+
+                # Debug: In ra cấu trúc của một changelog (chỉ in ra khi tìm thấy dữ liệu)
+                values = response_data.get("values", [])
+                if values and len(values) > 0 and not all_changelogs:
+                    log.debug(f"Sample changelog structure: {values[0]}")
+                    if 'author' in values[0]:
+                        log.debug(f"Sample author structure: {values[0]['author']}")
+
+                all_changelogs.extend(values)
+
+                # Lấy thông tin phân trang
+                total = response_data.get("total", 0) if total is None else total
+                is_last = response_data.get("isLast", True)
+
+                if is_last or len(values) < max_results:
+                    break
+
+                start_at += len(values)
+
+            # Tạo response DTO
+            changelog_response = {
+                "values": all_changelogs,
+                "startAt": 0,
+                "maxResults": len(all_changelogs),
+                "total": total or len(all_changelogs),
+                "isLast": True
+            }
+
+            # Map kết quả sang DTO
+            try:
+                return JiraIssueChangelogResponseDTO(**changelog_response)
+            except Exception as validation_error:
+                # Ghi log chi tiết về lỗi validation để debug
+                log.error(f"DTO validation error: {str(validation_error)}")
+                # Xem thử cấu trúc của dữ liệu author để phát hiện vấn đề
+                if all_changelogs and len(all_changelogs) > 0 and 'author' in all_changelogs[0]:
+                    log.error(f"Author structure: {all_changelogs[0]['author']}")
+                raise
+
+        except Exception as e:
+            log.error(f"Error getting changelog for issue {issue_id}: {str(e)}")
+            # Trả về DTO rỗng
+            return JiraIssueChangelogResponseDTO(values=[], startAt=0, maxResults=0, total=0, isLast=True)

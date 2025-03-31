@@ -6,6 +6,7 @@ from .base import BaseEntityWithTimestamps
 
 if TYPE_CHECKING:
     from src.infrastructure.entities.jira_issue import JiraIssueEntity
+    from src.infrastructure.entities.jira_issue_history import JiraIssueHistoryEntity
     from src.infrastructure.entities.jira_project import JiraProjectEntity
 
 
@@ -34,4 +35,9 @@ class JiraUserEntity(BaseEntityWithTimestamps, table=True):
     projects: List["JiraProjectEntity"] = Relationship(
         back_populates="user",
         sa_relationship_kwargs={"foreign_keys": "[JiraProjectEntity.user_id]"}
+    )
+
+    issue_histories: List["JiraIssueHistoryEntity"] = Relationship(
+        back_populates="author",
+        sa_relationship_kwargs={"lazy": "selectin"}
     )

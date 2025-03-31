@@ -11,6 +11,7 @@ from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
+from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
 from src.domain.services.jira_user_api_service import IJiraUserAPIService
@@ -30,7 +31,8 @@ class JiraWebhookHandler(ABC):
         jira_sprint_api_service: Optional[IJiraSprintAPIService] = None,
         jira_user_repository: Optional[IJiraUserRepository] = None,
         jira_user_api_service: Optional[IJiraUserAPIService] = None,
-        user_database_service: Optional[IJiraUserDatabaseService] = None
+        user_database_service: Optional[IJiraUserDatabaseService] = None,
+        jira_issue_history_service: Optional[IJiraIssueHistoryDatabaseService] = None
     ):
         self.jira_issue_repository = jira_issue_repository
         self.sync_log_repository = sync_log_repository
@@ -40,6 +42,7 @@ class JiraWebhookHandler(ABC):
         self.jira_user_repository = jira_user_repository
         self.jira_user_api_service = jira_user_api_service
         self.user_database_service = user_database_service
+        self.jira_issue_history_service = jira_issue_history_service
 
     @abstractmethod
     async def can_handle(self, webhook_event: str) -> bool:

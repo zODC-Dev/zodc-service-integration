@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, List, Optional
 from sqlmodel import Column, DateTime, Field, Relationship
 
 from src.infrastructure.entities.base import BaseEntityWithTimestamps
+from src.infrastructure.entities.jira_issue_history import JiraIssueHistoryEntity
 from src.infrastructure.entities.jira_issue_sprint import JiraIssueSprintEntity
 
 if TYPE_CHECKING:
@@ -49,4 +50,8 @@ class JiraIssueEntity(BaseEntityWithTimestamps, table=True):
     reporter: Optional["JiraUserEntity"] = Relationship(
         back_populates="reported_issues",
         sa_relationship_kwargs={"foreign_keys": "[JiraIssueEntity.reporter_id]", "lazy": "selectin"}
+    )
+    histories: List["JiraIssueHistoryEntity"] = Relationship(
+        back_populates="issue",
+        sa_relationship_kwargs={"lazy": "selectin"}
     )

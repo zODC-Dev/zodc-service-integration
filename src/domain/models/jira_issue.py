@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
+from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
 
@@ -46,6 +47,7 @@ class JiraIssueModel(BaseModel):
     is_system_linked: bool = Field(default=False)
     is_deleted: bool = Field(default=False)
     link_url: Optional[str] = None
+    history_items: Optional[List[JiraIssueHistoryModel]] = None
 
     class Config:
         from_attributes = True

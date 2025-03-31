@@ -12,6 +12,7 @@ from src.domain.models.jira.webhooks.jira_webhook import (
 )
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
+from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
 from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQLAlchemyJiraSprintRepository
@@ -27,6 +28,7 @@ class JiraWebhookQueueService:
         self,
         jira_issue_api_service: IJiraIssueAPIService,
         jira_sprint_api_service: IJiraSprintAPIService,
+        jira_issue_history_service: IJiraIssueHistoryDatabaseService,
         webhook_handlers: List[JiraWebhookHandler]
     ):
         # Dùng PriorityQueue để đảm bảo xử lý theo thứ tự ưu tiên
@@ -54,6 +56,7 @@ class JiraWebhookQueueService:
         self.webhook_handlers = webhook_handlers
         self.retry_counts: Dict[str, int] = {}
         self.RETRY_DELAYS = [5, 30, 300]  # Retry delays in seconds: 5s, 30s, 5min
+        self.jira_issue_history_service = jira_issue_history_service
 
     def _start_retry_worker(self) -> None:
         """Khởi động worker xử lý retry queue"""
@@ -396,7 +399,7 @@ class JiraWebhookQueueService:
                 if result and "error" in result:
                     return False
 
-                log.info(f"Successfully processed {webhook_data.webhook_event} for issue {webhook_data.issue.id}")
+                log.info(f"Successfully processed {webhook_data.webhook_event} for issue {webhook_data}")
                 return True
 
         except Exception as e:

@@ -13,6 +13,7 @@ from src.domain.models.jira_sprint_analytics import (
     SprintScopeChange,
 )
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
+from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
 from src.domain.services.jira_sprint_analytics_service import IJiraSprintAnalyticsService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
@@ -25,11 +26,13 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         self,
         jira_project_api_service: IJiraProjectAPIService,
         jira_issue_db_service: IJiraIssueDatabaseService,
-        jira_sprint_db_service: IJiraSprintDatabaseService
+        jira_sprint_db_service: IJiraSprintDatabaseService,
+        jira_issue_history_db_service: IJiraIssueHistoryDatabaseService
     ):
         self.jira_project_api_service = jira_project_api_service
         self.jira_issue_db_service = jira_issue_db_service
         self.jira_sprint_db_service = jira_sprint_db_service
+        self.jira_issue_history_db_service = jira_issue_history_db_service
 
     async def get_sprint_burndown_data(
         self,
@@ -124,7 +127,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         total_points_initial = sum(issue.estimate_point or 0 for issue in issues)
 
         # Tính toán scope changes và tổng điểm hiện tại
-        scope_changes, daily_scope_points = self._calculate_scope_changes(
+        scope_changes, daily_scope_points = await self._calculate_scope_changes(
             issues, start_date, end_date, sprint.id
         )
 
@@ -210,7 +213,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
         return False
 
-    def _calculate_scope_changes(
+    async def _calculate_scope_changes(
         self,
         issues: List[JiraIssueModel],
         start_date: datetime,
@@ -218,51 +221,101 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         sprint_id: int
     ) -> Tuple[List[SprintScopeChange], Dict[str, float]]:
         """Tính toán các thay đổi phạm vi dựa trên lịch sử issues"""
-        # Giả định: Trong thực tế cần truy vấn lịch sử thay đổi của issues để xác định scope changes chính xác
-
         # Dictionary lưu trữ dữ liệu scope change theo ngày
         daily_scope_points: Dict[str, float] = {}
         scope_changes: List[SprintScopeChange] = []
 
-        # Mô phỏng phân tích scope changes dựa trên ngày tạo issues
-        # (Trong thực tế cần query lịch sử issue từ database)
+        # Lấy lịch sử thay đổi sprint của tất cả issues
+        sprint_histories = await self.jira_issue_history_db_service.get_sprint_issue_histories(
+            sprint_id=sprint_id,
+            from_date=start_date,
+            to_date=end_date
+        )
 
-        # Group issues theo ngày được thêm vào sprint
-        issues_by_day: Dict[str, List[JiraIssueModel]] = {}
+        # Filter chỉ lấy các thay đổi liên quan đến sprint và story points
+        sprint_changes = [h for h in sprint_histories if h.field_name == "sprint"]
+        story_point_changes = [h for h in sprint_histories if h.field_name == "story_points"]
 
-        # Đơn giản hóa: coi ngày tạo issue là ngày được thêm vào sprint
-        # Nếu issue được tạo sau ngày sprint bắt đầu, coi như một scope change
-        for issue in issues:
-            # Bỏ qua các issue được tạo trước khi sprint bắt đầu (coi là phạm vi ban đầu)
-            if issue.created_at and issue.created_at > start_date:
-                # Format ngày tạo để gom nhóm
-                created_date_str = issue.created_at.strftime("%Y-%m-%d")
+        # Phân tích thay đổi sprint
+        for change in sprint_changes:
+            # Chỉ xét các thay đổi khi issue được thêm vào sprint
+            new_value = change.new_value_parsed
+            if new_value and str(sprint_id) in str(new_value):
+                # Tìm issue tương ứng
+                issue = next((i for i in issues if i.jira_issue_id == change.jira_issue_id), None)
+                if not issue:
+                    continue
 
-                # Chỉ tính các ngày trong khoảng thời gian sprint
-                if start_date <= issue.created_at <= end_date:
-                    if created_date_str not in issues_by_day:
-                        issues_by_day[created_date_str] = []
+                # Ngày thay đổi
+                change_date_str = change.created_at.strftime("%Y-%m-%d")
 
-                    issues_by_day[created_date_str].append(issue)
+                # Nếu issue được thêm vào sau khi sprint bắt đầu, đây là scope change
+                if change.created_at > start_date:
+                    points = issue.estimate_point or 0
 
-        # Tạo scope change entry cho mỗi ngày có issue mới
-        for date_str, day_issues in issues_by_day.items():
-            total_points = sum(issue.estimate_point or 0 for issue in day_issues)
+                    # Cập nhật daily scope points
+                    if change_date_str not in daily_scope_points:
+                        daily_scope_points[change_date_str] = 0
+                    daily_scope_points[change_date_str] += points
 
-            # Chỉ tạo scope change nếu có điểm được thêm vào
-            if total_points > 0:
-                issue_keys = [issue.key for issue in day_issues]
-                date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+                    # Tạo scope change entry
+                    existing_change = next(
+                        (sc for sc in scope_changes if sc.date.strftime("%Y-%m-%d") == change_date_str),
+                        None
+                    )
 
-                # Tạo scope change object
-                scope_change = SprintScopeChange(
-                    date=date_obj,
-                    points_added=total_points,
-                    issue_keys=issue_keys
+                    if existing_change:
+                        existing_change.points_added += points
+                        existing_change.issue_keys.append(issue.key)
+                    else:
+                        scope_changes.append(
+                            SprintScopeChange(
+                                date=change.created_at,
+                                points_added=points,
+                                issue_keys=[issue.key]
+                            )
+                        )
+
+        # Phân tích thay đổi story points
+        for change in story_point_changes:
+            # Kiểm tra xem issue có thuộc sprint không
+            issue = next((i for i in issues if i.id == change.issue_id), None)
+            if not issue:
+                continue
+
+            # Ngày thay đổi
+            change_date_str = change.created_at.strftime("%Y-%m-%d")
+
+            # Tính toán điểm thay đổi
+            old_points = float(change.old_value or 0)
+            new_points = float(change.new_value or 0)
+            points_diff = new_points - old_points
+
+            # Nếu có thay đổi điểm và thời điểm thay đổi sau khi sprint bắt đầu
+            if points_diff != 0 and change.created_at > start_date:
+                # Cập nhật daily scope points
+                if change_date_str not in daily_scope_points:
+                    daily_scope_points[change_date_str] = 0
+                daily_scope_points[change_date_str] += points_diff
+
+                # Tạo hoặc cập nhật scope change entry
+                existing_change = next(
+                    (sc for sc in scope_changes if sc.date.strftime("%Y-%m-%d") == change_date_str),
+                    None
                 )
 
-                scope_changes.append(scope_change)
-                daily_scope_points[date_str] = total_points
+                if existing_change:
+                    existing_change.points_added += points_diff
+                    if issue.key not in existing_change.issue_keys:
+                        existing_change.issue_keys.append(issue.key)
+                else:
+                    scope_changes.append(
+                        SprintScopeChange(
+                            date=change.created_at,
+                            points_added=points_diff,
+                            issue_keys=[issue.key]
+                        )
+                    )
 
         # Sắp xếp scope changes theo ngày
         scope_changes.sort(key=lambda x: x.date)
