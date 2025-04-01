@@ -69,6 +69,8 @@ class Settings(BaseSettings):
     JIRA_SYSTEM_USER_ID: int = 37  # ID của service account
     JIRA_ADMIN_ORG_ID: str = "1234567890"
     JIRA_ADMIN_API_KEY: str = "1234567890"
+    # Azure Blob Storage settings
+    AZURE_STORAGE_ACCOUNT_CONTAINER_NAME: str = "media-files"
 
     class Config:
         """Configuration settings."""
