@@ -3,10 +3,10 @@ from uuid import UUID
 
 from fastapi import UploadFile
 
+from src.configs.settings import settings
 from src.domain.entities.media import Media
 from src.domain.repositories.media_repository import IMediaRepository
 from src.domain.services.blob_storage_service import IBlobStorageService
-from src.configs.settings import settings
 
 
 class MediaService:
