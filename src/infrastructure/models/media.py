@@ -16,7 +16,7 @@ class Media(BaseModelWithTimestamps, table=True):
     blob_url: str
     content_type: str
     size: int
-    uploaded_by: int = Field(foreign_key="users.id")
+    uploaded_by: int = Field(foreign_key="jira_users.id")
     container_name: str = "media-files"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
