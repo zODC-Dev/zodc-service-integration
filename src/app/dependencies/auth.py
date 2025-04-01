@@ -53,7 +53,11 @@ async def get_jwt_claims(request: Request) -> JWTClaims:
         system_permissions = []
 
     try:
-        project_roles = json.loads(headers.get("x-kong-jwt-claim-project_roles", "{}"))
+        # Now expecting project_roles as Dict[str, List[str]]
+        project_roles_str = headers.get("x-kong-jwt-claim-project_roles", "{}")
+        project_roles = json.loads(project_roles_str)
+        # Ensure values are lists
+        project_roles = {k: (v if isinstance(v, list) else [v]) for k, v in project_roles.items()}
     except json.JSONDecodeError:
         project_roles = {}
 
