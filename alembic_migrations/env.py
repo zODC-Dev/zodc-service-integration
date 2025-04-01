@@ -14,6 +14,7 @@ from sqlmodel import SQLModel
 from src.infrastructure.models.project import Project
 from src.infrastructure.models.user import User
 from src.infrastructure.models.refresh_token import RefreshToken
+from src.infrastructure.models.media import Media
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

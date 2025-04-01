@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     JIRA_CLIENT_ID: str = ""
     JIRA_CLIENT_SECRET: str = ""
 
+    # Azure Blob Storage settings
+    AZURE_STORAGE_ACCOUNT_CONTAINER_NAME: str = "media-files"
+
     class Config:
         """Configuration settings."""
 

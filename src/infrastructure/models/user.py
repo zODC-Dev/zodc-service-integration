@@ -6,7 +6,7 @@ from .base import BaseModelWithTimestamps
 
 
 class User(BaseModelWithTimestamps, table=True):
-    __tablename__ = "users"
+    __tablename__ = "jira_users"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
