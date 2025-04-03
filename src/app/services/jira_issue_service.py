@@ -169,7 +169,7 @@ class JiraIssueApplicationService:
                     user_id=request.user_id,
                     source_issue_id=link.source_issue_id,
                     target_issue_id=link.target_issue_id,
-                    relationship="relates to"  # Fixed relationship
+                    relationship="Relates"  # Fixed relationship
                 )
 
                 if success:

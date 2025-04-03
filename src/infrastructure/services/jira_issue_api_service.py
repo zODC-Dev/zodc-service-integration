@@ -318,6 +318,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
             # 3.1. Kiểm tra xem issue có đã ở trạng thái mong muốn chưa
             current_issue = await self.get_issue(user_id, issue_id)
+            if not current_issue:
+                log.error(f"Issue {issue_id} not found")
+                return False
+
             current_status_value = current_issue.status.value
             log.info(f"Current status of issue {issue_id} is {current_status_value}, wanted {status_value}")
 

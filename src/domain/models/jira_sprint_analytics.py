@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from pydantic import BaseModel
 
@@ -26,7 +26,7 @@ class DailySprintData(BaseModel):
     ideal_points: float
     added_points: float = 0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dict for API response"""
         return {
             "date": self.date.strftime("%Y-%m-%d"),

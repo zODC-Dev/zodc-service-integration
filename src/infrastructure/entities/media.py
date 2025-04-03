@@ -4,10 +4,10 @@ from uuid import UUID, uuid4
 
 from sqlmodel import Field
 
-from src.infrastructure.entities.base import BaseModelWithTimestamps
+from src.infrastructure.entities.base import BaseEntityWithTimestamps
 
 
-class Media(BaseModelWithTimestamps, table=True):
+class MediaEntity(BaseEntityWithTimestamps, table=True):
     __tablename__ = "media"
 
     id: Optional[int] = Field(default=None, primary_key=True)

@@ -11,11 +11,11 @@ class IJiraUserRepository(ABC):
         pass
 
     @abstractmethod
-    async def update_user(self, user_id: int, user_data: JiraUserDBUpdateDTO) -> Optional[JiraUserModel]:
+    async def update_user(self, user_id: int, user_data: JiraUserDBUpdateDTO) -> JiraUserModel:
         pass
 
     @abstractmethod
-    async def update_user_by_jira_account_id(self, account_id: str, user_data: JiraUserDBUpdateDTO) -> JiraUserModel:
+    async def update_user_by_jira_account_id(self, account_id: str, user_data: JiraUserDBUpdateDTO) -> Optional[JiraUserModel]:
         pass
 
     @abstractmethod

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 from uuid import UUID
 
-from src.domain.entities.media import Media
+from src.domain.models.media import Media
 
 
 class IMediaRepository(ABC):

@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
+from src.domain.models.database.refresh_token import RefreshTokenDBCreateDTO
 from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
 from src.domain.models.database.jira_user import JiraUserDBUpdateDTO
@@ -57,7 +58,7 @@ class JiraLoginMessageHandler(INATSMessageHandler):
             # Store refresh token
             expires_at = get_jwt_expiry(event.refresh_token) or datetime.now(
                 timezone.utc) + timedelta(seconds=event.expires_in * 2)
-            refresh_token = RefreshTokenModel(
+            refresh_token = RefreshTokenDBCreateDTO(
                 token=event.refresh_token,
                 user_id=event.user_id,
                 token_type=TokenType.JIRA,

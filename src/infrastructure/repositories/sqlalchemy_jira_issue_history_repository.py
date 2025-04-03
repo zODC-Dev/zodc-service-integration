@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 import uuid
 
-from sqlmodel import and_, select
+from sqlmodel import and_, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
@@ -25,8 +25,8 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
         try:
             stmt = select(JiraIssueHistoryEntity).where(
-                JiraIssueHistoryEntity.issue_id == issue_id
-            ).order_by(JiraIssueHistoryEntity.created_at)
+                JiraIssueHistoryEntity.jira_issue_id == issue_id
+            ).order_by(col(JiraIssueHistoryEntity.created_at))
 
             result = await self.session.exec(stmt)
             history_items = result.all()
@@ -45,10 +45,10 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
         try:
             stmt = select(JiraIssueHistoryEntity).where(
                 and_(
-                    JiraIssueHistoryEntity.issue_id == issue_id,
-                    JiraIssueHistoryEntity.field_name == field_name
+                    col(JiraIssueHistoryEntity.jira_issue_id) == issue_id,
+                    col(JiraIssueHistoryEntity.field_name) == field_name
                 )
-            ).order_by(JiraIssueHistoryEntity.created_at)
+            ).order_by(col(JiraIssueHistoryEntity.created_at))
 
             result = await self.session.exec(stmt)
             history_items = result.all()
@@ -133,8 +133,8 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                         )
                     )
 
-                    existing_item = await self.session.execute(stmt)
-                    existing_item = existing_item.scalar_one_or_none()
+                    result = await self.session.exec(stmt)
+                    existing_item = result.one_or_none()
                 except Exception as e:
                     log.error(f"Error checking for existing history item: {str(e)}")
                     # Nếu lỗi khi kiểm tra, giả định không có trùng lặp
@@ -189,8 +189,8 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
         """Lấy lịch sử thay đổi của tất cả issue trong một sprint"""
         try:
             # Lấy danh sách issue_id trong sprint
-            sprint_issues_stmt = select(JiraIssueSprintEntity.issue_id).where(
-                JiraIssueSprintEntity.sprint_id == sprint_id
+            sprint_issues_stmt = select(JiraIssueSprintEntity.jira_issue_id).where(
+                JiraIssueSprintEntity.jira_sprint_id == sprint_id
             )
             result = await self.session.exec(sprint_issues_stmt)
             issue_ids = result.all()
@@ -199,19 +199,19 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                 return []
 
             # Tạo query để lấy lịch sử của các issue
-            conditions = [JiraIssueHistoryEntity.issue_id.in_(issue_ids)]
+            conditions = [col(JiraIssueHistoryEntity.jira_issue_id).in_(issue_ids)]
 
             if from_date:
-                conditions.append(JiraIssueHistoryEntity.created_at >= from_date)
+                conditions.append(col(JiraIssueHistoryEntity.created_at) >= from_date)
             if to_date:
-                conditions.append(JiraIssueHistoryEntity.created_at <= to_date)
+                conditions.append(col(JiraIssueHistoryEntity.created_at) <= to_date)
 
             stmt = select(JiraIssueHistoryEntity).where(
                 and_(*conditions)
-            ).order_by(JiraIssueHistoryEntity.created_at)
+            ).order_by(col(JiraIssueHistoryEntity.created_at))
 
-            result = await self.session.execute(stmt)
-            history_items = result.scalars().all()
+            result = await self.session.exec(stmt)
+            history_items = result.all()
 
             return [self._entity_to_model(item) for item in history_items]
         except Exception as e:

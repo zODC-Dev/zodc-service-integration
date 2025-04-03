@@ -1,9 +1,9 @@
 from uuid import UUID, uuid4
 
-from src.domain.entities.base import BaseEntity
+from src.domain.models.base import BaseModel
 
 
-class Media(BaseEntity):
+class Media(BaseModel):
     media_id: UUID = uuid4()
     filename: str
     blob_url: str

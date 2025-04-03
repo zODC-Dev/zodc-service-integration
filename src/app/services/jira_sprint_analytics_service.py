@@ -71,20 +71,20 @@ class JiraSprintAnalyticsApplicationService:
 
             # Chuyển đổi domain model sang response DTO với các giá trị đã làm tròn
             return SprintBurnupResponse(
-                sprintName=burnup_data.name,
-                startDate=burnup_data.start_date.strftime("%Y-%m-%d"),
-                endDate=burnup_data.end_date.strftime("%Y-%m-%d"),
-                totalPointsInitial=round(burnup_data.total_points_initial, 2),
-                totalPointsCurrent=round(burnup_data.total_points_current, 2),
+                sprint_name=burnup_data.name,
+                start_date=burnup_data.start_date.strftime("%Y-%m-%d"),
+                end_date=burnup_data.end_date.strftime("%Y-%m-%d"),
+                total_points_initial=round(burnup_data.total_points_initial, 2),
+                total_points_current=round(burnup_data.total_points_current, 2),
                 dates=burnup_data.get_dates_list(),
-                idealBurnup=self._round_float_list(ideal_burnup),
-                actualBurnup=self._round_float_list(burnup_data.get_actual_burnup()),
-                scopeLine=self._round_float_list(burnup_data.get_scope_line()),
-                addedPoints=self._round_float_list(burnup_data.get_added_points()),
-                scopeChanges=[
+                ideal_burnup=self._round_float_list(ideal_burnup),
+                actual_burnup=self._round_float_list(burnup_data.get_actual_burnup()),
+                scope_line=self._round_float_list(burnup_data.get_scope_line()),
+                added_points=self._round_float_list(burnup_data.get_added_points()),
+                scope_changes=[
                     {
                         "date": change.date.strftime("%Y-%m-%d"),
-                        "pointsAdded": round(change.points_added, 2),
+                        "points_added": round(change.points_added, 2),
                         "issueKeys": change.issue_keys
                     }
                     for change in burnup_data.scope_changes

@@ -11,11 +11,11 @@ class IJiraSprintAPIService(ABC):
         pass
 
     @abstractmethod
-    async def get_sprint_by_id(self, user_id: int, sprint_id: int) -> JiraSprintModel:
+    async def get_sprint_by_id(self, user_id: int, sprint_id: int) -> Optional[JiraSprintModel]:
         pass
 
     @abstractmethod
-    async def get_sprint_by_id_with_system_user(self, sprint_id: int) -> JiraSprintModel:
+    async def get_sprint_by_id_with_system_user(self, sprint_id: int) -> Optional[JiraSprintModel]:
         pass
 
     @abstractmethod

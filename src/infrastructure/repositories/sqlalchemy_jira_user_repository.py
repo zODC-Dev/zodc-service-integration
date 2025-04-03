@@ -1,9 +1,9 @@
 from typing import List, Optional
 
-from sqlalchemy import or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import col
+from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel import col, or_, select
 
+from src.domain.exceptions.user_exceptions import UserCreationError, UserNotFoundError
 from src.configs.logger import log
 from src.domain.models.database.jira_user import JiraUserDBCreateDTO, JiraUserDBUpdateDTO
 from src.domain.models.jira_user import JiraUserModel
@@ -42,9 +42,9 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
         except Exception as e:
             await self.session.rollback()
             log.error(f"Error creating user: {str(e)}")
-            raise
+            raise UserCreationError(f"Error creating user: {str(e)}") from e
 
-    async def update_user(self, user_id: int, user_data: JiraUserDBUpdateDTO) -> Optional[JiraUserModel]:
+    async def update_user(self, user_id: int, user_data: JiraUserDBUpdateDTO) -> JiraUserModel:
         """Update user by ID"""
         try:
             # Get existing user
@@ -55,7 +55,7 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
 
             if not user_entity:
                 log.warning(f"User with ID {user_id} not found")
-                return None
+                raise UserNotFoundError(f"User with ID {user_id} not found")
 
             # Update fields
             update_data = user_data.model_dump(exclude_unset=True)

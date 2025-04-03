@@ -87,7 +87,7 @@ class JiraIssueMapper:
             assignee_id = None
             reporter_id = None
 
-            project_key = api_response.fields.project.key if hasattr(fields, 'project') else ""
+            project_key = fields.project.key if hasattr(fields, 'project') and fields.project else ""
 
             if hasattr(fields, 'assignee') and fields.assignee:
                 assignee_id = fields.assignee.account_id
