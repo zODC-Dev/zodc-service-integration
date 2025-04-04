@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from src.domain.entities.microsoft_calendar_event import MicrosoftCalendarEventsList
+from src.domain.models.microsoft_calendar_event import MicrosoftCalendarEventsList
 from src.domain.services.microsoft_calendar_service import IMicrosoftCalendarService
 
 

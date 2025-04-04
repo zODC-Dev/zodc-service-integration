@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # Logging
-    LOG_LEVEL: str = "INFO"
+    LOG_LEVEL: str = "DEBUG"
 
     # Port
     PORT: int = 8001
@@ -63,6 +63,12 @@ class Settings(BaseSettings):
     JIRA_CLIENT_ID: str = ""
     JIRA_CLIENT_SECRET: str = ""
 
+    # Jira dashboard URL
+    JIRA_DASHBOARD_URL: str = "https://vphoa.atlassian.net"
+
+    JIRA_SYSTEM_USER_ID: int = 37  # ID của service account
+    JIRA_ADMIN_ORG_ID: str = "1234567890"
+    JIRA_ADMIN_API_KEY: str = "1234567890"
     # Azure Blob Storage settings
     AZURE_STORAGE_ACCOUNT_CONTAINER_NAME: str = "media-files"
 

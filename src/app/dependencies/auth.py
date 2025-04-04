@@ -46,7 +46,6 @@ async def get_jwt_claims(request: Request) -> JWTClaims:
     try:
         system_permissions_str = headers.get("x-kong-jwt-claim-system_permissions", "[]")
         system_permissions = json.loads(system_permissions_str)
-        # Convert dict to list if empty dict is received
         if isinstance(system_permissions, dict) and not system_permissions:
             system_permissions = []
     except json.JSONDecodeError:
