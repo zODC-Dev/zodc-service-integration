@@ -1,7 +1,7 @@
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.domain.models.sync_log import SyncLogModel
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
+from src.domain.models.sync_log import SyncLogModel
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.infrastructure.entities.sync_log import SyncLogEntity
 

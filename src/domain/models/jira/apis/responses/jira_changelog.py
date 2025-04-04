@@ -15,7 +15,7 @@ class JiraChangelogItemDTO(BaseModel):
     toString: Optional[str] = Field(None, description="Mô tả giá trị sau khi thay đổi")
 
     class Config:
-        allow_population_by_field_name = True
+        populate_by_name = True
 
 
 class JiraChangelogAuthorDTO(BaseModel):

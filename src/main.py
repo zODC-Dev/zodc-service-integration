@@ -24,6 +24,7 @@ from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginM
 from src.app.services.nats_handlers.jira_project_sync_handler import JiraProjectSyncRequestHandler
 from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
 from src.app.services.nats_handlers.user_message_handler import UserMessageHandler
+from src.app.services.nats_handlers.workflow_sync_handler import WorkflowSyncRequestHandler
 from src.configs.database import get_db, init_db, session_maker
 from src.configs.logger import log
 from src.configs.settings import settings
@@ -140,7 +141,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         NATSSubscribeTopic.JIRA_ISSUES_SYNC.value: JiraIssueSyncRequestHandler(jira_issue_application_service),
         NATSSubscribeTopic.JIRA_PROJECT_SYNC.value: JiraProjectSyncRequestHandler(
             jira_project_application_service, sync_log_repository),
-        NATSSubscribeTopic.JIRA_ISSUE_LINK.value: JiraIssueLinkRequestHandler(jira_issue_application_service)
+        NATSSubscribeTopic.JIRA_ISSUE_LINK.value: JiraIssueLinkRequestHandler(jira_issue_application_service),
+        NATSSubscribeTopic.WORKFLOW_SYNC.value: WorkflowSyncRequestHandler(
+            jira_issue_application_service, user_repository, jira_sprint_repository)
     }
 
     # Initialize and start NATS Event Service

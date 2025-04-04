@@ -1,10 +1,10 @@
 from typing import List, Optional
 
-from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import col, or_, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.domain.exceptions.user_exceptions import UserCreationError, UserNotFoundError
 from src.configs.logger import log
+from src.domain.exceptions.user_exceptions import UserCreationError, UserNotFoundError
 from src.domain.models.database.jira_user import JiraUserDBCreateDTO, JiraUserDBUpdateDTO
 from src.domain.models.jira_user import JiraUserModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository

@@ -19,6 +19,7 @@ from src.infrastructure.entities.jira_issue_sprint import JiraIssueSprintEntity
 from src.infrastructure.entities.jira_issue_history import JiraIssueHistoryEntity
 from src.infrastructure.entities.sync_log import SyncLogEntity
 from src.infrastructure.entities.refresh_token import RefreshTokenEntity
+from src.infrastructure.entities.media import MediaEntity
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

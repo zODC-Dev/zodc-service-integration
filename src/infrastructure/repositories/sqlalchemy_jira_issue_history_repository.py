@@ -20,12 +20,12 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
     async def get_issue_history(
         self,
-        issue_id: int
+        issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
         try:
             stmt = select(JiraIssueHistoryEntity).where(
-                JiraIssueHistoryEntity.jira_issue_id == issue_id
+                col(JiraIssueHistoryEntity.jira_issue_id) == issue_id
             ).order_by(col(JiraIssueHistoryEntity.created_at))
 
             result = await self.session.exec(stmt)

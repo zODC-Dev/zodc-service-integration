@@ -75,7 +75,7 @@ class JiraIssueAPICreateRequestDTO(BaseModel):
     description: Optional[str] = None
     type: Optional[Union[JiraIssueType, str]] = None
     status: Optional[Union[JiraIssueStatus, str]] = None
-    assignee_id: Optional[str] = None
+    assignee_id: Optional[str] = None  # User id of the assignee
     reporter_id: Optional[str] = None
     estimate_point: Optional[float] = None
     actual_point: Optional[float] = None

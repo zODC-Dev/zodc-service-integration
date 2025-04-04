@@ -26,6 +26,7 @@ class SyncLogEntity(BaseEntityWithTimestamps, table=True):
     sender: Optional[int] = Field(default=None, foreign_key="jira_users.user_id")
     source: str
     created_at: datetime = Field(default_factory=datetime.now)
+    status: Optional[str] = None
 
     __table_args__ = (
         CheckConstraint(

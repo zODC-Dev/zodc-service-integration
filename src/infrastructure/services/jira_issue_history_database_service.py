@@ -15,7 +15,7 @@ class JiraIssueHistoryDatabaseService(IJiraIssueHistoryDatabaseService):
 
     async def get_issue_history(
         self,
-        issue_id: int
+        issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
         return await self.history_repository.get_issue_history(issue_id)

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -10,9 +11,9 @@ class SyncLogModel(BaseModel):
     entity_type: str
     entity_id: str
     operation: str
-    status: str
+    status: Optional[str] = None
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
     @classmethod
     def from_entity(cls, entity: SyncLogEntity) -> "SyncLogModel":

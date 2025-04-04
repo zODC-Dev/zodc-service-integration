@@ -11,7 +11,7 @@ class IJiraIssueHistoryDatabaseService(ABC):
     @abstractmethod
     async def get_issue_history(
         self,
-        issue_id: int
+        issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
         pass

@@ -17,6 +17,7 @@ class NATSSubscribeTopic(str, Enum):
     JIRA_ISSUES_SYNC = "jira.issues.sync.request"
     JIRA_PROJECT_SYNC = "jira.project.sync.request"
     JIRA_ISSUE_LINK = "jira.issue.link.request"
+    WORKFLOW_SYNC = "workflow.sync.request"
 
 
 class NATSPublishTopic(str, Enum):

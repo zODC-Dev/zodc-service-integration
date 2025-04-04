@@ -5,6 +5,7 @@ from .jira_issue_sprint import JiraIssueSprintEntity
 from .jira_project import JiraProjectEntity
 from .jira_sprint import JiraSprintEntity
 from .jira_user import JiraUserEntity
+from .media import MediaEntity
 from .refresh_token import RefreshTokenEntity
 from .sync_log import SyncLogEntity
 
@@ -19,3 +20,4 @@ JiraSprintEntity.model_rebuild()
 JiraIssueSprintEntity.model_rebuild()
 JiraIssueHistoryEntity.model_rebuild()
 SyncLogEntity.model_rebuild()
+MediaEntity.model_rebuild()

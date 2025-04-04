@@ -1,12 +1,11 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
-from src.domain.models.database.refresh_token import RefreshTokenDBCreateDTO
 from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
 from src.domain.models.database.jira_user import JiraUserDBUpdateDTO
+from src.domain.models.database.refresh_token import RefreshTokenDBCreateDTO
 from src.domain.models.nats.subscribes.jira_user import JiraUserLoginNATSSubscribeDTO
-from src.domain.models.refresh_token import RefreshTokenModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.domain.services.nats_message_handler import INATSMessageHandler

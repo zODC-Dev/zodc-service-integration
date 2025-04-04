@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlmodel import col, not_, select, and_
+from sqlmodel import and_, col, not_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log

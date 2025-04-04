@@ -95,10 +95,13 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             "fields": {
                 "project": {"key": issue_data.project_key},
                 "summary": issue_data.summary,
-                "description": issue_data.description,
                 "issuetype": self._get_issue_type_payload(issue_data.type),
             }
         }
+
+        # Add description if available
+        if issue_data.description:
+            payload["fields"]["description"] = self._text_to_adf(issue_data.description)
 
         # Add sprint if available
         if issue_data.sprint_id:
@@ -123,6 +126,11 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             payload,
             error_msg="Error when creating issue"
         )
+
+        # Handle error
+        if response_data.get("errorMessages"):
+            log.error(f"Error when creating issue: {response_data.get('errorMessages')}")
+            raise Exception(f"Error when creating issue: {response_data.get('errorMessages')}")
 
         # Get new created issue
         created_issue_id: str = response_data.get("id")
