@@ -5,14 +5,14 @@ set -e
 # ./wait-for-it.sh $DB_HOST:$DB_PORT
 
 # Create database schema if it doesn't exist
-# python -c "
-# from src.configs.database import init_db
-# import asyncio
-# asyncio.run(init_db())
-# "
+python -c "
+from src.configs.database import init_db
+import asyncio
+asyncio.run(init_db())
+"
 
 # # Run migrations
-# alembic upgrade head
+alembic upgrade head
 
 # Start the application
 exec python -m src.main

@@ -5,8 +5,8 @@ from httpx import AsyncClient
 
 from src.configs.logger import log
 from src.configs.settings import settings
-from src.domain.entities.microsoft_calendar_event import MicrosoftCalendarEvent, MicrosoftCalendarEventsList
 from src.domain.exceptions.microsoft_calendar_exceptions import CalendarError, CalendarTokenError
+from src.domain.models.microsoft_calendar_event import MicrosoftCalendarEvent, MicrosoftCalendarEventsList
 from src.domain.services.microsoft_calendar_service import IMicrosoftCalendarService
 from src.infrastructure.services.redis_service import RedisService
 

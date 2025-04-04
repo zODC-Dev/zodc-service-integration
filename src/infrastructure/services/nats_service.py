@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List
+from typing import Any, Callable, Coroutine, Dict, List
 
 from nats.aio.client import Client
 from nats.aio.msg import Msg
@@ -48,13 +48,13 @@ class NATSService(INATSService):
 
             payload = json.dumps(message).encode()
             await self._client.publish(subject, payload)
-            log.debug(f"Published message to {subject}: {message}")
+            log.info(f"Published message to {subject}: {message}")
         except Exception as e:
             log.error(f"Failed to publish message: {str(e)}")
             raise
 
     async def subscribe(self, subject: str, callback: MessageCallback) -> None:
-        """Subscribe to a subject"""
+        """Subscribe to a subject for pub/sub pattern"""
         try:
             if not self._is_connected:
                 await self.connect()
@@ -72,6 +72,42 @@ class NATSService(INATSService):
             log.error(f"Failed to subscribe: {str(e)}")
             raise
 
+    async def subscribe_request(self, subject: str, callback: Callable[[str, Dict[str, Any]], Coroutine[Any, Any, Dict[str, Any]]]) -> None:
+        """Subscribe to a subject for request-reply pattern"""
+        try:
+            if not self._is_connected:
+                await self.connect()
+
+            async def request_handler(msg: Msg) -> None:
+                try:
+                    # Parse request data
+                    data = json.loads(msg.data.decode())
+
+                    # Process request and get response
+                    response = await callback(msg.subject, data)
+
+                    # Send response back
+                    response_data = json.dumps(response).encode()
+                    await msg.respond(response_data)
+
+                    log.info(f"Handled request for {msg.subject} with response: {response}")
+                except Exception as e:
+                    # Send error response
+                    error_response = json.dumps({"error": str(e)}).encode()
+                    await msg.respond(error_response)
+                    log.error(f"Error handling request: {str(e)}")
+
+            # Subscribe with queue group for load balancing if needed
+            await self._client.subscribe(
+                subject,
+                cb=request_handler,
+                queue=f"{subject}_queue"  # Optional: Enable queue group for load balancing
+            )
+            log.info(f"Subscribed to requests on {subject}")
+        except Exception as e:
+            log.error(f"Failed to subscribe to requests: {str(e)}")
+            raise
+
     async def request(self, subject: str, message: Dict[str, Any], timeout: int = 10) -> Dict[str, Any]:
         """Send request and wait for response"""
         try:
@@ -80,7 +116,18 @@ class NATSService(INATSService):
 
             payload = json.dumps(message).encode()
             response = await self._client.request(subject, payload, timeout=timeout)
-            return json.loads(response.data.decode()) if response.data else {}
+
+            if not response.data:
+                return {}
+
+            response_data: Dict[str, Any] = json.loads(response.data.decode())
+
+            # Check for error in response
+            if isinstance(response_data, dict) and "error" in response_data:
+                raise Exception(response_data["error"])
+
+            return response_data
+
         except Exception as e:
             log.error(f"Failed to send request: {str(e)}")
             raise

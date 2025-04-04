@@ -31,6 +31,7 @@ azure-storage-blob = "^12.24.0"
 nats-py = "^2.9.0"
 prometheus-fastapi-instrumentator = "^7.0.2"
 apscheduler = "^3.11.0"
+tenacity = "^9.0.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -78,6 +79,7 @@ ignore = [
     "D106",  # missing docstring in nested class
     "D107",  # missing docstring in __init__
     "B008",  # Do not perform function call in argument defaults;
+    "N815",  # Mixcase variable name
 ]
 
 [tool.ruff.lint.pydocstyle]

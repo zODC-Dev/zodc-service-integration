@@ -53,6 +53,7 @@ class TokenSchedulerService(ITokenSchedulerService):
         """Refresh both access and refresh tokens"""
         try:
             if token_type == TokenType.JIRA:
+                log.info(f"Refreshing Jira token for user {user_id}")
                 new_access_token = await self.token_refresh_service.refresh_jira_token(user_id)
             else:
                 new_access_token = await self.token_refresh_service.refresh_microsoft_token(user_id)

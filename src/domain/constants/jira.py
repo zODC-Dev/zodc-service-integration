@@ -32,6 +32,24 @@ class JiraIssueStatus(Enum):
         raise ValueError(f"Invalid status: {status}")
 
 
+# Status ID mapping - cần cập nhật các ID tương ứng với Jira instance của bạn
+JIRA_STATUS_ID_MAPPING = {
+    "10014": JiraIssueStatus.TO_DO,
+    "10015": JiraIssueStatus.IN_PROGRESS,
+    "10002": JiraIssueStatus.IN_REVIEW,
+    "10016": JiraIssueStatus.DONE,
+}
+
+# Issue Type ID mapping
+JIRA_ISSUE_TYPE_ID_MAPPING = {
+    "10009": JiraIssueType.TASK,
+    "10011": JiraIssueType.STORY,
+    "10002": JiraIssueType.EPIC,
+    "10010": JiraIssueType.BUG,
+    "10004": JiraIssueType.SUB_TASK,
+}
+
+
 class JiraSprintState(Enum):
     ACTIVE = "active"
     CLOSED = "closed"
@@ -53,3 +71,18 @@ class JiraSprintState(Enum):
 class JiraActionType(str, Enum):
     CREATE = "create"
     UPDATE = "update"
+
+
+class JiraWebhookEvent(str, Enum):
+    ISSUE_CREATED = "jira:issue_created"
+    ISSUE_UPDATED = "jira:issue_updated"
+    ISSUE_DELETED = "jira:issue_deleted"
+    SPRINT_CREATED = "jira:sprint_created"
+    SPRINT_UPDATED = "jira:sprint_updated"
+    PROJECT_UPDATED = "jira:project_updated"
+    SPRINT_STARTED = "jira:sprint_started"
+    SPRINT_CLOSED = "jira:sprint_closed"
+    USER_CREATED = "jira:user_created"
+    USER_UPDATED = "jira:user_updated"
+    USER_DELETED = "jira:user_deleted"
+    SPRINT_DELETED = "jira:sprint_deleted"

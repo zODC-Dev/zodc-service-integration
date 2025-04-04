@@ -6,9 +6,9 @@ from aiohttp import ClientSession
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.entities.refresh_token import RefreshTokenEntity
+from src.domain.models.database.refresh_token import RefreshTokenDBCreateDTO
+from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
-from src.domain.repositories.user_repository import IUserRepository
 from src.domain.services.redis_service import IRedisService
 from src.domain.services.token_refresh_service import ITokenRefreshService
 from src.utils.jwt_utils import get_jwt_expiry
@@ -18,7 +18,7 @@ class TokenRefreshService(ITokenRefreshService):
     def __init__(
         self,
         redis_service: IRedisService,
-        user_repository: IUserRepository,
+        user_repository: IJiraUserRepository,
         refresh_token_repository: IRefreshTokenRepository
     ):
         self.redis_service = redis_service
@@ -82,7 +82,7 @@ class TokenRefreshService(ITokenRefreshService):
                         "grant_type": "refresh_token",
                         "client_id": settings.JIRA_CLIENT_ID,
                         "client_secret": settings.JIRA_CLIENT_SECRET,
-                        "refresh_token": refresh_token.token
+                        "refresh_token": refresh_token.token,
                     }
                 )
                 data: Dict[str, str] = await response.json()
@@ -102,18 +102,17 @@ class TokenRefreshService(ITokenRefreshService):
     async def _save_new_microsoft_tokens(self, user_id: int, token_data: Dict[str, Any]) -> None:
         """Update Microsoft tokens in database and cache"""
         if "refresh_token" in token_data:
-            # For Microsoft, use expires_in or default value
             refresh_token_expires_in = token_data.get("refresh_token_expires_in",
                                                       token_data.get("expires_in", 3600) * 2)
             expires_at = datetime.now(timezone.utc) + timedelta(seconds=refresh_token_expires_in)
 
-            refresh_token = RefreshTokenEntity(
+            refresh_token_dto = RefreshTokenDBCreateDTO(
                 token=token_data["refresh_token"],
                 user_id=user_id,
                 token_type=TokenType.MICROSOFT,
                 expires_at=expires_at
             )
-            await self.refresh_token_repository.create_refresh_token(refresh_token)
+            await self.refresh_token_repository.create_refresh_token(refresh_token_dto)
 
         # Cache access token
         await self.redis_service.cache_microsoft_token(
@@ -131,13 +130,13 @@ class TokenRefreshService(ITokenRefreshService):
                 # Fallback to default if JWT decode fails
                 expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600) * 2)
 
-            refresh_token = RefreshTokenEntity(
+            refresh_token_dto = RefreshTokenDBCreateDTO(
                 token=token_data["refresh_token"],
                 user_id=user_id,
                 token_type=TokenType.JIRA,
                 expires_at=expires_at
             )
-            await self.refresh_token_repository.create_refresh_token(refresh_token)
+            await self.refresh_token_repository.create_refresh_token(refresh_token_dto)
 
         # Cache access token
         await self.redis_service.cache_jira_token(
