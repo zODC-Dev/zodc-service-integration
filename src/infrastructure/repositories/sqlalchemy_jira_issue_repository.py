@@ -231,7 +231,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                 email=entity.assignee.email,
                 avatar_url=entity.assignee.avatar_url,
                 is_system_user=entity.assignee.is_system_user,
-                name=entity.assignee.name
+                name=entity.assignee.name,
+                user_id=entity.assignee.user_id
             )
 
         return JiraIssueModel(

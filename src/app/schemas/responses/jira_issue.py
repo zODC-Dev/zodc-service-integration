@@ -21,7 +21,7 @@ class JiraAssigneeResponse(BaseModel):
     @classmethod
     def from_domain(cls, assignee: JiraUserModel) -> "JiraAssigneeResponse":
         return cls(
-            id=assignee.id,
+            id=assignee.user_id,
             jira_account_id=assignee.jira_account_id,
             email=assignee.email,
             avatar_url=assignee.avatar_url,
