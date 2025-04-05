@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class JiraUserDBCreateDTO(BaseModel):
     """DTO for creating a new Jira user in database"""
     user_id: Optional[int] = None
-    jira_account_id: str
+    jira_account_id: Optional[str] = None
     name: str
     email: str = ""
     is_active: bool = True

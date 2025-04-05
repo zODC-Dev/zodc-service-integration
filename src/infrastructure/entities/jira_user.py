@@ -16,7 +16,7 @@ class JiraUserEntity(BaseEntityWithTimestamps, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)  # Auto incremented id
     email: str = Field(unique=True, index=True)
     user_id: Optional[int] = Field(default=None, unique=True, index=True)  # System user id
-    jira_account_id: Optional[str] = Field(default=None, unique=True, index=True)  # Jira account id
+    jira_account_id: Optional[str] = Field(default=None, index=True, unique=True)  # Jira account id
     is_system_user: bool = Field(default=False)
     is_active: bool = Field(default=True)
     avatar_url: Optional[str] = Field(default=None)
