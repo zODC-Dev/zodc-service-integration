@@ -1,6 +1,5 @@
 from typing import Any, Dict
 
-from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
@@ -22,12 +21,12 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         jira_issue_repository: IJiraIssueRepository,
         sync_log_repository: ISyncLogRepository,
         jira_issue_api_service: IJiraIssueAPIService,
-        issue_history_sync_service: JiraIssueHistorySyncService
+        # issue_history_sync_service: JiraIssueHistorySyncService
     ):
         self.jira_issue_repository = jira_issue_repository
         self.sync_log_repository = sync_log_repository
         self.jira_issue_api_service = jira_issue_api_service
-        self.issue_history_sync_service = issue_history_sync_service
+        # self.issue_history_sync_service = issue_history_sync_service
 
     async def can_handle(self, webhook_event: str) -> bool:
         """Check if this handler can process the given webhook event"""
@@ -59,13 +58,13 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         if not issue_data:
             return {"error": "Failed to fetch issue data", "issue_id": issue_id}
 
-        # Thay vì lưu history trực tiếp từ webhook, gọi service đồng bộ history từ API
-        if self.issue_history_sync_service:
-            try:
-                await self.issue_history_sync_service.sync_issue_history(issue_id)
-                log.info(f"Successfully synced history for issue {issue_id} from Jira API")
-            except Exception as e:
-                log.error(f"Error syncing history for issue {issue_id}: {str(e)}")
+        # # Thay vì lưu history trực tiếp từ webhook, gọi service đồng bộ history từ API
+        # if self.issue_history_sync_service:
+        #     try:
+        #         await self.issue_history_sync_service.sync_issue_history(issue_id)
+        #         log.info(f"Successfully synced history for issue {issue_id} from Jira API")
+        #     except Exception as e:
+        #         log.error(f"Error syncing history for issue {issue_id}: {str(e)}")
 
         # Update in database
         update_dto = JiraIssueConverter._convert_to_update_dto(issue_data)

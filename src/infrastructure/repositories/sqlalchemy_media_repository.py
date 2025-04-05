@@ -26,18 +26,18 @@ class SQLAlchemyMediaRepository(IMediaRepository):
         self.session.add(db_media)
         await self.session.commit()
         await self.session.refresh(db_media)
-        return MediaModel.model_validate(db_media)
+        return MediaModel.model_validate(db_media.model_dump())
 
     async def get_by_id(self, media_id: UUID) -> Optional[MediaModel]:
         result = await self.session.exec(
             select(MediaEntity).where(col(MediaEntity.media_id) == media_id)
         )
         media = result.first()
-        return MediaModel.model_validate(media) if media else None
+        return MediaModel.model_validate(media.model_dump()) if media else None
 
     async def get_by_user(self, user_id: int) -> List[MediaModel]:
         result = await self.session.exec(
             select(MediaEntity).where(col(MediaEntity.uploaded_by) == user_id)
         )
         media_list = result.all()
-        return [MediaModel.model_validate(media) for media in media_list]
+        return [MediaModel.model_validate(media.model_dump()) for media in media_list]
