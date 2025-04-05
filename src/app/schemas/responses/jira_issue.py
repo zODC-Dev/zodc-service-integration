@@ -10,7 +10,7 @@ from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
 
 
-class JiraAssigneeResponse(BaseModel):
+class JiraAssigneeResponse(BaseResponse):
     id: Optional[int] = None
     jira_account_id: str
     email: str
