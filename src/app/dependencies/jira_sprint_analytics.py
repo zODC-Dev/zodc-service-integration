@@ -1,10 +1,12 @@
 from fastapi import Depends
 
 from src.app.controllers.jira_sprint_analytics_controller import JiraSprintAnalyticsController
+from src.app.dependencies.gantt_chart import get_gantt_chart_service
 from src.app.dependencies.jira_issue import get_jira_issue_database_service
 from src.app.dependencies.jira_issue_history import get_jira_issue_history_database_service
 from src.app.dependencies.jira_project import get_jira_project_api_service
 from src.app.dependencies.jira_sprint import get_jira_sprint_database_service
+from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_sprint_analytics_service import JiraSprintAnalyticsApplicationService
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
@@ -37,7 +39,8 @@ async def get_sprint_analytics_application_service(
 
 
 async def get_sprint_analytics_controller(
-    sprint_analytics_service: JiraSprintAnalyticsApplicationService = Depends(get_sprint_analytics_application_service)
+    sprint_analytics_service: JiraSprintAnalyticsApplicationService = Depends(get_sprint_analytics_application_service),
+    gantt_chart_service: GanttChartApplicationService = Depends(get_gantt_chart_service)
 ) -> JiraSprintAnalyticsController:
     """Get the sprint analytics controller"""
-    return JiraSprintAnalyticsController(sprint_analytics_service)
+    return JiraSprintAnalyticsController(sprint_analytics_service, gantt_chart_service)

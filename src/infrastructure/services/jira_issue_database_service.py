@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from src.domain.constants.jira import JiraIssueType
+from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.models.database.jira_issue import JiraIssueDBCreateDTO, JiraIssueDBUpdateDTO
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
@@ -46,7 +46,7 @@ class JiraIssueDatabaseService(IJiraIssueDatabaseService):
         if update.actual_point is not None:
             current_issue.actual_point = update.actual_point
         if update.status:
-            current_issue.status = update.status
+            current_issue.status = JiraIssueStatus.from_str(update.status)
 
         current_issue.updated_at = datetime.now(timezone.utc)
         # current_issue.needs_sync = True  # Mark as needing sync with Jira

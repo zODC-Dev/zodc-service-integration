@@ -15,9 +15,11 @@ from src.app.routers.jira_webhook_router import router as jira_webhook_router
 from src.app.routers.media_router import router as media_router
 from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
 from src.app.routers.util_router import router as util_router
+from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.nats_event_service import NATSEventService
+from src.app.services.nats_handlers.gantt_chart_handler import GanttChartRequestHandler
 from src.app.services.nats_handlers.jira_issue_link_handler import JiraIssueLinkRequestHandler
 from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueSyncRequestHandler
 from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
@@ -35,6 +37,8 @@ from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQ
 from src.infrastructure.repositories.sqlalchemy_jira_user_repository import SQLAlchemyJiraUserRepository
 from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
+from src.infrastructure.repositories.sqlalchemy_workflow_mapping_repository import SQLAlchemyWorkflowMappingRepository
+from src.infrastructure.services.gantt_chart_calculator_service import GanttChartCalculatorService
 from src.infrastructure.services.jira_issue_api_service import JiraIssueAPIService
 from src.infrastructure.services.jira_issue_database_service import JiraIssueDatabaseService
 from src.infrastructure.services.jira_project_api_service import JiraProjectAPIService
@@ -42,6 +46,7 @@ from src.infrastructure.services.jira_project_database_service import JiraProjec
 from src.infrastructure.services.jira_service import JiraAPIClient
 from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
 from src.infrastructure.services.nats_service import NATSService
+from src.infrastructure.services.nats_workflow_service_client import NATSWorkflowServiceClient
 from src.infrastructure.services.redis_service import RedisService
 from src.infrastructure.services.token_refresh_service import TokenRefreshService
 from src.infrastructure.services.token_scheduler_service import TokenSchedulerService
@@ -121,6 +126,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         sync_log_repository
     )
 
+    workflow_mapping_repository = SQLAlchemyWorkflowMappingRepository(db)
+    workflow_service_client = NATSWorkflowServiceClient(nats_service)
+    gantt_calculator_service = GanttChartCalculatorService()
+    gantt_chart_service = GanttChartApplicationService(jira_issue_repository, jira_sprint_repository,
+                                                       workflow_mapping_repository, gantt_calculator_service, workflow_service_client)
+
     # Initialize NATS Message Handlers with correct dependencies
     message_handlers = {
         NATSSubscribeTopic.USER_EVENT.value: UserMessageHandler(redis_service),
@@ -143,7 +154,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             jira_project_application_service, sync_log_repository),
         NATSSubscribeTopic.JIRA_ISSUE_LINK.value: JiraIssueLinkRequestHandler(jira_issue_application_service),
         NATSSubscribeTopic.WORKFLOW_SYNC.value: WorkflowSyncRequestHandler(
-            jira_issue_application_service, user_repository, jira_sprint_repository)
+            jira_issue_application_service, user_repository, jira_sprint_repository, workflow_mapping_repository),
+        NATSSubscribeTopic.GANTT_CHART_CALCULATION.value: GanttChartRequestHandler(gantt_chart_service)
     }
 
     # Initialize and start NATS Event Service

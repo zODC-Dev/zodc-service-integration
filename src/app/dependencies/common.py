@@ -7,6 +7,7 @@ from src.configs.database import get_db
 from src.configs.redis import get_redis_client
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
+from src.domain.services.nats_service import INATSService
 from src.domain.services.redis_service import IRedisService
 from src.domain.services.token_refresh_service import ITokenRefreshService
 from src.domain.services.token_scheduler_service import ITokenSchedulerService
@@ -33,7 +34,7 @@ async def get_redis_service(redis_client: Redis = Depends(get_redis_client)):
     return RedisService(redis_client=redis_client)
 
 
-async def get_nats_service():
+async def get_nats_service() -> INATSService:
     """Dependency for nats service"""
     return NATSService()
 

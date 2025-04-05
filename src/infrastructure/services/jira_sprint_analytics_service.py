@@ -127,6 +127,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         total_points_initial = sum(issue.estimate_point or 0 for issue in issues)
 
         # Tính toán scope changes và tổng điểm hiện tại
+        assert sprint.id is not None, "Sprint ID must be provided"
         scope_changes, daily_scope_points = await self._calculate_scope_changes(
             issues, start_date, end_date, sprint.id
         )
@@ -279,7 +280,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         # Phân tích thay đổi story points
         for change in story_point_changes:
             # Kiểm tra xem issue có thuộc sprint không
-            issue = next((i for i in issues if i.id == change.issue_id), None)
+            issue = next((i for i in issues if i.jira_issue_id == change.jira_issue_id), None)
             if not issue:
                 continue
 

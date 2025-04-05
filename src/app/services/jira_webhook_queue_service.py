@@ -372,6 +372,7 @@ class JiraWebhookQueueService:
             sync_log_repo = SQLAlchemySyncLogRepository(session)
             sprint_repo = SQLAlchemyJiraSprintRepository(session)
             sprint_database_service = JiraSprintDatabaseService(sprint_repo)
+            # issue_history_sync_service = JiraIssueHistorySyncService(issue_repo)
 
             # Tạo webhook service
             webhook_service = JiraWebhookService(

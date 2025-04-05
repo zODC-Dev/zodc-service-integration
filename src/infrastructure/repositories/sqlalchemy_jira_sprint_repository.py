@@ -94,12 +94,12 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             log.error(f"Error updating sprint {sprint_id}: {str(e)}")
             raise
 
-    async def update_sprint_by_jira_sprint_id(self, jira_sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> Optional[JiraSprintModel]:
+    async def update_sprint_by_jira_sprint_id(self, jira_sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
         try:
             result = await self.session.exec(select(JiraSprintEntity).where(col(JiraSprintEntity.jira_sprint_id) == jira_sprint_id))
             sprint = result.first()
             if not sprint:
-                return None
+                raise Exception(f"Sprint with Jira ID {jira_sprint_id} not found")
 
             data = self._prepare_data(sprint_data.model_dump())
             for key, value in data.items():
@@ -111,7 +111,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
         except Exception as e:
             await self.session.rollback()
             log.error(f"Error updating sprint {jira_sprint_id}: {str(e)}")
-            raise
+            raise Exception(f"Error updating sprint {jira_sprint_id}: {str(e)}") from e
 
     async def get_project_sprints(self, project_key: str, include_deleted: bool = False) -> List[JiraSprintModel]:
         """Get all sprints for a specific project"""
