@@ -53,3 +53,22 @@ class MediaController:
                 status_code=500,
                 detail=f"Failed to get media: {str(e)}"
             ) from e
+
+    async def remove_media(self, media_id: UUID) -> StandardResponse:
+        try:
+            success, message = await self.media_service.remove_media(media_id)
+            if not success:
+                raise HTTPException(status_code=404, detail=message)
+
+            return StandardResponse(
+                message=message,
+                data=None
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            log.error(f"Failed to remove media: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to remove media: {str(e)}"
+            ) from e

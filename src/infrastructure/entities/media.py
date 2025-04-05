@@ -4,14 +4,14 @@ from uuid import UUID, uuid4
 
 from sqlmodel import Field
 
-from src.infrastructure.entities.base import BaseEntityWithTimestamps
+from src.infrastructure.entities.base import BaseEntityWithTimestampsAndSoftDelete
 
 
-class MediaEntity(BaseEntityWithTimestamps, table=True):
+class MediaEntity(BaseEntityWithTimestampsAndSoftDelete, table=True):
     __tablename__ = "media"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    media_id: UUID = Field(default_factory=uuid4, index=True)
+    media_id: UUID = Field(default_factory=uuid4, index=True, unique=True)
     filename: str
     blob_url: str
     content_type: str
