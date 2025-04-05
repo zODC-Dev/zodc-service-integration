@@ -70,9 +70,6 @@ class JiraWebhookHandler(ABC):
                 log.error(f"No event type found for webhook data: {webhook_data}")
                 return None
 
-            # Ghi log để debug
-            log.info(f"Processing event {webhook_data.webhook_event} (normalized: {event_type})")
-
             if not await self.can_handle(event_type):
                 log.info(f"Handler {self.__class__.__name__} cannot handle event {event_type}")
                 return None

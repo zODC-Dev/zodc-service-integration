@@ -1,9 +1,9 @@
 from uuid import UUID
 
-from src.domain.models.base import BaseModel
+from pydantic import BaseModel
 
 
-class MediaModel(BaseModel):
+class MediaDBCreateDTO(BaseModel):
     media_id: UUID = None
     filename: str
     blob_url: str

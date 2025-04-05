@@ -33,6 +33,7 @@ class JiraProjectSyncRequestHandler(INATSRequestHandler):
             # Update sync log with success
             await self._update_sync_log(sync_log.id, True)
 
+            # The result now includes synced_users
             return result.model_dump()
 
         except Exception as e:

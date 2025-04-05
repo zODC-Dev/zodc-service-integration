@@ -33,7 +33,6 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
     async def handle(self, webhook_data: JiraSprintWebhookDTO) -> Dict[str, Any]:
         """Handle the sprint start webhook"""
         sprint_id = webhook_data.sprint.id
-        log.info(f"Processing sprint start webhook for sprint {sprint_id}")
 
         # Get latest sprint data from Jira API
         sprint_data = await self.jira_sprint_api_service.get_sprint_by_id_with_system_user(sprint_id)
@@ -53,7 +52,6 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
                     return {"error": f"Could not determine project key for sprint {sprint_id}"}
 
                 # Sprint doesn't exist, create it
-                log.info(f"Sprint {sprint_id} not found in database, creating new sprint")
                 create_dto = JiraSprintDBCreateDTO(
                     jira_sprint_id=sprint_id,
                     name=sprint_data.name,
@@ -71,11 +69,9 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
                 if not created_sprint:
                     return {"error": f"Failed to create sprint {sprint_id}"}
 
-                log.info(f"Successfully created sprint {sprint_id}")
                 operation_type = OperationType.CREATE
             else:
                 # Sprint exists, update it
-                log.info(f"Updating existing sprint {sprint_id}")
                 update_dto = JiraSprintDBUpdateDTO(
                     name=sprint_data.name,
                     state=JiraSprintState.ACTIVE.value,  # Ensure state is ACTIVE
@@ -89,7 +85,6 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
                 if not updated_sprint:
                     return {"error": f"Failed to update sprint {sprint_id}"}
 
-                log.info(f"Successfully updated sprint {sprint_id}")
                 operation_type = OperationType.UPDATE
 
             # Log sync event

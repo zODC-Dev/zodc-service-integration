@@ -33,7 +33,6 @@ class SprintDeleteWebhookHandler(JiraWebhookHandler):
     async def handle(self, webhook_data: JiraSprintWebhookDTO) -> Dict[str, Any]:
         """Handle the sprint delete webhook"""
         sprint_id = webhook_data.sprint.id
-        log.info(f"Processing sprint delete webhook for sprint {sprint_id}")
 
         try:
             # Check if sprint exists
@@ -81,7 +80,6 @@ class SprintDeleteWebhookHandler(JiraWebhookHandler):
             if not success:
                 return {"error": f"Failed to delete sprint {sprint_id}"}
 
-            log.info(f"Successfully marked sprint {sprint_id} as deleted")
             return {
                 "sprint_id": sprint_id,
                 "deleted": True

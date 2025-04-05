@@ -18,6 +18,7 @@ from src.domain.models.jira_user import JiraUserModel
 from src.domain.models.nats.replies.jira_project import (
     JiraProjectSyncNATSReplyDTO,
     JiraProjectSyncSummaryDTO,
+    SyncedJiraUserDTO,
 )
 from src.domain.models.nats.requests.jira_project import JiraProjectSyncNATSRequestDTO
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
@@ -105,7 +106,6 @@ class JiraProjectApplicationService:
         sprints = await self.jira_sprint_db_service.get_project_sprints(
             project_key=project_key
         )
-        log.info(f"Found {len(sprints)} sprints for project {project_key}")
         return sprints
 
     async def get_project_by_key(self, key: str) -> Optional[JiraProjectModel]:
@@ -124,6 +124,8 @@ class JiraProjectApplicationService:
         try:
             log.info(f"Starting sync for project {request.project_key}")
             started_at = datetime.now(timezone.utc)
+            synced_users = []
+
             async with self.sync_session as session:
                 # Sync project details
                 log.info("Syncing project details...")
@@ -133,6 +135,18 @@ class JiraProjectApplicationService:
                 log.info("Syncing project users...")
                 users = await self._sync_project_users(request.user_id, request.project_key, session)
                 log.info(f"Successfully synced {len(users)} users")
+
+                # Prepare synced users for response
+                synced_users = [
+                    SyncedJiraUserDTO(
+                        id=user.id,
+                        jira_account_id=user.jira_account_id,
+                        name=user.name,
+                        email=user.email,
+                        is_active=user.is_active,
+                        avatar_url=user.avatar_url
+                    ) for user in users
+                ]
 
                 # Sync sprints
                 log.info("Syncing project sprints...")
@@ -156,10 +170,12 @@ class JiraProjectApplicationService:
                         started_at=started_at.isoformat(),
                         completed_at=datetime.now(timezone.utc).isoformat(),
                         total_sprints=len(sprint_id_mapping),
-                        total_issues=len(issues)
-                    )
+                        total_issues=len(issues),
+                        total_users=len(users),
+                        synced_users=len(users)
+                    ),
+                    synced_users=synced_users
                 )
-
         except Exception as e:
             log.error(f"Error during project sync: {str(e)}")
             raise
@@ -225,8 +241,6 @@ class JiraProjectApplicationService:
                 user_id=user_id,
                 project_key=project_key
             )
-
-            log.info(f"Jira users: {jira_users}")
 
             synced_users = []
             for jira_user in jira_users:
@@ -313,8 +327,6 @@ class JiraProjectApplicationService:
                     if new_sprint and new_sprint.id:
                         sprint_id_mapping[sprint.jira_sprint_id] = new_sprint.id
 
-                log.info(f"Successfully synced sprint {sprint.name} for project {project_key}")
-
             except Exception as e:
                 log.error(f"Error syncing sprint {sprint.jira_sprint_id}: {str(e)}")
                 continue
@@ -334,7 +346,6 @@ class JiraProjectApplicationService:
                 project_key=project_key,
                 limit=1000
             )
-            log.info(f"Jira issues: {jira_issues}")
 
             synced_issues = []
             for jira_issue in jira_issues:
@@ -348,7 +359,6 @@ class JiraProjectApplicationService:
                     )
 
                     if existing_issue:
-                        log.info(f"Existing issue: {existing_issue} 111111111")
                         if jira_issue.updated_at > existing_issue.last_synced_at:
                             # Update existing issue with new data
                             updated_issue = await session.issue_repository.update(
@@ -359,7 +369,6 @@ class JiraProjectApplicationService:
                     else:
                         # Create new issue
                         issue_create_dto = JiraIssueDBCreateDTO._from_domain(jira_issue)
-                        log.info(f"Issue create dto: {issue_create_dto} 222222222")
                         new_issue = await session.issue_repository.create(issue_create_dto)
                         synced_issues.append(new_issue)
 

@@ -10,6 +10,7 @@ class JiraUserLoginNATSSubscribeDTO(BaseModel):
     user_id: int
     email: str
     jira_account_id: str
+    avatar_url: str
     is_system_user: bool
     access_token: str
     refresh_token: str
@@ -19,6 +20,7 @@ class JiraUserLoginNATSSubscribeDTO(BaseModel):
 class MicrosoftUserLoginNATSSubscribeDTO(BaseModel):
     user_id: int
     email: str
+    name: str
     access_token: str
     refresh_token: str
     expires_in: int

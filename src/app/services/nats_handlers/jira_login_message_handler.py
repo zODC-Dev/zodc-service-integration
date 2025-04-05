@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
-from src.domain.models.database.jira_user import JiraUserDBUpdateDTO
+from src.domain.models.database.jira_user import JiraUserDBCreateDTO, JiraUserDBUpdateDTO
 from src.domain.models.database.refresh_token import RefreshTokenDBCreateDTO
 from src.domain.models.nats.subscribes.jira_user import JiraUserLoginNATSSubscribeDTO
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
@@ -29,30 +29,31 @@ class JiraLoginMessageHandler(INATSMessageHandler):
             event = JiraUserLoginNATSSubscribeDTO.model_validate(message)
 
             # Check if user exists
-            user = await self.user_repository.get_user_by_jira_account_id(event.jira_account_id)
+            user = await self.user_repository.get_user_by_id(event.user_id)
 
             if user:
                 # Update Jira info if user exists
                 user_update = JiraUserDBUpdateDTO(
                     is_system_user=True,
                     user_id=event.user_id,
+                    jira_account_id=event.jira_account_id,
+                    avatar_url=event.avatar_url
                 )
-                await self.user_repository.update_user_by_jira_account_id(user.jira_account_id, user_update)
+                await self.user_repository.update_user(user.user_id, user_update)
                 log.info(f"Updated Jira link for existing user {user.jira_account_id}")
 
             else:
-                log.error(f"User {event.user_id} not found")
-            # else:
-            #     # Create new user with Jira info
-            #     new_user = JiraUserDBCreateDTO(
-            #         email=event.email,
-            #         user_id=event.user_id,
-            #         jira_account_id=event.jira_account_id,
-            #         is_system_user=event.is_system_user,
-            #         is_active=True
-            #     )
-            #     await self.user_repository.create_user(new_user)
-            #     log.info(f"Created new user with Jira link for user {event.user_id}")
+                # Create new user with Jira info
+                new_user = JiraUserDBCreateDTO(
+                    email=event.email,
+                    user_id=event.user_id,
+                    jira_account_id=event.jira_account_id,
+                    is_system_user=True,
+                    is_active=True,
+                    name=''
+                )
+                await self.user_repository.create_user(new_user)
+                log.info(f"Created new user with Jira link for user {event.user_id}")
 
             # Store refresh token
             expires_at = get_jwt_expiry(event.refresh_token) or datetime.now(

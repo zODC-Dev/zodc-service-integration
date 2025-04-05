@@ -25,3 +25,20 @@ class AzureBlobStorageService(IBlobStorageService):
 
             # Return blob URL
             return f"{self.account_url}/{container_name}/{file.filename}"
+
+    async def delete_file(self, filename: str, container_name: str) -> bool:
+        try:
+            async with BlobServiceClient.from_connection_string(self.connection_string) as blob_service_client:
+                container_client = blob_service_client.get_container_client(container_name)
+                blob_client = container_client.get_blob_client(filename)
+
+                # Check if blob exists before deleting
+                exists = await blob_client.exists()
+                if not exists:
+                    return False
+
+                # Delete the blob
+                await blob_client.delete_blob()
+                return True
+        except Exception:
+            return False

@@ -31,3 +31,13 @@ async def get_media(
 ):
     """Get media file by id"""
     return await controller.get_media(media_id)
+
+
+@router.delete("/{media_id}", response_model=StandardResponse)
+async def remove_media(
+    media_id: UUID,
+    controller: MediaController = Depends(get_media_controller),
+    claims: JWTClaims = Depends(get_jwt_claims),
+):
+    """Remove media file by id (soft delete)"""
+    return await controller.remove_media(media_id)
