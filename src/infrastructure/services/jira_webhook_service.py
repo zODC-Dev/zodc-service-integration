@@ -51,7 +51,7 @@ class JiraWebhookService:
             IssueCreateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
                                       self.jira_issue_api_service),
             IssueUpdateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
-                                      self.jira_issue_api_service, self.issue_history_sync_service),
+                                      self.jira_issue_api_service),
             IssueDeleteWebhookHandler(self.jira_issue_repository, self.sync_log_repository)
         ]
 

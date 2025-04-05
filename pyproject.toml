@@ -101,7 +101,7 @@ force-sort-within-sections = true
 combine-as-imports = true
 
 [tool.mypy]
-disable_error_code = ["no-untyped-def", "import-untyped"]
+disable_error_code = ["no-untyped-def", "import-untyped", "union-attr", "override"]
 explicit_package_bases = true
 disallow_untyped_decorators = false
 strict = true

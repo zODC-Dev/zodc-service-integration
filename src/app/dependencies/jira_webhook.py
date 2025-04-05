@@ -53,7 +53,7 @@ async def get_webhook_handlers(
         # Issue handlers
         IssueCreateWebhookHandler(jira_issue_repository, sync_log_repository, jira_issue_api_service),
         IssueUpdateWebhookHandler(jira_issue_repository, sync_log_repository,
-                                  jira_issue_api_service, issue_history_sync_service),
+                                  jira_issue_api_service),
         IssueDeleteWebhookHandler(jira_issue_repository, sync_log_repository),
 
         # Sprint handlers
