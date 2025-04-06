@@ -32,17 +32,18 @@ async def get_project_issues(
     controller: JiraProjectController = Depends(get_jira_project_controller),
 ) -> StandardResponse[List[GetJiraIssueResponse]]:
     """Get issues from a specific Jira project"""
-    is_backlog = None
+    is_backlog: bool = False
+    sprint_number: Optional[int] = None
     if sprint_id == "backlog":
         is_backlog = True
-        sprint_id = None
+        sprint_number = None
     elif sprint_id:
-        sprint_id = int(sprint_id)
+        sprint_number = int(sprint_id)
 
     return await controller.get_project_issues(
         user_id=int(claims.sub),
         project_key=project_key,
-        sprint_id=sprint_id,
+        sprint_id=sprint_number,
         is_backlog=is_backlog,
         issue_type=issue_type,
         search=search,

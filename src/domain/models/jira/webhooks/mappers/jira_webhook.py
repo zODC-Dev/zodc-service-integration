@@ -1,11 +1,8 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, List
 
 from src.configs.logger import log
-from src.configs.settings import settings
 from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JIRA_STATUS_ID_MAPPING, JiraIssueStatus, JiraIssueType
-from src.domain.models.database.jira_issue import JiraIssueDBCreateDTO
-from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
 from src.domain.models.jira_sprint import JiraSprintModel
 
 
@@ -30,95 +27,95 @@ class JiraWebhookMapper:
         "Actual point": "actual_point",
     }
 
-    @classmethod
-    def map_to_create_dto(cls, webhook_data: JiraWebhookResponseDTO) -> JiraIssueDBCreateDTO:
-        """Map webhook data to JiraIssueDBCreateDTO"""
-        try:
-            issue = webhook_data.issue
+    # @classmethod
+    # def map_to_create_dto(cls, webhook_data: JiraWebhookResponseDTO) -> JiraIssueDBCreateDTO:
+    #     """Map webhook data to JiraIssueDBCreateDTO"""
+    #     try:
+    #         issue = webhook_data.issue
 
-            log.info(f"Issue in map_to_create_dto: {issue}")
-            fields = issue.fields
+    #         log.info(f"Issue in map_to_create_dto: {issue}")
+    #         fields = issue.fields
 
-            # Xử lý status theo mapping
-            status = None
-            if fields.status:
-                status_id = getattr(fields.status, 'id', None)
-                if status_id and str(status_id) in JIRA_STATUS_ID_MAPPING:
-                    status = JIRA_STATUS_ID_MAPPING[str(status_id)]
-                else:
-                    try:
-                        status = JiraIssueStatus(fields.status.name)
-                    except ValueError:
-                        status = JiraIssueStatus.TO_DO
-            else:
-                status = JiraIssueStatus.TO_DO
+    #         # Xử lý status theo mapping
+    #         status = None
+    #         if fields.status:
+    #             status_id = getattr(fields.status, 'id', None)
+    #             if status_id and str(status_id) in JIRA_STATUS_ID_MAPPING:
+    #                 status = JIRA_STATUS_ID_MAPPING[str(status_id)]
+    #             else:
+    #                 try:
+    #                     status = JiraIssueStatus(fields.status.name)
+    #                 except ValueError:
+    #                     status = JiraIssueStatus.TO_DO
+    #         else:
+    #             status = JiraIssueStatus.TO_DO
 
-            # Xử lý issue type theo mapping
-            issue_type = None
-            if fields.issue_type:
-                type_id = getattr(fields.issue_type, 'id', None)
-                if type_id and str(type_id) in JIRA_ISSUE_TYPE_ID_MAPPING:
-                    issue_type = JIRA_ISSUE_TYPE_ID_MAPPING[str(type_id)]
-                else:
-                    try:
-                        issue_type = JiraIssueType(fields.issue_type.name)
-                    except ValueError:
-                        issue_type = JiraIssueType.TASK
-            else:
-                issue_type = JiraIssueType.TASK
+    #         # Xử lý issue type theo mapping
+    #         issue_type = None
+    #         if fields.issue_type:
+    #             type_id = getattr(fields.issue_type, 'id', None)
+    #             if type_id and str(type_id) in JIRA_ISSUE_TYPE_ID_MAPPING:
+    #                 issue_type = JIRA_ISSUE_TYPE_ID_MAPPING[str(type_id)]
+    #             else:
+    #                 try:
+    #                     issue_type = JiraIssueType(fields.issue_type.name)
+    #                 except ValueError:
+    #                     issue_type = JiraIssueType.TASK
+    #         else:
+    #             issue_type = JiraIssueType.TASK
 
-            # Map sprints from customfield_10020
-            sprints: List[JiraSprintModel] = []
-            if fields.sprints and len(fields.sprints) > 0:
-                log.info(f"Found sprint data: {fields.sprints}")
-                for sprint_data in fields.sprints:
-                    if not sprint_data:
-                        continue
-                    try:
-                        sprint = JiraSprintModel(
-                            jira_sprint_id=sprint_data.id,
-                            name=sprint_data.name,
-                            state=sprint_data.state,
-                            start_date=cls._parse_datetime(sprint_data.start_date) if sprint_data.start_date else None,
-                            end_date=cls._parse_datetime(sprint_data.end_date) if sprint_data.end_date else None,
-                            goal=sprint_data.goal or "",
-                            board_id=sprint_data.board_id,
-                            project_key=fields.project.key,
-                            created_at=datetime.now(timezone.utc)
-                        )
-                        sprints.append(sprint)
-                    except Exception as e:
-                        log.error(f"Error mapping sprint data: {str(e)}")
-                        continue
+    #         # Map sprints from customfield_10020
+    #         sprints: List[JiraSprintModel] = []
+    #         if fields.sprints and len(fields.sprints) > 0:
+    #             log.info(f"Found sprint data: {fields.sprints}")
+    #             for sprint_data in fields.sprints:
+    #                 if not sprint_data:
+    #                     continue
+    #                 try:
+    #                     sprint = JiraSprintModel(
+    #                         jira_sprint_id=sprint_data.id,
+    #                         name=sprint_data.name,
+    #                         state=sprint_data.state,
+    #                         start_date=cls._parse_datetime(sprint_data.start_date) if sprint_data.start_date else None,
+    #                         end_date=cls._parse_datetime(sprint_data.end_date) if sprint_data.end_date else None,
+    #                         goal=sprint_data.goal or "",
+    #                         board_id=sprint_data.board_id,
+    #                         project_key=fields.project.key,
+    #                         created_at=datetime.now(timezone.utc)
+    #                     )
+    #                     sprints.append(sprint)
+    #                 except Exception as e:
+    #                     log.error(f"Error mapping sprint data: {str(e)}")
+    #                     continue
 
-            # Create link URL
-            jira_base_url = settings.JIRA_DASHBOARD_URL
-            project_key = fields.project.key
-            issue_key = issue.key
-            # current_sprint_id = sprints[0].board_id if sprints else 3
-            current_sprint_id = 3
-            link_url = f"{jira_base_url}/jira/software/projects/{project_key}/boards/{current_sprint_id}?selectedIssue={issue_key}"
+    #         # Create link URL
+    #         jira_base_url = settings.JIRA_DASHBOARD_URL
+    #         project_key = fields.project.key
+    #         issue_key = issue.key
+    #         # current_sprint_id = sprints[0].board_id if sprints else 3
+    #         current_sprint_id = 3
+    #         link_url = f"{jira_base_url}/jira/software/projects/{project_key}/boards/{current_sprint_id}?selectedIssue={issue_key}"
 
-            return JiraIssueDBCreateDTO(
-                jira_issue_id=issue.id,
-                key=issue.key,
-                project_key=fields.project.key,
-                summary=fields.summary,
-                description=fields.description,
-                type=issue_type,
-                status=status,
-                assignee_id=fields.assignee.account_id if fields.assignee else None,
-                reporter_id=fields.reporter.account_id if fields.reporter else None,
-                created_at=cls._parse_datetime(fields.created),
-                updated_at=cls._parse_datetime(fields.updated),
-                estimate_point=getattr(fields, 'customfield_10016', None),
-                actual_point=getattr(fields, 'customfield_10017', None),
-                sprints=sprints,  # Add sprints to DTO
-                link_url=link_url
-            )
-        except Exception as e:
-            log.error(f"Error mapping webhook data to create DTO: {str(e)}")
-            raise
+    #         return JiraIssueDBCreateDTO(
+    #             jira_issue_id=issue.id,
+    #             key=issue.key,
+    #             project_key=fields.project.key,
+    #             summary=fields.summary,
+    #             description=fields.description,
+    #             type=issue_type,
+    #             status=status,
+    #             assignee_id=fields.assignee.account_id if fields.assignee else None,
+    #             reporter_id=fields.reporter.account_id if fields.reporter else None,
+    #             created_at=cls._parse_datetime(fields.created),
+    #             updated_at=cls._parse_datetime(fields.updated),
+    #             estimate_point=getattr(fields, 'customfield_10016', None),
+    #             actual_point=getattr(fields, 'customfield_10017', None),
+    #             sprints=sprints,  # Add sprints to DTO
+    #             link_url=link_url
+    #         )
+    #     except Exception as e:
+    #         log.error(f"Error mapping webhook data to create DTO: {str(e)}")
+    #         raise
 
     # @classmethod
     # def map_to_update_dto(cls, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:

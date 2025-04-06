@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+import uuid
 
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.configs.logger import log
@@ -8,8 +9,10 @@ from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRe
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.nats.replies.workflow_sync import WorkflowSyncReply, WorkflowSyncReplyIssue
 from src.domain.models.nats.requests.workflow_sync import WorkflowSyncConnection, WorkflowSyncIssue, WorkflowSyncRequest
+from src.domain.models.workflow_mapping import WorkflowMappingModel
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
+from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
 from src.domain.services.nats_message_handler import INATSRequestHandler
 
 
@@ -18,11 +21,13 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
         self,
         jira_issue_service: JiraIssueApplicationService,
         user_repository: IJiraUserRepository,
-        jira_sprint_repository: IJiraSprintRepository
+        jira_sprint_repository: IJiraSprintRepository,
+        workflow_mapping_repository: IWorkflowMappingRepository
     ):
         self.jira_issue_service = jira_issue_service
         self.user_repository = user_repository
         self.jira_sprint_repository = jira_sprint_repository
+        self.workflow_mapping_repository = workflow_mapping_repository
 
     async def handle(self, subject: str, message: Dict[str, Any]) -> Dict[str, Any]:
         """Handle workflow sync requests"""
@@ -30,6 +35,19 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             log.info(f"Received workflow sync request: {message}")
             # Convert raw message to DTO
             request = WorkflowSyncRequest.model_validate(message)
+
+            # Lưu workflow mapping
+            workflow_id = str(uuid.uuid4())  # Generate UUID cho workflow mới
+            workflow_mapping = WorkflowMappingModel(
+                workflow_id=workflow_id,
+                transaction_id=request.transaction_id,
+                project_key=request.project_key,
+                sprint_id=request.sprint_id,
+                status="active"
+            )
+
+            await self.workflow_mapping_repository.create(workflow_mapping)
+            log.info(f"Created workflow mapping with ID: {workflow_id}")
 
             # Tạo mapping ban đầu từ các issue đã có Jira key
             node_to_jira_key_map = {}
@@ -154,7 +172,8 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
 
     async def _update_issue(self, issue: WorkflowSyncIssue) -> JiraIssueModel:
         """Update an existing issue in Jira"""
-        # Map assignee_id to Jira account ID if provided
+        if not issue.jira_key:
+            raise Exception("Cannot update issue without jira_key")
 
         # Create update data
         update_dto = JiraIssueAPIUpdateRequestDTO(

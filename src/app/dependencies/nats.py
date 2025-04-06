@@ -3,15 +3,19 @@ from typing import Mapping
 from fastapi import Depends
 
 from src.app.dependencies.common import (
-    get_jira_sprint_repository,
     get_jira_user_repository,
     get_nats_service,
     get_redis_service,
     get_refresh_token_repository,
 )
+from src.app.dependencies.gantt_chart import get_gantt_chart_service
 from src.app.dependencies.jira_issue import get_jira_issue_application_service
+from src.app.dependencies.jira_sprint import get_jira_sprint_repository
+from src.app.dependencies.workflow_mapping import get_workflow_mapping_repository
+from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.nats_event_service import NATSEventService
+from src.app.services.nats_handlers.gantt_chart_handler import GanttChartRequestHandler
 from src.app.services.nats_handlers.jira_issue_link_handler import JiraIssueLinkRequestHandler
 from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueSyncRequestHandler
 from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
@@ -22,6 +26,7 @@ from src.domain.constants.nats_events import NATSSubscribeTopic
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
+from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
 from src.domain.services.nats_event_service import INATSEventService
 from src.domain.services.nats_message_handler import INATSRequestHandler
 from src.domain.services.nats_service import INATSService
@@ -36,6 +41,8 @@ def get_nats_event_service(
     refresh_token_repository: IRefreshTokenRepository = Depends(get_refresh_token_repository),
     jira_issue_application_service: JiraIssueApplicationService = Depends(get_jira_issue_application_service),
     jira_sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository),
+    workflow_mapping_repository: IWorkflowMappingRepository = Depends(get_workflow_mapping_repository),
+    gantt_chart_service: GanttChartApplicationService = Depends(get_gantt_chart_service)
 ) -> INATSEventService:
     """Get NATS event service with all handlers configured"""
     # Configure message handlers
@@ -58,8 +65,11 @@ def get_nats_event_service(
             WorkflowSyncRequestHandler(
                 jira_issue_application_service,
                 user_repository,
-                jira_sprint_repository
-            )
+                jira_sprint_repository,
+                workflow_mapping_repository
+            ),
+        NATSSubscribeTopic.GANTT_CHART_CALCULATION.value:
+            GanttChartRequestHandler(gantt_chart_service)
     }
 
     # Create and return service

@@ -1,7 +1,7 @@
-from typing import Optional, Tuple
+from typing import AsyncIterator, Tuple
 from uuid import UUID, uuid4
 
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 
 from src.configs.settings import settings
 from src.domain.models.database.media import MediaDBCreateDTO
@@ -41,8 +41,23 @@ class MediaService:
 
         return await self.media_repository.create(media)
 
-    async def get_media(self, media_id: UUID) -> Optional[MediaModel]:
-        return await self.media_repository.get_by_id(media_id)
+    async def get_media(self, media_id: UUID) -> Tuple[MediaModel, AsyncIterator[bytes], int]:
+        """Get media file by id
+
+        Returns:
+            Tuple[MediaModel, AsyncIterator[bytes], int]: Media info, file content stream and file size
+        """
+        media = await self.media_repository.get_by_id(media_id)
+        if not media:
+            raise HTTPException(status_code=404, detail="Media not found")
+
+        # Download file from blob storage
+        file_stream, file_size = await self.blob_storage_service.download_file(
+            filename=media.filename,
+            container_name=self.container_name
+        )
+
+        return media, file_stream, file_size
 
     async def remove_media(self, media_id: UUID) -> Tuple[bool, str]:
         """Remove media file from storage and database (soft delete)

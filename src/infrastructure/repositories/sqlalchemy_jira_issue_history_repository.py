@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Any, List, Optional
 import uuid
 
 from sqlmodel import and_, col, select
@@ -199,7 +199,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                 return []
 
             # Tạo query để lấy lịch sử của các issue
-            conditions = [col(JiraIssueHistoryEntity.jira_issue_id).in_(issue_ids)]
+            conditions: List[Any] = [col(JiraIssueHistoryEntity.jira_issue_id).in_(issue_ids)]
 
             if from_date:
                 conditions.append(col(JiraIssueHistoryEntity.created_at) >= from_date)

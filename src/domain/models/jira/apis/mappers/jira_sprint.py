@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from src.configs.logger import log
 from src.domain.constants.jira import JiraSprintState
@@ -40,18 +40,18 @@ class JiraSprintMapper:
             log.error(f"Error converting sprint data to domain model: {str(e)}")
             raise
 
-    @classmethod
-    def from_domain(cls, model: JiraSprintModel) -> Dict[str, Any]:
-        """Convert domain model to API request format"""
-        return {
-            "id": int(model.id),
-            "name": model.name,
-            "state": model.state,
-            "startDate": model.start_date.isoformat() + 'Z' if model.start_date else None,
-            "endDate": model.end_date.isoformat() + 'Z' if model.end_date else None,
-            "completeDate": model.complete_date.isoformat() + 'Z' if model.complete_date else None,
-            "goal": model.goal
-        }
+    # @classmethod
+    # def from_domain(cls, model: JiraSprintModel) -> Dict[str, Any]:
+    #     """Convert domain model to API request format"""
+    #     return {
+    #         "id": int(model.id),
+    #         "name": model.name,
+    #         "state": model.state,
+    #         "startDate": model.start_date.isoformat() + 'Z' if model.start_date else None,
+    #         "endDate": model.end_date.isoformat() + 'Z' if model.end_date else None,
+    #         "completeDate": model.complete_date.isoformat() + 'Z' if model.complete_date else None,
+    #         "goal": model.goal
+    #     }
 
     @classmethod
     def from_webhook_list(cls, sprint_data: Any) -> Optional[List[JiraSprintModel]]:
