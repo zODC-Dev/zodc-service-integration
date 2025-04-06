@@ -79,3 +79,15 @@ async def get_jira_api_client(
         redis_service=redis_service,
         token_scheduler_service=token_scheduler_service,
     )
+
+
+async def get_jira_api_admin_client(
+    redis_service: RedisService = Depends(get_redis_service),
+    token_scheduler_service: ITokenSchedulerService = Depends(get_token_scheduler_service),
+):
+    """Dependency for jira api client with admin auth"""
+    return JiraAPIClient(
+        redis_service=redis_service,
+        token_scheduler_service=token_scheduler_service,
+        use_admin_auth=True  # Sử dụng admin auth
+    )

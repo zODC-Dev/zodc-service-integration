@@ -161,12 +161,8 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             sprint_id=jira_sprint_id  # Sử dụng Jira sprint ID đã được map
         )
 
-        # Use system user or first available user with Jira access
-        user_id = await self._get_valid_user_id()
-
-        # Create issue via Jira API
-        return await self.jira_issue_service.jira_issue_api_service.create_issue(
-            user_id=user_id,
+        # Sử dụng admin auth để tạo issue
+        return await self.jira_issue_service.jira_issue_api_service.create_issue_with_admin_auth(
             issue_data=create_dto
         )
 
@@ -181,12 +177,8 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             assignee_id=str(issue.assignee_id)
         )
 
-        # Use system user or first available user with Jira access
-        user_id = await self._get_valid_user_id()
-
-        # Update issue via Jira API
-        return await self.jira_issue_service.jira_issue_api_service.update_issue(
-            user_id=user_id,
+        # Sử dụng admin auth để update issue
+        return await self.jira_issue_service.jira_issue_api_service.update_issue_with_admin_auth(
             issue_id=issue.jira_key,
             update=update_dto
         )
@@ -197,7 +189,6 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
         node_to_jira_key_map: Dict[str, str]
     ):
         """Process all connections between issues"""
-        user_id = await self._get_valid_user_id()
         connection_results = []
 
         # Log mapping để dễ debug
@@ -220,9 +211,8 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
                     connection_results.append(False)
                     continue
 
-                # Create "relates to" link between issues
-                success = await self.jira_issue_service.jira_issue_api_service.create_issue_link(
-                    user_id=user_id,
+                # Create "relates to" link between issues using admin auth
+                success = await self.jira_issue_service.jira_issue_api_service.create_issue_link_with_admin_auth(
                     source_issue_id=source_key,
                     target_issue_id=target_key,
                     relationship="Relates"  # Always using "relates to" as requested
@@ -243,13 +233,6 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
         # Nếu không có connection nào thành công, raise exception
         if connections and not any(connection_results):
             raise Exception("Failed to create any connections between issues")
-
-    async def _get_valid_user_id(self) -> int:
-        """Get a valid user ID for Jira API calls"""
-        # In a real implementation, you might want to use a system user or
-        # get the first user with Jira access from the repository
-        # For now, returning a placeholder value
-        return settings.JIRA_SYSTEM_USER_ID
 
     def _map_issue_type(self, issue_type: str) -> str:
         """Map issue type to Jira issue type"""

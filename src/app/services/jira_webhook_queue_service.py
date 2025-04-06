@@ -244,7 +244,7 @@ class JiraWebhookQueueService:
         """Lấy data mới nhất của issue từ Jira API"""
         try:
             # Lấy issue từ Jira API
-            issue = await self.jira_issue_api_service.get_issue_with_system_user(issue_id)
+            issue = await self.jira_issue_api_service.get_issue_with_admin_auth(issue_id)
             return issue
         except Exception as e:
             log.error(f"Error fetching issue {issue_id} from Jira API: {str(e)}")
