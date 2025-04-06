@@ -35,7 +35,6 @@ class MicrosoftLoginMessageHandler(INATSMessageHandler):
                     user_id=event.user_id,
                     is_system_user=True,
                     is_active=True,
-                    jira_account_id='',
                     name=event.name
                 )
                 user = await self.user_repository.create_user(new_user)

@@ -29,16 +29,16 @@ class JiraSprintAnalyticsApplicationService:
 
             # Chuyển đổi domain model sang response DTO với các giá trị đã làm tròn
             return SprintBurndownResponse(
-                sprintName=burndown_data.name,
-                startDate=burndown_data.start_date.strftime("%Y-%m-%d"),
-                endDate=burndown_data.end_date.strftime("%Y-%m-%d"),
-                totalPointsInitial=round(burndown_data.total_points_initial, 2),
-                totalPointsCurrent=round(burndown_data.total_points_current, 2),
+                sprint_name=burndown_data.name,
+                start_date=burndown_data.start_date.strftime("%Y-%m-%d"),
+                end_date=burndown_data.end_date.strftime("%Y-%m-%d"),
+                total_points_initial=round(burndown_data.total_points_initial, 2),
+                total_points_current=round(burndown_data.total_points_current, 2),
                 dates=burndown_data.get_dates_list(),
-                idealBurndown=self._round_float_list(burndown_data.get_ideal_burndown()),
-                actualBurndown=self._round_float_list(burndown_data.get_actual_burndown()),
-                addedPoints=self._round_float_list(burndown_data.get_added_points()),
-                scopeChanges=[
+                ideal_burndown=self._round_float_list(burndown_data.get_ideal_burndown()),
+                actual_burndown=self._round_float_list(burndown_data.get_actual_burndown()),
+                added_points=self._round_float_list(burndown_data.get_added_points()),
+                scope_changes=[
                     {
                         "date": change.date.strftime("%Y-%m-%d"),
                         "pointsAdded": round(change.points_added, 2),

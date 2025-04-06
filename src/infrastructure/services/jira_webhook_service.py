@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional
 
-from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
 from src.app.services.jira_webhook_handlers.issue_create_webhook_handler import IssueCreateWebhookHandler
 from src.app.services.jira_webhook_handlers.issue_delete_webhook_handler import IssueDeleteWebhookHandler
 from src.app.services.jira_webhook_handlers.issue_update_webhook_handler import IssueUpdateWebhookHandler
@@ -33,7 +32,7 @@ class JiraWebhookService:
         jira_issue_api_service: IJiraIssueAPIService,
         jira_sprint_api_service: IJiraSprintAPIService,
         sprint_database_service: IJiraSprintDatabaseService,
-        issue_history_sync_service: JiraIssueHistorySyncService
+        # issue_history_sync_service: JiraIssueHistorySyncService
     ):
         self.handlers: List[JiraWebhookHandler] = []
         self.jira_issue_repository = jira_issue_repository
@@ -41,17 +40,17 @@ class JiraWebhookService:
         self.jira_issue_api_service = jira_issue_api_service
         self.jira_sprint_api_service = jira_sprint_api_service
         self.sprint_database_service = sprint_database_service
-        self.issue_history_sync_service = issue_history_sync_service
+        # self.issue_history_sync_service = issue_history_sync_service
         self._init_handlers()
 
-    def _init_handlers(self):
+    def _init_handlers(self) -> None:
         """Initialize webhook handlers"""
         # Issue handlers
         issue_handlers = [
             IssueCreateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
                                       self.jira_issue_api_service),
             IssueUpdateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
-                                      self.jira_issue_api_service, self.issue_history_sync_service),
+                                      self.jira_issue_api_service),
             IssueDeleteWebhookHandler(self.jira_issue_repository, self.sync_log_repository)
         ]
 

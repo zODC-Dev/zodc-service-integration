@@ -142,10 +142,17 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             await self.transition_issue(user_id, created_issue_id, issue_data.status)
             created_issue = await self.get_issue(user_id, created_issue_id)
 
-        return created_issue
+        if created_issue:
+            return created_issue
+        else:
+            log.error(f"Failed to get issue {created_issue_id} after create")
+            raise Exception(f"Failed to get issue {created_issue_id} after create")
 
-    def _get_issue_type_payload(self, issue_type: Union[JiraIssueType, str]) -> Dict[str, Any]:
+    def _get_issue_type_payload(self, issue_type: Union[JiraIssueType, str, None]) -> Dict[str, Any]:
         """Get issue type payload for Jira API"""
+        if issue_type is None:
+            issue_type = JiraIssueType.TASK
+
         if isinstance(issue_type, str):
             try:
                 issue_type = JiraIssueType(issue_type)
@@ -223,7 +230,12 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         log.info(f"Update result for issue {issue_id}: {update_result}")
 
         # Return issue after update
-        return await self.get_issue(user_id, issue_id)
+        updated_issue = await self.get_issue(user_id, issue_id)
+        if updated_issue:
+            return updated_issue
+        else:
+            log.error(f"Failed to get issue {issue_id} after update")
+            raise Exception(f"Failed to get issue {issue_id} after update")
 
     async def search_issues(
         self,
@@ -502,7 +514,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             }
 
             # Lấy tất cả changelog
-            all_changelogs = []
+            all_changelogs: List[Dict[str, Any]] = []
             start_at = 0
             max_results = 100
             total = None
@@ -524,7 +536,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                     break
 
                 # Debug: In ra cấu trúc của một changelog (chỉ in ra khi tìm thấy dữ liệu)
-                values = response_data.get("values", [])
+                values: List[Dict[str, Any]] = response_data.get("values", [])
                 if values and len(values) > 0 and not all_changelogs:
                     log.debug(f"Sample changelog structure: {values[0]}")
                     if 'author' in values[0]:

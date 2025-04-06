@@ -16,11 +16,11 @@ class IJiraIssueAPIService(ABC):
         pass
 
     @abstractmethod
-    async def get_issue(self, user_id: int, issue_id: str) -> JiraIssueModel:
+    async def get_issue(self, user_id: int, issue_id: str) -> Optional[JiraIssueModel]:
         pass
 
     @abstractmethod
-    async def get_issue_with_system_user(self, issue_id: str) -> JiraIssueModel:
+    async def get_issue_with_system_user(self, issue_id: str) -> Optional[JiraIssueModel]:
         """Get issue using system user account"""
         pass
 
