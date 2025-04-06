@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -14,8 +14,19 @@ class JiraProjectSyncSummaryDTO(BaseModel):
     completed_at: Optional[str] = None
 
 
+class SyncedJiraUserDTO(BaseModel):
+    """DTO for synced Jira user information in the reply"""
+    id: Optional[int] = None
+    jira_account_id: str
+    name: str
+    email: str = ""
+    is_active: bool = True
+    avatar_url: Optional[str] = None
+
+
 class JiraProjectSyncNATSReplyDTO(BaseModel):
     success: bool
     project_key: str
     error_message: Optional[str] = None
     sync_summary: JiraProjectSyncSummaryDTO
+    synced_users: List[SyncedJiraUserDTO] = []

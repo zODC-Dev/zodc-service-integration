@@ -64,7 +64,6 @@ class JiraProjectAPIService(IJiraProjectAPIService):
                 JiraUserAPIGetResponseDTO,
                 JiraUserMapper
             )
-            log.info(f"User via get_project_users: {user}")
             users.append(user)
 
         return users

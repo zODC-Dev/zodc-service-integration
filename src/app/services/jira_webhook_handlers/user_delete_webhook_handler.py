@@ -30,7 +30,6 @@ class UserDeleteWebhookHandler(JiraWebhookHandler):
     async def handle(self, webhook_data: JiraUserWebhookDTO) -> Dict[str, Any]:
         """Handle the user delete webhook"""
         account_id = webhook_data.user.account_id
-        log.info(f"Processing user delete webhook for user {account_id}")
 
         try:
             # Check if user exists

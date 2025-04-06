@@ -33,7 +33,6 @@ class SprintUpdateWebhookHandler(JiraWebhookHandler):
     async def handle(self, webhook_data: JiraSprintWebhookDTO) -> Dict[str, Any]:
         """Handle the sprint update webhook"""
         sprint_id = webhook_data.sprint.id
-        log.info(f"Processing sprint update webhook for sprint {sprint_id}")
 
         # Get latest sprint data from Jira API
         sprint_data = await self.jira_sprint_api_service.get_sprint_by_id_with_system_user(sprint_id)

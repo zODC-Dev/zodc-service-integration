@@ -33,7 +33,6 @@ class SprintCreateWebhookHandler(JiraWebhookHandler):
     async def handle(self, webhook_data: JiraSprintWebhookDTO) -> Dict[str, Any]:
         """Handle the sprint creation webhook"""
         sprint_id = webhook_data.sprint.id
-        log.info(f"Processing sprint create webhook for sprint {sprint_id}")
 
         # Get latest sprint data from Jira API
         sprint_data = await self.jira_sprint_api_service.get_sprint_by_id_with_system_user(sprint_id)
@@ -50,7 +49,6 @@ class SprintCreateWebhookHandler(JiraWebhookHandler):
         # Check if sprint already exists
         existing_sprint = await self.sprint_database_service.get_sprint_by_jira_sprint_id(sprint_id)
         if existing_sprint:
-            log.info(f"Sprint {sprint_id} already exists, skipping creation")
             return {"success": True, "message": f"Sprint {sprint_id} already exists"}
 
         try:
@@ -88,7 +86,6 @@ class SprintCreateWebhookHandler(JiraWebhookHandler):
                 )
             )
 
-            log.info(f"Successfully created sprint {sprint_id} in database")
             return {
                 "sprint_id": sprint_id,
                 "created": True

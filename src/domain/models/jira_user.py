@@ -8,7 +8,7 @@ class JiraUserModel(BaseModel):
     """Domain model for Jira User"""
     id: Optional[int] = None  # auto increment id
     user_id: Optional[int] = None  # for internal use
-    jira_account_id: str  # Jira account ID
+    jira_account_id: Optional[str] = None
     name: str
     email: str = ""
     is_active: bool = True

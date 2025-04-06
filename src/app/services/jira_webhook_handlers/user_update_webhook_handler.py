@@ -44,8 +44,6 @@ class UserUpdateWebhookHandler(JiraWebhookHandler):
             existing_user = await self.user_database_service.get_user_by_jira_account_id(account_id)
 
             if not existing_user:
-                log.info(f"User {account_id} not found in database, creating new user")
-
                 # If we couldn't get data from API, use the webhook data
                 if not user_data:
                     log.warning(f"Could not fetch user {account_id} from API, using webhook data")
