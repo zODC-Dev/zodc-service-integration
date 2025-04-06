@@ -6,7 +6,7 @@ from src.app.schemas.responses.jira_sprint_analytics import SprintBurndownRespon
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_sprint_analytics_service import JiraSprintAnalyticsApplicationService
 from src.configs.logger import log
-from src.domain.models.gantt_chart import ScheduleConfigModel
+from src.domain.models.gantt_chart import ProjectConfigModel
 
 
 class JiraSprintAnalyticsController:
@@ -52,7 +52,7 @@ class JiraSprintAnalyticsController:
         """Get Gantt chart for a sprint"""
         try:
             # Create config from params
-            config = ScheduleConfigModel(
+            config = ProjectConfigModel(
                 working_hours_per_day=params.working_hours_per_day,
                 hours_per_point=params.hours_per_point,
                 start_work_hour=time(9, 0),
@@ -113,7 +113,7 @@ class JiraSprintAnalyticsController:
         """Check if a sprint is feasible"""
         try:
             # Create config from params
-            config = ScheduleConfigModel(
+            config = ProjectConfigModel(
                 working_hours_per_day=params.working_hours_per_day,
                 hours_per_point=params.hours_per_point,
                 start_work_hour=time(9, 0),

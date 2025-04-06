@@ -6,3 +6,4 @@ class MediaResponse(BaseResponse):
     filename: str
     content_type: str
     size: int
+    download_url: str

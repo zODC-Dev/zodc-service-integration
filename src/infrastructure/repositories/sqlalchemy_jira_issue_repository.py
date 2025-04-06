@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Dict
 
-from sqlmodel import col, delete, select
+from sqlmodel import col, delete, select, and_
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
@@ -331,4 +331,28 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
         except Exception as e:
             log.error(f"Error fetching project issues: {str(e)}")
+            raise
+
+    async def get_issues_by_keys(self, keys: List[str]) -> List[JiraIssueModel]:
+        """Get multiple issues by their Jira keys"""
+        try:
+            log.debug(f"[REPO] Fetching {len(keys)} issues by keys: {keys}")
+
+            query = select(JiraIssueEntity).where(
+                and_(
+                    JiraIssueEntity.key.in_(keys),
+                    JiraIssueEntity.is_deleted.is_(False)
+                )
+            )
+
+            log.debug(f"[REPO] Executing query: {query}")
+            result = await self.session.exec(query)
+            entities = result.all()
+            log.debug(f"[REPO] Found {len(entities)} issues in database")
+
+            # Convert to domain models
+            return [self._to_domain(entity) for entity in entities]
+
+        except Exception as e:
+            log.error(f"[REPO] Error getting issues by keys: {str(e)}", exc_info=True)
             raise

@@ -1,7 +1,7 @@
-from typing import AsyncIterator, Optional, Tuple
+from typing import AsyncIterator, Tuple
 from uuid import UUID, uuid4
 
-from fastapi import UploadFile, HTTPException
+from fastapi import HTTPException, UploadFile
 
 from src.configs.settings import settings
 from src.domain.models.database.media import MediaDBCreateDTO

@@ -2,7 +2,6 @@ from typing import Mapping
 
 from fastapi import Depends
 
-from src.app.dependencies.jira_sprint import get_jira_sprint_repository
 from src.app.dependencies.common import (
     get_jira_user_repository,
     get_nats_service,

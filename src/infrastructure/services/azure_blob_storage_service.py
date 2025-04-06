@@ -1,7 +1,7 @@
 from typing import AsyncIterator, Tuple
 
 from azure.storage.blob.aio import BlobServiceClient
-from fastapi import UploadFile, HTTPException
+from fastapi import HTTPException, UploadFile
 
 from src.configs.settings import settings
 from src.domain.services.blob_storage_service import IBlobStorageService
@@ -68,4 +68,4 @@ class AzureBlobStorageService(IBlobStorageService):
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to download file: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to download file: {str(e)}") from e

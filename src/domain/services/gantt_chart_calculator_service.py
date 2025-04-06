@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import List
+from typing import Dict, List
 
 from src.domain.models.gantt_chart import (
     GanttChartConnectionModel,
     GanttChartJiraIssueModel,
-    ScheduleConfigModel,
+    ProjectConfigModel,
     TaskScheduleModel,
 )
 
@@ -20,7 +20,8 @@ class IGanttChartCalculatorService(ABC):
         sprint_end_date: datetime,
         issues: List[GanttChartJiraIssueModel],
         connections: List[GanttChartConnectionModel],
-        config: ScheduleConfigModel
+        hierarchy_map: Dict[str, List[str]],
+        config: ProjectConfigModel
     ) -> List[TaskScheduleModel]:
         """Calculate schedule for tasks based on dependencies and constraints
 
@@ -29,6 +30,7 @@ class IGanttChartCalculatorService(ABC):
         - sprint_end_date: End date of the sprint
         - issues: List of issues with their details
         - connections: List of connections between issues
+        - hierarchy_map: Map of parent-child relationships (parent_id -> List[child_id])
         - config: Schedule configuration
 
         Returns:

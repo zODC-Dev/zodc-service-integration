@@ -2,9 +2,10 @@ from typing import Any, Dict
 
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.configs.logger import log
-from src.domain.models.gantt_chart import ScheduleConfigModel
+from src.domain.models.gantt_chart import ProjectConfigModel
 from src.domain.models.nats.replies.gantt_chart_calculation import (
-    GanttChartCalculationReply,
+    GanttChartCalculationResponse,
+    GanttChartJiraIssueResult,
 )
 from src.domain.models.nats.requests.gantt_chart_calculation import (
     GanttChartCalculationRequest,
@@ -21,15 +22,21 @@ class GanttChartRequestHandler(INATSRequestHandler):
     async def handle(self, subject: str, message: Dict[str, Any]) -> Dict[str, Any]:
         """Handle Gantt chart calculation requests"""
         try:
-            log.info(f"Received Gantt chart calculation request: {message}")
+            log.info(f"[GANTT-NATS] Received Gantt chart calculation request for subject: {subject}")
+            log.debug(f"[GANTT-NATS] Request message: {message}")
 
             # Validate request against our defined model
             request = GanttChartCalculationRequest.model_validate(message)
+            log.info(f"[GANTT-NATS] Processing request for project: {request.project_key}, sprint: {request.sprint_id}")
+            log.debug(
+                f"[GANTT-NATS] Request contains {len(request.issues) if request.issues else 0} issues and {len(request.connections) if request.connections else 0} connections")
 
             # Create config if provided, otherwise use default
-            config = request.config if request.config else ScheduleConfigModel()
+            config = request.config if request.config else ProjectConfigModel()
+            log.debug(f"[GANTT-NATS] Using configuration: {config.model_dump()}")
 
             # Get Gantt chart with properly typed models
+            log.info("[GANTT-NATS] Calling application service to calculate Gantt chart")
             gantt_chart = await self.gantt_chart_service.get_gantt_chart(
                 project_key=request.project_key,
                 sprint_id=request.sprint_id,
@@ -38,25 +45,42 @@ class GanttChartRequestHandler(INATSRequestHandler):
                 issues=request.issues,
                 connections=request.connections
             )
+            log.info(f"[GANTT-NATS] Gantt chart calculation completed with {len(gantt_chart.tasks)} tasks")
 
-            # Prepare reply - using our model directly
-            reply = GanttChartCalculationReply(
-                transaction_id=request.transaction_id,
-                project_key=request.project_key,
-                sprint_id=request.sprint_id,
-                sprint_start_date=gantt_chart.start_date,
-                sprint_end_date=gantt_chart.end_date,
-                tasks=gantt_chart.tasks,
-                is_feasible=gantt_chart.is_feasible
-            )
+            # Create client response directly from gantt chart tasks
+            client_issues = [
+                GanttChartJiraIssueResult(
+                    node_id=task.node_id,
+                    planned_start_time=task.plan_start_time,
+                    planned_end_time=task.plan_end_time
+                )
+                for task in gantt_chart.tasks
+            ]
+
+            # Create the final response model
+            client_response = GanttChartCalculationResponse(issues=client_issues)
+            log.info(f"[GANTT-NATS] Created client response with {len(client_issues)} issues")
+
+            # Serialize với datetime xử lý đúng
+            response_data = {}
+            response_data["issues"] = [
+                {
+                    "node_id": issue.node_id,
+                    "planned_start_time": issue.planned_start_time.isoformat(),
+                    "planned_end_time": issue.planned_end_time.isoformat()
+                }
+                for issue in client_issues
+            ]
+
+            log.debug(f"[GANTT-NATS] Final response data structure: {response_data.keys()}")
 
             return {
                 "success": True,
-                "data": reply.model_dump()
+                "data": response_data
             }
 
         except Exception as e:
-            log.error(f"Error handling Gantt chart calculation request: {str(e)}")
+            log.error(f"[GANTT-NATS] Error handling Gantt chart calculation request: {str(e)}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e),

@@ -40,7 +40,8 @@ class MediaController:
                 content=file_stream,
                 media_type=media.content_type,
                 headers={
-                    "Content-Disposition": f"attachment; filename={media.filename}"
+                    "Access-Control-Expose-Headers": "*",
+                    "Content-Disposition": f"attachment; filename={media.filename}; filesize1={media.size}; filetype={media.content_type}"
                 }
             )
         except HTTPException:
