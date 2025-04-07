@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Optional
 
-from src.domain.models.jira_issue_history import IssueHistoryEventModel, JiraIssueHistoryModel
+from src.domain.models.database.jira_issue_history import JiraIssueHistoryDBCreateDTO
+from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 
 
 class IJiraIssueHistoryDatabaseService(ABC):
@@ -44,7 +45,7 @@ class IJiraIssueHistoryDatabaseService(ABC):
     @abstractmethod
     async def save_issue_history_event(
         self,
-        event: IssueHistoryEventModel
+        event: JiraIssueHistoryDBCreateDTO
     ) -> None:
         """Lưu một sự kiện thay đổi issue"""
         pass

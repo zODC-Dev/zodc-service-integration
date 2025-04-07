@@ -38,8 +38,7 @@ class IJiraIssueRepository(ABC):
 
     @abstractmethod
     async def get_issues_by_keys(self, keys: List[str]) -> List[JiraIssueModel]:
-        """
-        Get issues by their Jira keys
+        """Get issues by their Jira keys
 
         Parameters:
         - keys: List of Jira issue keys (e.g., ["PROJ-1", "PROJ-2"])

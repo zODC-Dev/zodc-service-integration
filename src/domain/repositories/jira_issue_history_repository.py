@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Optional
 
-from src.domain.models.jira_issue_history import IssueHistoryEventModel, JiraIssueHistoryModel
+from src.domain.models.database.jira_issue_history import JiraIssueHistoryDBCreateDTO
+from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 
 
 class IJiraIssueHistoryRepository(ABC):
@@ -26,26 +27,9 @@ class IJiraIssueHistoryRepository(ABC):
         pass
 
     @abstractmethod
-    async def create_history_item(
+    async def create(
         self,
-        jira_issue_id: str,
-        field_name: str,
-        field_type: str,
-        old_value: Optional[str],
-        new_value: Optional[str],
-        old_string: Optional[str],
-        new_string: Optional[str],
-        author_id: Optional[str],
-        created_at: datetime,
-        jira_change_id: Optional[str]
-    ) -> Optional[JiraIssueHistoryModel]:
-        """Tạo một bản ghi lịch sử mới"""
-        pass
-
-    @abstractmethod
-    async def save_history_event(
-        self,
-        event: IssueHistoryEventModel
+        event: JiraIssueHistoryDBCreateDTO
     ) -> bool:
         """Lưu một sự kiện thay đổi issue bao gồm nhiều thay đổi"""
         pass

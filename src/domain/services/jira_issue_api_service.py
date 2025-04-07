@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
-from src.domain.models.jira.apis.responses.jira_changelog import JiraIssueChangelogResponseDTO
+from src.domain.models.jira.apis.responses.jira_changelog import JiraIssueChangelogAPIGetResponseDTO
 from src.domain.models.jira_issue import JiraIssueModel
 
 
@@ -48,6 +48,6 @@ class IJiraIssueAPIService(ABC):
         pass
 
     @abstractmethod
-    async def get_issue_changelog(self, issue_id: str) -> JiraIssueChangelogResponseDTO:
+    async def get_issue_changelog(self, issue_id: str) -> JiraIssueChangelogAPIGetResponseDTO:
         """Lấy lịch sử thay đổi của issue từ Jira API"""
         pass

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import time
 from typing import Any, Dict, List, Optional, Set, Union
 
+from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.database import AsyncSessionLocal
 from src.configs.logger import log
@@ -14,9 +15,14 @@ from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
+from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import (
+    SQLAlchemyJiraIssueHistoryRepository,
+)
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
+from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
 from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQLAlchemyJiraSprintRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
+from src.infrastructure.services.jira_issue_history_database_service import JiraIssueHistoryDatabaseService
 from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
 from src.infrastructure.services.jira_webhook_service import JiraWebhookService
 
@@ -372,11 +378,14 @@ class JiraWebhookQueueService:
             sync_log_repo = SQLAlchemySyncLogRepository(session)
             sprint_repo = SQLAlchemyJiraSprintRepository(session)
             sprint_database_service = JiraSprintDatabaseService(sprint_repo)
-            # issue_history_sync_service = JiraIssueHistorySyncService(issue_repo)
-
+            issue_history_repo = SQLAlchemyJiraIssueHistoryRepository(session)
+            issue_history_db_service = JiraIssueHistoryDatabaseService(issue_history_repo)
+            issue_history_sync_service = JiraIssueHistorySyncService(
+                self.jira_issue_api_service, issue_history_db_service)
+            jira_project_repository = SQLAlchemyJiraProjectRepository(session)
             # Tạo webhook service
             webhook_service = JiraWebhookService(
-                issue_repo, sync_log_repo, self.jira_issue_api_service, self.jira_sprint_api_service, sprint_database_service)
+                issue_repo, sync_log_repo, self.jira_issue_api_service, self.jira_sprint_api_service, sprint_database_service, issue_history_sync_service, jira_project_repository)
 
             try:
                 yield webhook_service

@@ -2,7 +2,6 @@ import asyncio
 from typing import List, Optional
 
 from src.configs.logger import log
-from src.configs.settings import settings
 from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.jira.apis.mappers.jira_user import JiraUserMapper
 from src.domain.models.jira.apis.responses.jira_user import JiraUserAPIGetResponseDTO

@@ -235,19 +235,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     scheduler.start()
     app.state.scheduler = scheduler
 
-    # Initialize webhook handlers with API service
-    # webhook_handlers = [
-    #     IssueCreateWebhookHandler(jira_issue_repository, sync_log_repository, jira_issue_api_service),
-    #     IssueUpdateWebhookHandler(jira_issue_repository, sync_log_repository, jira_issue_api_service),
-    #     IssueDeleteWebhookHandler(jira_issue_repository, sync_log_repository)
-    # ]
-
-    # Initialize webhook service
-    # webhook_service = JiraWebhookService(jira_issue_repository, sync_log_repository, jira_issue_api_service)
-
-    # Initialize queue service
-    # webhook_queue_service = JiraWebhookQueueService(jira_issue_api_service)
-
     try:
         yield
     finally:

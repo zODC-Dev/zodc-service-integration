@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 from src.configs.logger import log
 from src.domain.models.gantt_chart import (
@@ -60,6 +60,7 @@ class GanttChartApplicationService:
                 log.error(f"[GANTT] Sprint with ID {sprint_id} not found")
                 raise ValueError(f"Sprint with ID {sprint_id} not found")
 
+            assert sprint.end_date is not None, "Sprint end date is None"
             log.info(f"[GANTT] Sprint period: {sprint.start_date} to {sprint.end_date}")
 
             # Process issues from request

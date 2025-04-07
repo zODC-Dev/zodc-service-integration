@@ -28,7 +28,7 @@ class JiraIssueHistoryEntity(SQLModel, table=True):
         sa_column=Column(String, ForeignKey("jira_users.jira_account_id", name="fk_jira_users"), nullable=True)
     )
     created_at: datetime = Field(sa_column=Column(DateTime, nullable=False))
-    jira_change_id: Optional[str] = Field(max_length=100, nullable=True)
+    jira_change_id: Optional[str] = Field(max_length=100, nullable=False, unique=True)
 
     # Định nghĩa mối quan hệ với JiraIssueEntity và JiraUserEntity
     issue: Optional["JiraIssueEntity"] = Relationship(

@@ -3,7 +3,6 @@ import uuid
 
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.configs.logger import log
-from src.configs.settings import settings
 from src.domain.constants.jira import JiraActionType, JiraIssueType
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
 from src.domain.models.jira_issue import JiraIssueModel

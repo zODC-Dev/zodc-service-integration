@@ -1,8 +1,8 @@
 import asyncio
+import base64
 from typing import Any, Dict, List, Optional, Type, TypeVar
 
 import aiohttp
-import base64
 
 from src.configs.logger import log
 from src.configs.settings import settings
@@ -153,22 +153,22 @@ class JiraAPIClient:
 
         raise JiraRequestError(500, "Error fetching data from Jira")
 
-    async def get(self, endpoint: str, user_id: int, params: Optional[Dict[str, Any]] = None, error_msg: str = "Error fetching data from Jira") -> Dict[str, Any]:
+    async def get(self, endpoint: str, user_id: Optional[int] = None, params: Optional[Dict[str, Any]] = None, error_msg: str = "Error fetching data from Jira") -> Dict[str, Any]:
         """Perform HTTP GET request"""
         url = f"{self.base_url}{endpoint}"
         return await self.request_with_retry("GET", url, user_id, params=params, error_msg=error_msg)
 
-    async def post(self, endpoint: str, user_id: int, data: Dict[str, Any], error_msg: str = "Error creating new data on Jira") -> Dict[str, Any]:
+    async def post(self, endpoint: str, user_id: Optional[int] = None, data: Dict[str, Any] = None, error_msg: str = "Error creating new data on Jira") -> Dict[str, Any]:
         """Perform HTTP POST request"""
         url = f"{self.base_url}{endpoint}"
         return await self.request_with_retry("POST", url, user_id, json_data=data, error_msg=error_msg)
 
-    async def put(self, endpoint: str, user_id: int, data: Dict[str, Any], error_msg: str = "Error updating data on Jira") -> Dict[str, Any]:
+    async def put(self, endpoint: str, user_id: Optional[int] = None, data: Dict[str, Any] = None, error_msg: str = "Error updating data on Jira") -> Dict[str, Any]:
         """Perform HTTP PUT request"""
         url = f"{self.base_url}{endpoint}"
         return await self.request_with_retry("PUT", url, user_id, json_data=data, error_msg=error_msg)
 
-    async def delete(self, endpoint: str, user_id: int, error_msg: str = "Error deleting data on Jira") -> Dict[str, Any]:
+    async def delete(self, endpoint: str, user_id: Optional[int] = None, error_msg: str = "Error deleting data on Jira") -> Dict[str, Any]:
         """Perform HTTP DELETE request"""
         url = f"{self.base_url}{endpoint}"
         return await self.request_with_retry("DELETE", url, user_id, error_msg=error_msg)

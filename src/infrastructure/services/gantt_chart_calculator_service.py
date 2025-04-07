@@ -1,5 +1,5 @@
 from datetime import datetime, time, timedelta
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List
 
 from src.configs.logger import log
 from src.domain.models.gantt_chart import (

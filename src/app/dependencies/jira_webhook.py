@@ -6,6 +6,7 @@ from src.app.controllers.jira_webhook_controller import JiraWebhookController
 from src.app.dependencies.base import get_issue_repository, get_sync_log_repository
 from src.app.dependencies.jira_issue import get_jira_issue_api_service
 from src.app.dependencies.jira_issue_history import get_jira_issue_history_database_service
+from src.app.dependencies.jira_project import get_jira_project_repository
 from src.app.dependencies.jira_sprint import get_jira_sprint_api_service, get_jira_sprint_database_service
 from src.app.dependencies.jira_user import (
     get_jira_user_api_service,
@@ -46,14 +47,16 @@ async def get_webhook_handlers(
     jira_user_repository=Depends(get_user_repository),
     jira_user_api_service=Depends(get_jira_user_api_service),
     user_database_service=Depends(get_jira_user_database_service),
-    # issue_history_sync_service=Depends(get_jira_issue_history_sync_service)
+    issue_history_sync_service=Depends(get_jira_issue_history_sync_service),
+    jira_project_repository=Depends(get_jira_project_repository)
 ) -> List[JiraWebhookHandler]:
     """Get list of webhook handlers with dependencies"""
     return [
         # Issue handlers
-        IssueCreateWebhookHandler(jira_issue_repository, sync_log_repository, jira_issue_api_service),
+        IssueCreateWebhookHandler(jira_issue_repository, sync_log_repository,
+                                  jira_issue_api_service, jira_project_repository),
         IssueUpdateWebhookHandler(jira_issue_repository, sync_log_repository,
-                                  jira_issue_api_service),
+                                  jira_issue_api_service, issue_history_sync_service),
         IssueDeleteWebhookHandler(jira_issue_repository, sync_log_repository),
 
         # Sprint handlers
@@ -76,11 +79,12 @@ async def get_webhook_service(
     jira_issue_api_service=Depends(get_jira_issue_api_service),
     jira_sprint_api_service=Depends(get_jira_sprint_api_service),
     sprint_database_service=Depends(get_jira_sprint_database_service),
-    # issue_history_sync_service=Depends(get_jira_issue_history_sync_service)
+    issue_history_sync_service=Depends(get_jira_issue_history_sync_service),
+    jira_project_repository=Depends(get_jira_project_repository)
 ) -> AsyncGenerator[JiraWebhookService, None]:
     """Get Jira webhook service"""
-    # yield JiraWebhookService(jira_issue_repository, sync_log_repository, jira_issue_api_service, jira_sprint_api_service, sprint_database_service, issue_history_sync_service)
-    yield JiraWebhookService(jira_issue_repository, sync_log_repository, jira_issue_api_service, jira_sprint_api_service, sprint_database_service)
+    yield JiraWebhookService(jira_issue_repository, sync_log_repository, jira_issue_api_service, jira_sprint_api_service, sprint_database_service, issue_history_sync_service, jira_project_repository)
+    # yield JiraWebhookService(jira_issue_repository, sync_log_repository, jira_issue_api_service, jira_sprint_api_service, sprint_database_service)
 
 
 async def get_webhook_queue_service(

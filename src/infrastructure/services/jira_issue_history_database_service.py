@@ -2,7 +2,8 @@ from datetime import datetime
 from typing import List, Optional
 
 from src.configs.logger import log
-from src.domain.models.jira_issue_history import IssueHistoryEventModel, JiraIssueHistoryModel
+from src.domain.models.database.jira_issue_history import JiraIssueHistoryDBCreateDTO
+from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 from src.domain.repositories.jira_issue_history_repository import IJiraIssueHistoryRepository
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 
@@ -44,11 +45,11 @@ class JiraIssueHistoryDatabaseService(IJiraIssueHistoryDatabaseService):
 
     async def save_issue_history_event(
         self,
-        event: IssueHistoryEventModel
+        event: JiraIssueHistoryDBCreateDTO
     ) -> None:
         """Lưu một sự kiện thay đổi issue"""
         try:
-            success = await self.history_repository.save_history_event(event)
+            success = await self.history_repository.create(event)
 
             if not success:
                 raise Exception("Failed to save history event")

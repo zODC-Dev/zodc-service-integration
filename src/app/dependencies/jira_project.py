@@ -2,13 +2,13 @@ from typing import AsyncGenerator
 
 from fastapi import Depends
 
-from src.app.dependencies.jira_issue import get_jira_issue_database_service
 from src.app.controllers.jira_project_controller import JiraProjectController
 from src.app.dependencies.base import get_project_repository
 from src.app.dependencies.common import (
     get_jira_api_client,
     get_jira_user_repository,
 )
+from src.app.dependencies.jira_issue import get_jira_issue_database_service
 from src.app.dependencies.jira_sprint import get_jira_sprint_database_service
 from src.app.dependencies.sync_log import get_sync_log_repository
 from src.app.services.jira_project_service import JiraProjectApplicationService

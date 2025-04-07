@@ -2,12 +2,11 @@ import asyncio
 from typing import Any, Dict, List, Optional, Union
 
 from src.configs.logger import log
-from src.configs.settings import settings
 from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JiraIssueStatus, JiraIssueType
 from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.jira.apis.mappers.jira_issue import JiraIssueMapper
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
-from src.domain.models.jira.apis.responses.jira_changelog import JiraIssueChangelogResponseDTO
+from src.domain.models.jira.apis.responses.jira_changelog import JiraIssueChangelogAPIGetResponseDTO
 from src.domain.models.jira.apis.responses.jira_issue import JiraIssueAPIGetResponseDTO
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
@@ -44,8 +43,6 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                     params={"expand": "renderedFields,transitions,changelog,names"},
                     error_msg=f"Error fetching issue {issue_id}"
                 )
-
-                log.info(f"Response data when get issue: {response_data}")
 
                 # Map response to domain model
                 issue: JiraIssueModel = await self.client.map_to_domain(
@@ -101,8 +98,6 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                     },
                     error_msg=f"Error fetching issue {issue_id}"
                 )
-
-                log.info(f"Response data when get issue: {response_data}")
 
                 # Map response to domain model
                 issue: JiraIssueModel = await self.client.map_to_domain(
@@ -546,11 +541,13 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             log.error(f"Error creating issue link: {str(e)}")
             return False
 
-    async def get_issue_changelog(self, issue_id: str) -> JiraIssueChangelogResponseDTO:
+    async def get_issue_changelog(self, issue_id: str) -> JiraIssueChangelogAPIGetResponseDTO:
         """Lấy lịch sử thay đổi của issue từ Jira API"""
         try:
             # Endpoint cho changelog
             url = f"/rest/api/3/issue/{issue_id}/changelog"
+
+            client_to_use = self.admin_client or self.client
 
             # Tham số mở rộng để lấy tất cả changelog (mặc định Jira giới hạn số lượng)
             params = {
@@ -568,7 +565,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 params["startAt"] = start_at
                 params["maxResults"] = max_results
 
-                response_data = await self.client.get(
+                response_data = await client_to_use.get(
                     url,
                     None,  # Không cần user_id
                     params=params,
@@ -609,7 +606,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
             # Map kết quả sang DTO
             try:
-                return JiraIssueChangelogResponseDTO(**changelog_response)
+                return JiraIssueChangelogAPIGetResponseDTO(**changelog_response)
             except Exception as validation_error:
                 # Ghi log chi tiết về lỗi validation để debug
                 log.error(f"DTO validation error: {str(validation_error)}")
@@ -621,7 +618,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         except Exception as e:
             log.error(f"Error getting changelog for issue {issue_id}: {str(e)}")
             # Trả về DTO rỗng
-            return JiraIssueChangelogResponseDTO(values=[], startAt=0, maxResults=0, total=0, isLast=True)
+            return JiraIssueChangelogAPIGetResponseDTO(values=[], startAt=0, maxResults=0, total=0, isLast=True)
 
     async def create_issue_with_admin_auth(self, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
         """Create new issue in Jira using admin auth"""

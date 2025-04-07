@@ -1,6 +1,7 @@
 from datetime import datetime, time
-from typing import Dict, List, Optional
-from pydantic import BaseModel, Field
+from typing import List, Optional
+
+from pydantic import BaseModel
 
 
 class ProjectConfigModel(BaseModel):
