@@ -1,5 +1,7 @@
 from datetime import time
 
+from fastapi import HTTPException
+
 from src.app.schemas.requests.gantt_chart import GanttChartRequest
 from src.app.schemas.responses.gantt_chart import GanttChartFeasibilityResponse, GanttChartResponse
 from src.app.schemas.responses.jira_sprint_analytics import SprintBurndownResponse, SprintBurnupResponse
@@ -23,11 +25,18 @@ class JiraSprintAnalyticsController:
         sprint_id: int,
     ) -> SprintBurndownResponse:
         """Get burndown chart data for a sprint"""
-        return await self.sprint_analytics_service.get_sprint_burndown_chart(
-            user_id=user_id,
-            project_key=project_key,
-            sprint_id=sprint_id
-        )
+        try:
+            return await self.sprint_analytics_service.get_sprint_burndown_chart(
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
+            )
+        except ValueError as e:
+            log.error(f"Error getting sprint burndown chart: {str(e)}")
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        except Exception as e:
+            log.error(f"Error getting sprint burndown chart: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
     async def get_sprint_burnup_chart(
         self,
@@ -36,11 +45,18 @@ class JiraSprintAnalyticsController:
         sprint_id: int,
     ) -> SprintBurnupResponse:
         """Get burnup chart data for a sprint"""
-        return await self.sprint_analytics_service.get_sprint_burnup_chart(
-            user_id=user_id,
-            project_key=project_key,
-            sprint_id=sprint_id
-        )
+        try:
+            return await self.sprint_analytics_service.get_sprint_burnup_chart(
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
+            )
+        except ValueError as e:
+            log.error(f"Error getting sprint burnup chart: {str(e)}")
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        except Exception as e:
+            log.error(f"Error getting sprint burnup chart: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
     async def get_sprint_gantt_chart(
         self,

@@ -20,12 +20,12 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
     async def get_issue_history(
         self,
-        issue_id: str
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
         try:
             stmt = select(JiraIssueHistoryEntity).where(
-                col(JiraIssueHistoryEntity.jira_issue_id) == issue_id
+                col(JiraIssueHistoryEntity.jira_issue_id) == jira_issue_id
             ).order_by(col(JiraIssueHistoryEntity.created_at))
 
             result = await self.session.exec(stmt)
@@ -38,14 +38,14 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
     async def get_issue_field_history(
         self,
-        issue_id: int,
+        jira_issue_id: str,
         field_name: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi của một trường cụ thể"""
         try:
             stmt = select(JiraIssueHistoryEntity).where(
                 and_(
-                    col(JiraIssueHistoryEntity.jira_issue_id) == issue_id,
+                    col(JiraIssueHistoryEntity.jira_issue_id) == jira_issue_id,
                     col(JiraIssueHistoryEntity.field_name) == field_name
                 )
             ).order_by(col(JiraIssueHistoryEntity.created_at))
@@ -81,8 +81,9 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                     stmt = (
                         select(JiraIssueHistoryEntity)
                         .where(
-                            JiraIssueHistoryEntity.jira_issue_id == event.jira_issue_id,
-                            JiraIssueHistoryEntity.jira_change_id == event.jira_change_id,
+                            col(JiraIssueHistoryEntity.jira_issue_id) == event.jira_issue_id,
+                            col(JiraIssueHistoryEntity.jira_change_id) == event.jira_change_id,
+                            col(JiraIssueHistoryEntity.field_name) == change.field
                         )
                     )
 

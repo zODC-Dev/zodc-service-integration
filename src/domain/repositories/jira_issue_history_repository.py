@@ -12,7 +12,7 @@ class IJiraIssueHistoryRepository(ABC):
     @abstractmethod
     async def get_issue_history(
         self,
-        issue_id: str
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
         pass
@@ -20,7 +20,7 @@ class IJiraIssueHistoryRepository(ABC):
     @abstractmethod
     async def get_issue_field_history(
         self,
-        issue_id: int,
+        issue_id: str,  # Lưu ý: Cần chuyển đổi thành string khi truy vấn database
         field_name: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi của một trường cụ thể"""

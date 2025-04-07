@@ -12,7 +12,7 @@ class IJiraIssueHistoryDatabaseService(ABC):
     @abstractmethod
     async def get_issue_history(
         self,
-        issue_id: str
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
         pass
@@ -20,7 +20,7 @@ class IJiraIssueHistoryDatabaseService(ABC):
     @abstractmethod
     async def get_issue_field_history(
         self,
-        issue_id: int,
+        jira_issue_id: str,
         field_name: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi của một trường cụ thể"""
@@ -29,7 +29,7 @@ class IJiraIssueHistoryDatabaseService(ABC):
     @abstractmethod
     async def get_issue_status_changes(
         self,
-        issue_id: int
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi trạng thái của issue"""
         pass
@@ -37,7 +37,7 @@ class IJiraIssueHistoryDatabaseService(ABC):
     @abstractmethod
     async def get_issue_sprint_changes(
         self,
-        issue_id: int
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi sprint của issue"""
         pass
