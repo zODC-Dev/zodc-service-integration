@@ -20,8 +20,23 @@ class IJiraIssueAPIService(ABC):
         pass
 
     @abstractmethod
-    async def get_issue_with_system_user(self, issue_id: str) -> Optional[JiraIssueModel]:
-        """Get issue using system user account"""
+    async def get_issue_with_admin_auth(self, issue_id: str) -> Optional[JiraIssueModel]:
+        """Get issue using admin auth"""
+        pass
+
+    @abstractmethod
+    async def create_issue_with_admin_auth(self, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
+        """Create new issue using admin auth"""
+        pass
+
+    @abstractmethod
+    async def update_issue_with_admin_auth(self, issue_id: str, update: JiraIssueAPIUpdateRequestDTO) -> JiraIssueModel:
+        """Update issue using admin auth"""
+        pass
+
+    @abstractmethod
+    async def create_issue_link_with_admin_auth(self, source_issue_id: str, target_issue_id: str, relationship: str) -> bool:
+        """Create issue link using admin auth"""
         pass
 
     @abstractmethod
