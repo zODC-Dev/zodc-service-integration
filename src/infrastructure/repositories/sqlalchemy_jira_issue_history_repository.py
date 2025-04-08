@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 from sqlmodel import and_, col, select
@@ -145,16 +145,26 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
             result = await self.session.exec(sprint_issues_stmt)
             issue_ids = result.all()
 
+            log.info(f"Issue IDs: {issue_ids}")
+
             if not issue_ids:
                 return []
 
             # Tạo query để lấy lịch sử của các issue
             conditions: List[Any] = [col(JiraIssueHistoryEntity.jira_issue_id).in_(issue_ids)]
 
+            # Đảm bảo from_date và to_date có timezone nhất quán
             if from_date:
-                conditions.append(col(JiraIssueHistoryEntity.created_at) >= from_date)
+                # Chuyển đổi từ_date thành datetime không có timezone để so sánh với cột created_at
+                from_date_naive = from_date.replace(tzinfo=None)
+                conditions.append(col(JiraIssueHistoryEntity.created_at) >= from_date_naive)
+                log.info(f"From date (naive): {from_date_naive}")
+
             if to_date:
-                conditions.append(col(JiraIssueHistoryEntity.created_at) <= to_date)
+                # Chuyển đổi to_date thành datetime không có timezone để so sánh với cột created_at
+                to_date_naive = to_date.replace(tzinfo=None)
+                conditions.append(col(JiraIssueHistoryEntity.created_at) <= to_date_naive)
+                log.info(f"To date (naive): {to_date_naive}")
 
             stmt = select(JiraIssueHistoryEntity).where(
                 and_(*conditions)
@@ -162,6 +172,8 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
             result = await self.session.exec(stmt)
             history_items = result.all()
+
+            # log.info(f"History items: {history_items}")
 
             return [self._entity_to_model(item) for item in history_items]
         except Exception as e:
@@ -180,6 +192,6 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
             old_string=entity.old_string,
             new_string=entity.new_string,
             author_id=entity.author_id,
-            created_at=entity.created_at,
+            created_at=entity.created_at.replace(tzinfo=timezone.utc),
             jira_change_id=entity.jira_change_id
         )

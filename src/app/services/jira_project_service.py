@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
+from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueType
 from src.domain.constants.sync import EntityType, OperationType, SourceType
@@ -12,6 +13,7 @@ from src.domain.models.database.jira_sprint import JiraSprintDBCreateDTO, JiraSp
 from src.domain.models.database.jira_user import JiraUserDBCreateDTO, JiraUserDBUpdateDTO
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 from src.domain.models.jira_project import JiraProjectModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
@@ -39,7 +41,8 @@ class JiraProjectApplicationService:
         jira_issue_db_service: IJiraIssueDatabaseService,
         jira_sprint_db_service: IJiraSprintDatabaseService,
         sync_session: IJiraSyncSession,
-        sync_log_repository: ISyncLogRepository
+        sync_log_repository: ISyncLogRepository,
+        issue_history_sync_service: JiraIssueHistorySyncService
     ):
         self.jira_project_api_service = jira_project_api_service
         self.jira_project_db_service = jira_project_db_service
@@ -47,6 +50,7 @@ class JiraProjectApplicationService:
         self.jira_sprint_db_service = jira_sprint_db_service
         self.sync_session = sync_session
         self.sync_log_repository = sync_log_repository
+        self.issue_history_sync_service = issue_history_sync_service
 
     async def get_project_issues(
         self,
@@ -158,9 +162,13 @@ class JiraProjectApplicationService:
                 issues = await self._sync_project_issues(request.user_id, request.project_key, session)
                 log.info(f"Successfully synced {len(issues)} issues")
 
+                # Sync changelog
+                # log.info("Syncing project changelog...")
+                # changelog = await self._sync_project_changelog(request.user_id, request.project_key, session)
+                # log.info(f"Successfully synced {len(changelog)} changelog")
+
                 # Create sync log
                 await self._create_sync_log(request.user_id, project)
-
                 log.info(f"Successfully completed sync for project {request.project_key}")
 
                 return JiraProjectSyncNATSReplyDTO(
@@ -459,3 +467,17 @@ class JiraProjectApplicationService:
         except Exception as e:
             log.error(f"Error creating sync log for project {project.key}: {str(e)}")
             # Don't raise the error as this is not critical for sync process
+
+    async def _sync_project_changelog(self, user_id: int, project_key: str, session: IJiraSyncSession) -> List[JiraIssueHistoryModel]:
+        """Sync issues changelog from Jira API to database"""
+        try:
+            issues = await self.jira_project_api_service.get_project_issues(user_id, project_key)
+            for issue in issues:
+                try:
+                    await self.issue_history_sync_service.sync_issue_history(issue.jira_issue_id)
+                    log.info(f"Successfully synced history for issue {issue.jira_issue_id} from Jira API")
+                except Exception as e:
+                    log.error(f"Error syncing history for issue {issue.jira_issue_id}: {str(e)}")
+        except Exception as e:
+            log.error(f"Error syncing project changelog: {str(e)}")
+            raise

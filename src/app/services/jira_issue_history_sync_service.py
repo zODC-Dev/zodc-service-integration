@@ -96,8 +96,8 @@ class JiraIssueHistorySyncService:
             "status": "status",
             "Sprint": "sprint",
             "assignee": "assignee",
-            "Story Points": "story_points",
-            "Actual Point": "actual_point",
+            "Story point estimate": "story_points",
+            "Actual point": "actual_point",
             # Thêm các mapping khác tùy theo nhu cầu
         }
 

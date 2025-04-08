@@ -1,7 +1,6 @@
-from datetime import datetime
 from typing import Optional
 
-from sqlmodel import Column, DateTime, Field
+from sqlmodel import Field
 
 from src.infrastructure.entities.base import BaseEntityWithTimestamps
 
@@ -17,5 +16,5 @@ class WorkflowMappingEntity(BaseEntityWithTimestamps, table=True):
     name: Optional[str] = None
     description: Optional[str] = None
     status: str = Field(default="active")  # active, completed, archived
-    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
-    updated_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
+    # created_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
+    # updated_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))

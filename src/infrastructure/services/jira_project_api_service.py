@@ -55,7 +55,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
             error_msg=f"Error fetching users for project {project_key}"
         )
 
-        log.info(f"Response data via get_project_users: {response_data}")
+        # log.info(f"Response data via get_project_users: {response_data}")
 
         users: List[JiraUserModel] = []
         for user_data in response_data:

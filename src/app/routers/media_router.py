@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, UploadFile
 
 from src.app.controllers.media_controller import MediaController
 from src.app.dependencies.auth import get_jwt_claims
-from src.app.dependencies.media import get_media_controller
+from src.app.dependencies.controllers import get_media_controller
 from src.app.schemas.requests.auth import JWTClaims
 from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.media import MediaResponse

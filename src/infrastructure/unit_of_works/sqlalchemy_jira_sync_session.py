@@ -3,6 +3,7 @@ from typing import Callable, Optional, Type
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import SQLAlchemyJiraIssueHistoryRepository
 from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
 from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
@@ -25,7 +26,7 @@ class SQLAlchemyJiraSyncSession(IJiraSyncSession):
         self.sprint_repository = SQLAlchemyJiraSprintRepository(self.session)
         self.user_repository = SQLAlchemyJiraUserRepository(self.session)
         self.sync_log_repository = SQLAlchemySyncLogRepository(self.session)
-
+        self.issue_history_repository = SQLAlchemyJiraIssueHistoryRepository(self.session)
         # Start transaction
         await self.session.begin()
         return self

@@ -3,7 +3,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends
 
 from src.app.controllers.jira_webhook_controller import JiraWebhookController
-from src.app.dependencies.jira_webhook import get_webhook_controller
+from src.app.dependencies.controllers import get_webhook_controller
 from src.configs.logger import log
 
 router = APIRouter()

@@ -9,7 +9,7 @@ class NATSMessage:
         self,
         subject: str,
         data: Dict[str, Any],
-        timestamp: datetime = datetime.utcnow()
+        timestamp: datetime = datetime.now(timezone.utc)
     ):
         self.subject = subject
         self.data = data
@@ -22,7 +22,7 @@ class NATSRequest(NATSMessage):
         subject: str,
         data: Dict[str, Any],
         user_id: Optional[int] = None,
-        timestamp: datetime = datetime.utcnow()
+        timestamp: datetime = datetime.now(timezone.utc)
     ):
         super().__init__(subject, data, timestamp)
         self.user_id = user_id
@@ -35,7 +35,7 @@ class NATSResponse(NATSMessage):
         success: bool,
         data: Optional[Dict[str, Any]] = None,
         error: Optional[str] = None,
-        timestamp: datetime = datetime.utcnow()
+        timestamp: datetime = datetime.now(timezone.utc)
     ):
         super().__init__(subject, data or {}, timestamp)
         self.success = success
