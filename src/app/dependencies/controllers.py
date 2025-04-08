@@ -3,6 +3,7 @@ from fastapi import Depends
 from src.app.controllers.jira_issue_controller import JiraIssueController
 from src.app.controllers.jira_project_controller import JiraProjectController
 from src.app.controllers.jira_sprint_analytics_controller import JiraSprintAnalyticsController
+from src.app.controllers.jira_sprint_controller import JiraSprintController
 from src.app.controllers.jira_webhook_controller import JiraWebhookController
 from src.app.controllers.media_controller import MediaController
 from src.app.controllers.microsoft_calendar_controller import MicrosoftCalendarController
@@ -13,6 +14,7 @@ from src.app.dependencies.services import (
     get_jira_issue_service,
     get_jira_project_application_service,
     get_jira_sprint_database_service,
+    get_jira_sprint_service,
     get_media_service,
     get_microsoft_calendar_application_service,
     get_sprint_analytics_application_service,
@@ -80,3 +82,10 @@ def get_microsoft_calendar_controller(
 ) -> MicrosoftCalendarController:
     """Get Microsoft Calendar controller."""
     return MicrosoftCalendarController(calendar_service=calendar_service)
+
+
+async def get_jira_sprint_controller(
+    sprint_service=Depends(get_jira_sprint_service)
+) -> JiraSprintController:
+    """Get Jira sprint controller"""
+    return JiraSprintController(sprint_service=sprint_service)

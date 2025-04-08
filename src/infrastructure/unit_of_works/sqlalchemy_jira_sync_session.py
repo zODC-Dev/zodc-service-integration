@@ -3,8 +3,10 @@ from typing import Callable, Optional, Type
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import SQLAlchemyJiraIssueHistoryRepository
 from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
+from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import (
+    SQLAlchemyJiraIssueHistoryRepository,
+)
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
 from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
 from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQLAlchemyJiraSprintRepository

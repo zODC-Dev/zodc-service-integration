@@ -42,11 +42,11 @@ JIRA_STATUS_ID_MAPPING = {
 
 # Issue Type ID mapping
 JIRA_ISSUE_TYPE_ID_MAPPING = {
-    "10009": JiraIssueType.TASK,
-    "10011": JiraIssueType.STORY,
-    "10002": JiraIssueType.EPIC,
-    "10010": JiraIssueType.BUG,
-    "10004": JiraIssueType.SUB_TASK,
+    "10020": JiraIssueType.TASK,
+    "10022": JiraIssueType.STORY,
+    "10023": JiraIssueType.EPIC,
+    "10021": JiraIssueType.BUG,
+    "10024": JiraIssueType.SUB_TASK,
 }
 
 

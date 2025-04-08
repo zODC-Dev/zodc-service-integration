@@ -25,3 +25,13 @@ class IJiraSprintAPIService(ABC):
     async def get_board_by_id(self, board_id: int) -> Optional[JiraBoardModel]:
         """Get board by ID"""
         pass
+
+    @abstractmethod
+    async def start_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
+        """Start a sprint in Jira"""
+        pass
+
+    @abstractmethod
+    async def end_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
+        """End a sprint in Jira"""
+        pass

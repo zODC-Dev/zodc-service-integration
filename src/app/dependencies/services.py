@@ -20,6 +20,7 @@ from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyn
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.jira_sprint_analytics_service import JiraSprintAnalyticsApplicationService
+from src.app.services.jira_sprint_service import JiraSprintApplicationService
 from src.app.services.jira_webhook_handlers.issue_create_webhook_handler import IssueCreateWebhookHandler
 from src.app.services.jira_webhook_handlers.issue_delete_webhook_handler import IssueDeleteWebhookHandler
 from src.app.services.jira_webhook_handlers.issue_update_webhook_handler import IssueUpdateWebhookHandler
@@ -170,6 +171,18 @@ async def get_jira_sprint_database_service(
 ) -> IJiraSprintDatabaseService:
     """Get Jira sprint database service"""
     return JiraSprintDatabaseService(sprint_repository)
+
+
+async def get_jira_sprint_service(
+    jira_sprint_api_service: IJiraSprintAPIService = Depends(get_jira_sprint_api_service),
+    jira_sprint_database_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service)
+) -> JiraSprintApplicationService:
+    """Get Jira sprint application service"""
+    return JiraSprintApplicationService(
+        jira_sprint_api_service=jira_sprint_api_service,
+        jira_sprint_database_service=jira_sprint_database_service
+    )
+
 # ============================ JIRA ISSUE HISTORY DATABASE SERVICE ===========================================
 
 

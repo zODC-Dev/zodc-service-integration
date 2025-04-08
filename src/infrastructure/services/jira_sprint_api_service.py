@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from src.configs.logger import log
@@ -44,6 +45,7 @@ class JiraSprintAPIService(IJiraSprintAPIService):
                     JiraSprintAPIGetResponseDTO,
                     JiraSprintMapper
                 )
+                log.info(f"Sprint: {sprint}")
 
                 return sprint
 
@@ -173,3 +175,83 @@ class JiraSprintAPIService(IJiraSprintAPIService):
         except Exception as e:
             log.error(f"Error fetching board {board_id}: {str(e)}")
             return None
+
+    async def start_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
+        """Start a sprint in Jira"""
+        log.info(f"Starting sprint {sprint_id}")
+
+        for attempt in range(self.retry_attempts):
+            try:
+                start_date = datetime.now().isoformat()
+                end_date = (datetime.now() + timedelta(days=14)).isoformat()
+                payload = {
+                    "state": "active",
+                    "startDate": start_date,
+                    "endDate": end_date
+                }
+                # Call Jira API to start the sprint
+                await self.client.post(
+                    f"/rest/agile/1.0/sprint/{sprint_id}",
+                    None,
+                    data=payload,
+                    error_msg=f"Error starting sprint {sprint_id}"
+                )
+
+                # Get the updated sprint data
+                return await self.get_sprint_by_id_with_admin_auth(sprint_id)
+
+            except JiraRequestError as e:
+                if e.status_code == 404:
+                    log.warning(f"Sprint {sprint_id} not found in Jira")
+                    return None
+                elif attempt < self.retry_attempts - 1:
+                    wait_time = self.retry_delay * (2 ** attempt)  # exponential backoff
+                    log.warning(f"Retrying start_sprint after {wait_time}s (attempt {attempt + 1})")
+                    await asyncio.sleep(wait_time)
+                else:
+                    log.error(f"Failed to start sprint {sprint_id} after {self.retry_attempts} attempts")
+                    return None
+
+            except Exception as e:
+                log.error(f"Unexpected error starting sprint {sprint_id}: {str(e)}")
+                return None
+
+        return None
+
+    async def end_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
+        """End a sprint in Jira"""
+        log.info(f"Ending sprint {sprint_id}")
+
+        for attempt in range(self.retry_attempts):
+            try:
+                # Call Jira API to end the sprint
+                payload = {
+                    "state": "closed"
+                }
+                await self.client.post(
+                    f"/rest/agile/1.0/sprint/{sprint_id}",
+                    None,
+                    data=payload,
+                    error_msg=f"Error ending sprint {sprint_id}"
+                )
+
+                # Get the updated sprint data
+                return await self.get_sprint_by_id_with_admin_auth(sprint_id)
+
+            except JiraRequestError as e:
+                if e.status_code == 404:
+                    log.warning(f"Sprint {sprint_id} not found in Jira")
+                    return None
+                elif attempt < self.retry_attempts - 1:
+                    wait_time = self.retry_delay * (2 ** attempt)  # exponential backoff
+                    log.warning(f"Retrying end_sprint after {wait_time}s (attempt {attempt + 1})")
+                    await asyncio.sleep(wait_time)
+                else:
+                    log.error(f"Failed to end sprint {sprint_id} after {self.retry_attempts} attempts")
+                    return None
+
+            except Exception as e:
+                log.error(f"Unexpected error ending sprint {sprint_id}: {str(e)}")
+                return None
+
+        return None

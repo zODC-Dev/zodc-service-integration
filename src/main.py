@@ -11,6 +11,7 @@ from redis.asyncio import Redis
 from src.app.routers.jira_issue_router import router as jira_issue_router
 from src.app.routers.jira_project_router import router as jira_project_router
 from src.app.routers.jira_sprint_analytics_router import router as jira_sprint_analytics_router
+from src.app.routers.jira_sprint_router import router as jira_sprint_router
 from src.app.routers.jira_webhook_router import router as jira_webhook_router
 from src.app.routers.media_router import router as media_router
 from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
@@ -296,6 +297,8 @@ app.include_router(microsoft_calendar_router, prefix=settings.API_V1_STR + "/mic
 app.include_router(jira_webhook_router, prefix=settings.API_V1_STR + "/jira-webhook", tags=["jira_webhook"])
 app.include_router(jira_sprint_analytics_router, prefix=settings.API_V1_STR +
                    "/jira/sprint-analytics", tags=["jira_sprint_analytics"])
+app.include_router(jira_sprint_router, prefix=settings.API_V1_STR +
+                   "/jira/sprint", tags=["jira_sprint"])
 app.include_router(media_router, prefix=settings.API_V1_STR + "/media", tags=["media"])
 
 if __name__ == "__main__":

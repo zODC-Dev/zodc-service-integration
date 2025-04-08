@@ -76,11 +76,9 @@ class JiraAPIClient:
 
     async def _get_headers_for_request(self, user_id: Optional[int] = None) -> Dict[str, str]:
         """Lấy headers cho request - hoặc từ admin hoặc từ user token"""
-        if self.use_admin_auth:
+        if user_id is None:
             return self._get_admin_headers()
         else:
-            if user_id is None:
-                raise JiraAuthenticationError("User ID is required for user auth")
             token = await self._get_token(user_id)
             return self._get_headers(token)
 
