@@ -102,11 +102,11 @@ class JiraIssueMapper:
                 sprints = JiraIssueMapper._map_sprints(fields.customfield_10020, project_key)
 
             # Create link URL
-            jira_base_url = settings.JIRA_DASHBOARD_URL
             # project_key = api_response.key.split("-")[0]
-            current_sprint_id = sprints[0].board_id if sprints else 3
-            current_sprint_id = 3
-            link_url = f"{jira_base_url}/jira/software/projects/{project_key}/boards/{current_sprint_id}?selectedIssue={api_response.key}"
+            board_id = sprints[0].board_id if sprints else None
+            link_url: Optional[str] = None
+            if board_id:
+                link_url = f"{settings.JIRA_DASHBOARD_URL}/jira/software/projects/{project_key}/boards/{board_id}?selectedIssue={api_response.key}"
 
             return JiraIssueModel(
                 jira_issue_id=api_response.id,
@@ -151,6 +151,7 @@ class JiraIssueMapper:
                 end_date=JiraIssueMapper._parse_datetime(api_sprint.end_date),
                 complete_date=JiraIssueMapper._parse_datetime(api_sprint.complete_date),
                 goal=api_sprint.goal,
+                board_id=api_sprint.board_id,
                 created_at=now,
                 project_key=project_key
             )

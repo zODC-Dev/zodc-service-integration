@@ -108,7 +108,7 @@ class JiraIssueDBUpdateDTO(BaseModel):
     sprints: Optional[List[JiraSprintModel]] = None
     is_deleted: Optional[bool] = None
     type: Optional[Union[JiraIssueType, str]] = None
-
+    link_url: Optional[str] = None
     @field_validator('status')
     @classmethod
     def validate_status(cls, v):

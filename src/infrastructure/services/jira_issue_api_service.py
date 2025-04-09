@@ -99,6 +99,8 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                     error_msg=f"Error fetching issue {issue_id}"
                 )
 
+                log.info(f"Response data when get issue: {response_data}")
+
                 # Map response to domain model
                 issue: JiraIssueModel = await self.client.map_to_domain(
                     response_data,
@@ -572,7 +574,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                     error_msg=f"Error getting changelog for issue {issue_id}"
                 )
 
-                log.info(f"Response data when get changelog: {response_data}")
+                # log.info(f"Response data when get changelog: {response_data}")
 
                 if not response_data:
                     break
@@ -580,9 +582,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 # Debug: In ra cấu trúc của một changelog (chỉ in ra khi tìm thấy dữ liệu)
                 values: List[Dict[str, Any]] = response_data.get("values", [])
                 if values and len(values) > 0 and not all_changelogs:
-                    log.debug(f"Sample changelog structure: {values[0]}")
+                    # log.debug(f"Sample changelog structure: {values[0]}")
                     if 'author' in values[0]:
-                        log.debug(f"Sample author structure: {values[0]['author']}")
+                        # log.debug(f"Sample author structure: {values[0]['author']}")
+                        pass
 
                 all_changelogs.extend(values)
 

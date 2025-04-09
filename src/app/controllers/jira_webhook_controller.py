@@ -17,7 +17,7 @@ class JiraWebhookController:
         """Handle incoming Jira webhook"""
         try:
             # Ghi log payload ban đầu để debug
-            log.debug(f"Received webhook payload: {payload}")
+            # log.debug(f"Received webhook payload: {payload}")
 
             # Sử dụng factory method từ BaseJiraWebhookDTO để tạo DTO phù hợp
             if "webhookEvent" in payload:
