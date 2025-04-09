@@ -18,11 +18,11 @@ class NodeStatusSyncHandler:
         """Parse status từ string sang enum JiraIssueStatus"""
         try:
             # Convert IN_PROGRESS, IN_REVIEW, DONE, TO_DO to JiraIssueStatus
-            if status.lower() == "in_progress":
+            if status.lower() == "in_progress" or status.lower() == "in_process":
                 return JiraIssueStatus.IN_PROGRESS
             elif status.lower() == "in_review":
                 return JiraIssueStatus.IN_REVIEW
-            elif status.lower() == "done":
+            elif status.lower() == "done" or status.lower() == "completed":
                 return JiraIssueStatus.DONE
             elif status.lower() == "to_do":
                 return JiraIssueStatus.TO_DO
