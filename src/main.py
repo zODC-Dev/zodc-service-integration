@@ -165,7 +165,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             jira_project_application_service, sync_log_repository),
         NATSSubscribeTopic.JIRA_ISSUE_LINK.value: JiraIssueLinkRequestHandler(jira_issue_application_service),
         NATSSubscribeTopic.WORKFLOW_SYNC.value: WorkflowSyncRequestHandler(
-            jira_issue_application_service, user_repository, jira_sprint_repository, workflow_mapping_repository),
+            jira_issue_application_service, user_repository, jira_sprint_repository, workflow_mapping_repository, redis_service),
         NATSSubscribeTopic.GANTT_CHART_CALCULATION.value: GanttChartRequestHandler(gantt_chart_service),
         NATSSubscribeTopic.NODE_STATUS_SYNC.value: NodeStatusSyncHandler(jira_issue_api_service)
     }

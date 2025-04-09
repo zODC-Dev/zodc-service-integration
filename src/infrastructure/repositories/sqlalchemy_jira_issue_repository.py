@@ -340,8 +340,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
             query = select(JiraIssueEntity).where(
                 and_(
-                    JiraIssueEntity.key.in_(keys),
-                    JiraIssueEntity.is_deleted.is_(False)
+                    col(JiraIssueEntity.key).in_(keys),
+                    col(JiraIssueEntity.is_deleted).is_(False)
                 )
             )
 

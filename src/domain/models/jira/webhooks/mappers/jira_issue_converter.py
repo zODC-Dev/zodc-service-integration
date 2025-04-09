@@ -23,7 +23,8 @@ class JiraIssueConverter:
             updated_at=issue_data.updated_at,
             last_synced_at=datetime.now(timezone.utc),
             project_key=issue_data.project_key,
-            sprints=issue_data.sprints
+            sprints=issue_data.sprints,
+            is_system_linked=issue_data.is_system_linked or False
         )
 
     @staticmethod

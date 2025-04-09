@@ -9,7 +9,7 @@ class IRedisService(ABC):
         pass
 
     @abstractmethod
-    async def set(self, key: str, value: str, expire: Optional[int] = None) -> None:
+    async def set(self, key: str, value: str, expiry: Optional[int] = None) -> None:
         """Set a value in Redis with an expiry time."""
         pass
 
