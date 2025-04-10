@@ -893,3 +893,22 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         )
 
         return response_data.get("transitions", [])
+
+    async def delete_issue_link_with_admin_auth(self, link_id: str) -> bool:
+        """Delete an issue link by its ID using admin authentication"""
+        try:
+            # Sử dụng admin client hoặc client thường với admin auth
+            client_to_use = self.admin_client or self.client
+
+            # Delete link bằng ID
+            await client_to_use.delete(
+                f"/rest/api/3/issueLink/{link_id}",
+                None,  # Không cần user_id khi sử dụng admin auth
+                error_msg=f"Error deleting issue link with ID {link_id}"
+            )
+
+            log.info(f"Successfully deleted issue link with ID {link_id}")
+            return True
+        except Exception as e:
+            log.error(f"Error deleting issue link with ID {link_id}: {str(e)}")
+            return False

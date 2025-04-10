@@ -11,7 +11,7 @@ class WorkflowMappingEntity(SQLModel, table=True):
     workflow_id: str = Field(index=True, unique=True)  # External workflow ID
     transaction_id: str = Field(index=True)
     project_key: str = Field(foreign_key="jira_projects.key", index=True)
-    sprint_id: int = Field(index=True)  # System sprint ID
+    sprint_id: Optional[int] = Field(index=True)  # System sprint ID
     name: Optional[str] = None
     description: Optional[str] = None
     status: str = Field(default="active")  # active, completed, archived

@@ -57,3 +57,8 @@ class IJiraIssueAPIService(ABC):
     async def transition_issue_with_admin_auth(self, issue_id: str, status: Union[JiraIssueStatus, str]) -> bool:
         """Transition issue using admin auth"""
         pass
+
+    @abstractmethod
+    async def delete_issue_link_with_admin_auth(self, link_id: str) -> bool:
+        """Delete an issue link by its ID using admin authentication"""
+        pass
