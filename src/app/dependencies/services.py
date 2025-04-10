@@ -42,6 +42,7 @@ from src.app.services.nats_handlers.jira_issue_link_handler import JiraIssueLink
 from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueSyncRequestHandler
 from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
 from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
+from src.app.services.nats_handlers.node_status_sync_handler import NodeStatusSyncHandler
 from src.app.services.nats_handlers.user_message_handler import UserMessageHandler
 from src.app.services.nats_handlers.workflow_sync_handler import WorkflowSyncRequestHandler
 from src.app.services.util_service import UtilService
@@ -56,6 +57,7 @@ from src.domain.repositories.refresh_token_repository import IRefreshTokenReposi
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
 from src.domain.services.gantt_chart_calculator_service import IGanttChartCalculatorService
+from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
@@ -363,13 +365,14 @@ async def get_webhook_handlers(
     jira_user_api_service=Depends(get_jira_user_api_service),
     user_database_service=Depends(get_jira_user_database_service),
     issue_history_sync_service=Depends(get_jira_issue_history_sync_service),
-    jira_project_repository=Depends(get_jira_project_repository)
+    jira_project_repository=Depends(get_jira_project_repository),
+    redis_service=Depends(get_redis_service)
 ) -> List[JiraWebhookHandler]:
     """Get list of webhook handlers with dependencies"""
     return [
         # Issue handlers
         IssueCreateWebhookHandler(jira_issue_repository, sync_log_repository,
-                                  jira_issue_api_service, jira_project_repository),
+                                  jira_issue_api_service, jira_project_repository, redis_service),
         IssueUpdateWebhookHandler(jira_issue_repository, sync_log_repository,
                                   jira_issue_api_service, issue_history_sync_service),
         IssueDeleteWebhookHandler(jira_issue_repository, sync_log_repository),
@@ -395,10 +398,11 @@ async def get_webhook_service(
     jira_sprint_api_service=Depends(get_jira_sprint_api_service),
     sprint_database_service=Depends(get_jira_sprint_database_service),
     issue_history_sync_service=Depends(get_jira_issue_history_sync_service),
-    jira_project_repository=Depends(get_jira_project_repository)
+    jira_project_repository=Depends(get_jira_project_repository),
+    redis_service=Depends(get_redis_service)
 ) -> JiraWebhookService:
     """Get Jira webhook service"""
-    return JiraWebhookService(jira_issue_repository, sync_log_repository, jira_issue_api_service, jira_sprint_api_service, sprint_database_service, issue_history_sync_service, jira_project_repository)
+    return JiraWebhookService(jira_issue_repository, sync_log_repository, jira_issue_api_service, jira_sprint_api_service, sprint_database_service, issue_history_sync_service, jira_project_repository, redis_service)
     # yield JiraWebhookService(jira_issue_repository, sync_log_repository, jira_issue_api_service, jira_sprint_api_service, sprint_database_service)
 
 
@@ -469,7 +473,8 @@ async def get_nats_event_service(
     jira_issue_application_service: JiraIssueApplicationService = Depends(get_jira_issue_service),
     jira_sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository),
     workflow_mapping_repository: IWorkflowMappingRepository = Depends(get_workflow_mapping_repository),
-    gantt_chart_service: GanttChartApplicationService = Depends(get_gantt_chart_service)
+    gantt_chart_service: GanttChartApplicationService = Depends(get_gantt_chart_service),
+    jira_issue_api_service: IJiraIssueAPIService = Depends(get_jira_issue_api_service)
 ) -> INATSEventService:
     """Get NATS event service with all handlers configured"""
     # Configure message handlers
@@ -493,10 +498,13 @@ async def get_nats_event_service(
                 jira_issue_application_service,
                 user_repository,
                 jira_sprint_repository,
-                workflow_mapping_repository
+                workflow_mapping_repository,
+                redis_service
             ),
         NATSSubscribeTopic.GANTT_CHART_CALCULATION.value:
-            GanttChartRequestHandler(gantt_chart_service)
+            GanttChartRequestHandler(gantt_chart_service),
+        NATSSubscribeTopic.NODE_STATUS_SYNC.value:
+            NodeStatusSyncHandler(jira_issue_api_service)
     }
 
     # Create and return service

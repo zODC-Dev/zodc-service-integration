@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Union
 
+from src.domain.constants.jira import JiraIssueStatus
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
 from src.domain.models.jira.apis.responses.jira_changelog import JiraIssueChangelogAPIGetResponseDTO
 from src.domain.models.jira_issue import JiraIssueModel
@@ -50,4 +51,9 @@ class IJiraIssueAPIService(ABC):
     @abstractmethod
     async def get_issue_changelog(self, issue_id: str) -> JiraIssueChangelogAPIGetResponseDTO:
         """Lấy lịch sử thay đổi của issue từ Jira API"""
+        pass
+
+    @abstractmethod
+    async def transition_issue_with_admin_auth(self, issue_id: str, status: Union[JiraIssueStatus, str]) -> bool:
+        """Transition issue using admin auth"""
         pass

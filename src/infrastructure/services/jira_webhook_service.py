@@ -22,6 +22,7 @@ from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
+from src.domain.services.redis_service import IRedisService
 
 
 class JiraWebhookService:
@@ -35,7 +36,8 @@ class JiraWebhookService:
         jira_sprint_api_service: IJiraSprintAPIService,
         sprint_database_service: IJiraSprintDatabaseService,
         issue_history_sync_service: JiraIssueHistorySyncService,
-        jira_project_repository: IJiraProjectRepository
+        jira_project_repository: IJiraProjectRepository,
+        redis_service: IRedisService
     ):
         self.handlers: List[JiraWebhookHandler] = []
         self.jira_issue_repository = jira_issue_repository
@@ -45,6 +47,7 @@ class JiraWebhookService:
         self.sprint_database_service = sprint_database_service
         self.issue_history_sync_service = issue_history_sync_service
         self.jira_project_repository = jira_project_repository
+        self.redis_service = redis_service
         self._init_handlers()
 
     def _init_handlers(self) -> None:
@@ -52,7 +55,7 @@ class JiraWebhookService:
         # Issue handlers
         issue_handlers = [
             IssueCreateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
-                                      self.jira_issue_api_service, self.jira_project_repository),
+                                      self.jira_issue_api_service, self.jira_project_repository, self.redis_service),
             IssueUpdateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
                                       self.jira_issue_api_service, self.issue_history_sync_service),
             IssueDeleteWebhookHandler(self.jira_issue_repository, self.sync_log_repository)

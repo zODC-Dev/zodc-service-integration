@@ -7,6 +7,7 @@ from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyn
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.database import AsyncSessionLocal
 from src.configs.logger import log
+from src.configs.redis import get_redis_client
 from src.domain.constants.jira import JiraWebhookEvent
 from src.domain.models.jira.webhooks.jira_webhook import (
     BaseJiraWebhookDTO,
@@ -25,6 +26,7 @@ from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAl
 from src.infrastructure.services.jira_issue_history_database_service import JiraIssueHistoryDatabaseService
 from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
 from src.infrastructure.services.jira_webhook_service import JiraWebhookService
+from src.infrastructure.services.redis_service import RedisService
 
 
 class JiraWebhookQueueService:
@@ -383,9 +385,11 @@ class JiraWebhookQueueService:
             issue_history_sync_service = JiraIssueHistorySyncService(
                 self.jira_issue_api_service, issue_history_db_service)
             jira_project_repository = SQLAlchemyJiraProjectRepository(session)
+            redis_client = await get_redis_client()
+            redis_service = RedisService(redis_client)
             # Tạo webhook service
             webhook_service = JiraWebhookService(
-                issue_repo, sync_log_repo, self.jira_issue_api_service, self.jira_sprint_api_service, sprint_database_service, issue_history_sync_service, jira_project_repository)
+                issue_repo, sync_log_repo, self.jira_issue_api_service, self.jira_sprint_api_service, sprint_database_service, issue_history_sync_service, jira_project_repository, redis_service)
 
             try:
                 yield webhook_service

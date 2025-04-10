@@ -9,6 +9,7 @@ class WorkflowSyncIssue(BaseModel):
     title: str
     assignee_id: Optional[int] = None
     jira_key: Optional[str] = None
+    estimate_point: Optional[float] = None
     action: str  # "create" hoặc "update"
 
 

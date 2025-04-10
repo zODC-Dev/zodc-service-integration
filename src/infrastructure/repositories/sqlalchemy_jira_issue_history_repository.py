@@ -170,8 +170,8 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                 and_(*conditions)
             ).order_by(col(JiraIssueHistoryEntity.created_at))
 
-            result = await self.session.exec(stmt)
-            history_items = result.all()
+            history_result = await self.session.exec(stmt)
+            history_items = history_result.all()
 
             # log.info(f"History items: {history_items}")
 

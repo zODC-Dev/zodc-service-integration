@@ -13,7 +13,7 @@ class JiraSprintAPIGetResponseDTO(BaseModel):
     end_date: Optional[str] = Field(None, alias="endDate")
     complete_date: Optional[str] = Field(None, alias="completeDate")
     created_date: Optional[str] = Field(None, alias="createdDate")
-    origin_board_id: Optional[int] = Field(None, alias="originBoardId")
+    board_id: Optional[int] = Field(None, alias="boardId")
     goal: Optional[str] = None
 
     class Config:
