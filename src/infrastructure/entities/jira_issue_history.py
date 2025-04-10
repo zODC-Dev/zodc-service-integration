@@ -1,14 +1,16 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlmodel import Column, DateTime, Field, ForeignKey, Relationship, SQLModel, String, Text
+from sqlmodel import Column, DateTime, Field, ForeignKey, Relationship, String, Text
+
+from src.infrastructure.entities.base import BaseEntity
 
 if TYPE_CHECKING:
     from src.infrastructure.entities.jira_issue import JiraIssueEntity
     from src.infrastructure.entities.jira_user import JiraUserEntity
 
 
-class JiraIssueHistoryEntity(SQLModel, table=True):
+class JiraIssueHistoryEntity(BaseEntity, table=True):
     """Entity để lưu trữ lịch sử thay đổi của Jira issue"""
     __tablename__ = "jira_issue_histories"  # Chú ý tên bảng số nhiều
 
@@ -27,8 +29,8 @@ class JiraIssueHistoryEntity(SQLModel, table=True):
     author_id: Optional[str] = Field(
         sa_column=Column(String, ForeignKey("jira_users.jira_account_id", name="fk_jira_users"), nullable=True)
     )
-    created_at: datetime = Field(sa_column=Column(DateTime, nullable=False))
-    jira_change_id: Optional[str] = Field(max_length=100, nullable=True)
+    jira_change_id: Optional[str] = Field(max_length=100, nullable=False)
+    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), default=datetime.now))
 
     # Định nghĩa mối quan hệ với JiraIssueEntity và JiraUserEntity
     issue: Optional["JiraIssueEntity"] = Relationship(

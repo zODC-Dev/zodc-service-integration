@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Column, DateTime, Field, SQLModel
 
 
 class BaseEntity(SQLModel):
@@ -10,9 +10,15 @@ class BaseEntity(SQLModel):
 
 
 class BaseEntityWithTimestamps(BaseEntity):
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True)),
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
 
-class BaseEntityWithTimestampsAndSoftDelete(BaseEntityWithTimestamps):
-    deleted_at: Optional[datetime] = Field(default=None)
+class BaseEntityWithTimestampsAndUpdatedAt(BaseEntityWithTimestamps):
+    updated_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
+
+
+class BaseEntityWithTimestampsAndSoftDelete(BaseEntityWithTimestampsAndUpdatedAt):
+    deleted_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))

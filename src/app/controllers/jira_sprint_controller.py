@@ -1,0 +1,62 @@
+from fastapi import APIRouter, HTTPException
+
+from src.app.schemas.responses.base import StandardResponse
+from src.app.schemas.responses.jira_project import GetJiraSprintResponse
+from src.app.services.jira_sprint_service import JiraSprintApplicationService
+from src.configs.logger import log
+from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
+
+router = APIRouter(prefix="/api/v1/sprints", tags=["sprints"])
+
+
+class JiraSprintController:
+    def __init__(self, sprint_service: JiraSprintApplicationService):
+        self.sprint_service = sprint_service
+
+    async def start_sprint(self, sprint_id: int) -> StandardResponse[GetJiraSprintResponse]:
+        """Start a sprint in Jira using admin account"""
+        try:
+            updated_sprint = await self.sprint_service.start_sprint(sprint_id=sprint_id)
+            log.info(f"Updated sprint: {updated_sprint}")
+            if updated_sprint is None:
+                raise HTTPException(status_code=404, detail="Sprint not found")
+            return StandardResponse(
+                message="Sprint started successfully",
+                data=GetJiraSprintResponse.from_domain(updated_sprint)
+            )
+        except JiraAuthenticationError as e:
+            log.error(f"Authentication error when starting sprint {sprint_id}: {str(e)}")
+            raise HTTPException(status_code=401, detail=str(e)) from e
+        except JiraConnectionError as e:
+            log.error(f"Connection error when starting sprint {sprint_id}: {str(e)}")
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        except JiraRequestError as e:
+            log.error(f"Request error when starting sprint {sprint_id}: {str(e)}")
+            raise HTTPException(status_code=e.status_code, detail=str(e)) from e
+        except Exception as e:
+            log.error(f"Unexpected error when starting sprint {sprint_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e
+
+    async def end_sprint(self, sprint_id: int) -> StandardResponse[GetJiraSprintResponse]:
+        """End a sprint in Jira using admin account"""
+        try:
+            updated_sprint = await self.sprint_service.end_sprint(sprint_id=sprint_id)
+            log.info(f"Updated sprint: {updated_sprint}")
+            if updated_sprint is None:
+                raise HTTPException(status_code=404, detail="Sprint not found")
+            return StandardResponse(
+                message="Sprint ended successfully",
+                data=GetJiraSprintResponse.from_domain(updated_sprint)
+            )
+        except JiraAuthenticationError as e:
+            log.error(f"Authentication error when ending sprint {sprint_id}: {str(e)}")
+            raise HTTPException(status_code=401, detail=str(e)) from e
+        except JiraConnectionError as e:
+            log.error(f"Connection error when ending sprint {sprint_id}: {str(e)}")
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        except JiraRequestError as e:
+            log.error(f"Request error when ending sprint {sprint_id}: {str(e)}")
+            raise HTTPException(status_code=e.status_code, detail=str(e)) from e
+        except Exception as e:
+            log.error(f"Unexpected error when ending sprint {sprint_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e

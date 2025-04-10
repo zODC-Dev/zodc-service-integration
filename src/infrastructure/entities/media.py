@@ -1,13 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlmodel import Field
-
-from src.infrastructure.entities.base import BaseEntityWithTimestampsAndSoftDelete
+from sqlmodel import Column, DateTime, Field, SQLModel
 
 
-class MediaEntity(BaseEntityWithTimestampsAndSoftDelete, table=True):
+class MediaEntity(SQLModel, table=True):
     __tablename__ = "media"
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -18,5 +16,11 @@ class MediaEntity(BaseEntityWithTimestampsAndSoftDelete, table=True):
     size: int
     uploaded_by: int = Field(foreign_key="jira_users.user_id")
     container_name: str = "media-files"
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+
+    # Timestamps
+    created_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True)),
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
+    deleted_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))

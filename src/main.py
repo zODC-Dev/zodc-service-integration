@@ -11,11 +11,13 @@ from redis.asyncio import Redis
 from src.app.routers.jira_issue_router import router as jira_issue_router
 from src.app.routers.jira_project_router import router as jira_project_router
 from src.app.routers.jira_sprint_analytics_router import router as jira_sprint_analytics_router
+from src.app.routers.jira_sprint_router import router as jira_sprint_router
 from src.app.routers.jira_webhook_router import router as jira_webhook_router
 from src.app.routers.media_router import router as media_router
 from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
 from src.app.routers.util_router import router as util_router
 from src.app.services.gantt_chart_service import GanttChartApplicationService
+from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.nats_event_service import NATSEventService
@@ -25,12 +27,16 @@ from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueSync
 from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
 from src.app.services.nats_handlers.jira_project_sync_handler import JiraProjectSyncRequestHandler
 from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
+from src.app.services.nats_handlers.node_status_sync_handler import NodeStatusSyncHandler
 from src.app.services.nats_handlers.user_message_handler import UserMessageHandler
 from src.app.services.nats_handlers.workflow_sync_handler import WorkflowSyncRequestHandler
 from src.configs.database import get_db, init_db, session_maker
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.nats_events import NATSSubscribeTopic
+from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import (
+    SQLAlchemyJiraIssueHistoryRepository,
+)
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
 from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
 from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQLAlchemyJiraSprintRepository
@@ -41,6 +47,7 @@ from src.infrastructure.repositories.sqlalchemy_workflow_mapping_repository impo
 from src.infrastructure.services.gantt_chart_calculator_service import GanttChartCalculatorService
 from src.infrastructure.services.jira_issue_api_service import JiraIssueAPIService
 from src.infrastructure.services.jira_issue_database_service import JiraIssueDatabaseService
+from src.infrastructure.services.jira_issue_history_database_service import JiraIssueHistoryDatabaseService
 from src.infrastructure.services.jira_project_api_service import JiraProjectAPIService
 from src.infrastructure.services.jira_project_database_service import JiraProjectDatabaseService
 from src.infrastructure.services.jira_service import JiraAPIClient
@@ -117,13 +124,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     jira_project_database_service = JiraProjectDatabaseService(project_repository)
     jira_sprint_repository = SQLAlchemyJiraSprintRepository(db)
     jira_sprint_database_service = JiraSprintDatabaseService(jira_sprint_repository)
+    issue_history_repository = SQLAlchemyJiraIssueHistoryRepository(db)
+    issue_history_db_service = JiraIssueHistoryDatabaseService(issue_history_repository)
+    issue_history_sync_service = JiraIssueHistorySyncService(jira_issue_api_service, issue_history_db_service)
     jira_project_application_service = JiraProjectApplicationService(
         jira_project_api_service,
         jira_project_database_service,
         jira_issue_database_service,
         jira_sprint_database_service,
         sync_session,
-        sync_log_repository
+        sync_log_repository,
+        issue_history_sync_service
     )
 
     workflow_mapping_repository = SQLAlchemyWorkflowMappingRepository(db)
@@ -154,8 +165,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             jira_project_application_service, sync_log_repository),
         NATSSubscribeTopic.JIRA_ISSUE_LINK.value: JiraIssueLinkRequestHandler(jira_issue_application_service),
         NATSSubscribeTopic.WORKFLOW_SYNC.value: WorkflowSyncRequestHandler(
-            jira_issue_application_service, user_repository, jira_sprint_repository, workflow_mapping_repository),
-        NATSSubscribeTopic.GANTT_CHART_CALCULATION.value: GanttChartRequestHandler(gantt_chart_service)
+            jira_issue_application_service, user_repository, jira_sprint_repository, workflow_mapping_repository, redis_service),
+        NATSSubscribeTopic.GANTT_CHART_CALCULATION.value: GanttChartRequestHandler(gantt_chart_service),
+        NATSSubscribeTopic.NODE_STATUS_SYNC.value: NodeStatusSyncHandler(jira_issue_api_service)
     }
 
     # Initialize and start NATS Event Service
@@ -235,19 +247,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     scheduler.start()
     app.state.scheduler = scheduler
 
-    # Initialize webhook handlers with API service
-    # webhook_handlers = [
-    #     IssueCreateWebhookHandler(jira_issue_repository, sync_log_repository, jira_issue_api_service),
-    #     IssueUpdateWebhookHandler(jira_issue_repository, sync_log_repository, jira_issue_api_service),
-    #     IssueDeleteWebhookHandler(jira_issue_repository, sync_log_repository)
-    # ]
-
-    # Initialize webhook service
-    # webhook_service = JiraWebhookService(jira_issue_repository, sync_log_repository, jira_issue_api_service)
-
-    # Initialize queue service
-    # webhook_queue_service = JiraWebhookQueueService(jira_issue_api_service)
-
     try:
         yield
     finally:
@@ -300,6 +299,8 @@ app.include_router(microsoft_calendar_router, prefix=settings.API_V1_STR + "/mic
 app.include_router(jira_webhook_router, prefix=settings.API_V1_STR + "/jira-webhook", tags=["jira_webhook"])
 app.include_router(jira_sprint_analytics_router, prefix=settings.API_V1_STR +
                    "/jira/sprint-analytics", tags=["jira_sprint_analytics"])
+app.include_router(jira_sprint_router, prefix=settings.API_V1_STR +
+                   "/jira/sprint", tags=["jira_sprint"])
 app.include_router(media_router, prefix=settings.API_V1_STR + "/media", tags=["media"])
 
 if __name__ == "__main__":

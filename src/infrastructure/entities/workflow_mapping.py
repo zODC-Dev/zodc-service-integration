@@ -1,12 +1,10 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlmodel import Column, DateTime, Field
-
-from src.infrastructure.entities.base import BaseEntityWithTimestamps
+from sqlmodel import Column, DateTime, Field, SQLModel
 
 
-class WorkflowMappingEntity(BaseEntityWithTimestamps, table=True):
+class WorkflowMappingEntity(SQLModel, table=True):
     __tablename__ = "workflow_mappings"
 
     id: Optional[int] = Field(default=None, primary_key=True)

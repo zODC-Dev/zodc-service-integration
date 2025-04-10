@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Optional
 
-from src.domain.models.jira_issue_history import IssueHistoryEventModel, JiraIssueHistoryModel
+from src.domain.models.database.jira_issue_history import JiraIssueHistoryDBCreateDTO
+from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 
 
 class IJiraIssueHistoryDatabaseService(ABC):
@@ -11,7 +12,7 @@ class IJiraIssueHistoryDatabaseService(ABC):
     @abstractmethod
     async def get_issue_history(
         self,
-        issue_id: str
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
         pass
@@ -19,7 +20,7 @@ class IJiraIssueHistoryDatabaseService(ABC):
     @abstractmethod
     async def get_issue_field_history(
         self,
-        issue_id: int,
+        jira_issue_id: str,
         field_name: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi của một trường cụ thể"""
@@ -28,7 +29,7 @@ class IJiraIssueHistoryDatabaseService(ABC):
     @abstractmethod
     async def get_issue_status_changes(
         self,
-        issue_id: int
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi trạng thái của issue"""
         pass
@@ -36,7 +37,7 @@ class IJiraIssueHistoryDatabaseService(ABC):
     @abstractmethod
     async def get_issue_sprint_changes(
         self,
-        issue_id: int
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi sprint của issue"""
         pass
@@ -44,7 +45,7 @@ class IJiraIssueHistoryDatabaseService(ABC):
     @abstractmethod
     async def save_issue_history_event(
         self,
-        event: IssueHistoryEventModel
+        event: JiraIssueHistoryDBCreateDTO
     ) -> None:
         """Lưu một sự kiện thay đổi issue"""
         pass

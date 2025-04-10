@@ -57,7 +57,7 @@ class JiraWebhookHandler(ABC):
     async def get_latest_issue_data(self, issue_id: str) -> Optional[JiraIssueModel]:
         """Get latest issue data from Jira API"""
         if self.jira_issue_api_service:
-            return await self.jira_issue_api_service.get_issue_with_system_user(issue_id)
+            return await self.jira_issue_api_service.get_issue_with_admin_auth(issue_id)
         return None
 
     async def process(self, webhook_data: BaseJiraWebhookDTO) -> Optional[Dict[str, Any]]:
@@ -89,8 +89,8 @@ class JiraWebhookHandler(ABC):
             return None
 
         try:
-            # Lấy sprint data
-            sprint_data = await self.jira_sprint_api_service.get_sprint_by_id_with_system_user(sprint_id)
+            # Lấy sprint data sử dụng admin auth
+            sprint_data = await self.jira_sprint_api_service.get_sprint_by_id_with_admin_auth(sprint_id)
             if not sprint_data:
                 log.error(f"Could not find sprint data for {sprint_id}")
                 return None
@@ -120,7 +120,7 @@ class JiraWebhookHandler(ABC):
         """Get user details from Jira API"""
         if self.jira_user_api_service:
             try:
-                return await self.jira_user_api_service.get_user_by_account_id_with_system_user(account_id)
+                return await self.jira_user_api_service.get_user_by_account_id_with_admin_auth(account_id)
             except Exception as e:
                 log.error(f"Error getting user details from API: {str(e)}")
                 return None

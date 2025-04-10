@@ -4,7 +4,6 @@ from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.configs.logger import log
 from src.domain.models.gantt_chart import ProjectConfigModel
 from src.domain.models.nats.replies.gantt_chart_calculation import (
-    GanttChartCalculationResponse,
     GanttChartJiraIssueResult,
 )
 from src.domain.models.nats.requests.gantt_chart_calculation import (
@@ -58,7 +57,7 @@ class GanttChartRequestHandler(INATSRequestHandler):
             ]
 
             # Create the final response model
-            client_response = GanttChartCalculationResponse(issues=client_issues)
+            # client_response = GanttChartCalculationResponse(issues=client_issues)
             log.info(f"[GANTT-NATS] Created client response with {len(client_issues)} issues")
 
             # Serialize với datetime xử lý đúng

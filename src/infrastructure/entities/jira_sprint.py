@@ -1,9 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlmodel import Column, DateTime, Field, Relationship
+from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
 
-from src.infrastructure.entities.base import BaseEntityWithTimestamps
 from src.infrastructure.entities.jira_issue_sprint import JiraIssueSprintEntity
 
 if TYPE_CHECKING:
@@ -11,7 +10,7 @@ if TYPE_CHECKING:
     from src.infrastructure.entities.jira_project import JiraProjectEntity
 
 
-class JiraSprintEntity(BaseEntityWithTimestamps, table=True):
+class JiraSprintEntity(SQLModel, table=True):
     __tablename__ = "jira_sprints"
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -36,5 +35,9 @@ class JiraSprintEntity(BaseEntityWithTimestamps, table=True):
         sa_relationship_kwargs={'lazy': 'selectin'}
     )
 
-    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
-    updated_at: Optional[datetime] = Field(sa_column=Column(DateTime(timezone=True)))
+    # Timestamps
+    created_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True)),
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))

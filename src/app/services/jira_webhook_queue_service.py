@@ -3,9 +3,11 @@ from contextlib import asynccontextmanager
 import time
 from typing import Any, Dict, List, Optional, Set, Union
 
+from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.database import AsyncSessionLocal
 from src.configs.logger import log
+from src.configs.redis import get_redis_client
 from src.domain.constants.jira import JiraWebhookEvent
 from src.domain.models.jira.webhooks.jira_webhook import (
     BaseJiraWebhookDTO,
@@ -14,11 +16,17 @@ from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
+from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import (
+    SQLAlchemyJiraIssueHistoryRepository,
+)
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
+from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
 from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQLAlchemyJiraSprintRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
+from src.infrastructure.services.jira_issue_history_database_service import JiraIssueHistoryDatabaseService
 from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
 from src.infrastructure.services.jira_webhook_service import JiraWebhookService
+from src.infrastructure.services.redis_service import RedisService
 
 
 class JiraWebhookQueueService:
@@ -244,7 +252,7 @@ class JiraWebhookQueueService:
         """Lấy data mới nhất của issue từ Jira API"""
         try:
             # Lấy issue từ Jira API
-            issue = await self.jira_issue_api_service.get_issue_with_system_user(issue_id)
+            issue = await self.jira_issue_api_service.get_issue_with_admin_auth(issue_id)
             return issue
         except Exception as e:
             log.error(f"Error fetching issue {issue_id} from Jira API: {str(e)}")
@@ -372,11 +380,16 @@ class JiraWebhookQueueService:
             sync_log_repo = SQLAlchemySyncLogRepository(session)
             sprint_repo = SQLAlchemyJiraSprintRepository(session)
             sprint_database_service = JiraSprintDatabaseService(sprint_repo)
-            # issue_history_sync_service = JiraIssueHistorySyncService(issue_repo)
-
+            issue_history_repo = SQLAlchemyJiraIssueHistoryRepository(session)
+            issue_history_db_service = JiraIssueHistoryDatabaseService(issue_history_repo)
+            issue_history_sync_service = JiraIssueHistorySyncService(
+                self.jira_issue_api_service, issue_history_db_service)
+            jira_project_repository = SQLAlchemyJiraProjectRepository(session)
+            redis_client = await get_redis_client()
+            redis_service = RedisService(redis_client)
             # Tạo webhook service
             webhook_service = JiraWebhookService(
-                issue_repo, sync_log_repo, self.jira_issue_api_service, self.jira_sprint_api_service, sprint_database_service)
+                issue_repo, sync_log_repo, self.jira_issue_api_service, self.jira_sprint_api_service, sprint_database_service, issue_history_sync_service, jira_project_repository, redis_service)
 
             try:
                 yield webhook_service

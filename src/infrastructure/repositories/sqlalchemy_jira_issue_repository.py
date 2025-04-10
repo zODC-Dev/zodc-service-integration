@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
+from typing import List, Optional
 
-from sqlmodel import col, delete, select, and_
+from sqlmodel import and_, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
@@ -340,8 +340,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
             query = select(JiraIssueEntity).where(
                 and_(
-                    JiraIssueEntity.key.in_(keys),
-                    JiraIssueEntity.is_deleted.is_(False)
+                    col(JiraIssueEntity.key).in_(keys),
+                    col(JiraIssueEntity.is_deleted).is_(False)
                 )
             )
 

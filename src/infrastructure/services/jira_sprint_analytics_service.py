@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 from src.configs.logger import log
-from src.domain.constants.jira import JiraIssueStatus
+from src.domain.constants.jira import JiraIssueStatus, JiraSprintState
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_sprint_analytics import (
@@ -44,15 +44,20 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         # Lấy thông tin sprint
         sprint = await self._get_sprint_details(sprint_id)
         if not sprint:
-            log.error(f"Không tìm thấy sprint {sprint_id}")
+            log.error(f"Sprint {sprint_id} not found")
             raise ValueError(f"Sprint {sprint_id} not found")
+
+        # Check if sprint status is active
+        if sprint.state != JiraSprintState.ACTIVE.value:
+            log.error(f"Sprint {sprint_id} is not active")
+            raise ValueError(f"Sprint {sprint.name} is not active")
 
         # Lấy danh sách issues trong sprint
         issues = await self._get_sprint_issues(user_id, project_key, sprint_id)
+        log.info(f"Issues count: {len(issues)}")
 
         # Tính toán dữ liệu burndown
         base_model = await self._calculate_sprint_analytics(sprint, issues, project_key)
-
         # Chuyển đổi sang model burndown
         return SprintBurndownModel(
             id=sprint.id,
@@ -119,17 +124,86 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
     ) -> SprintAnalyticsBaseModel:
         """Tính toán dữ liệu phân tích sprint dựa trên issues"""
         # Lấy khoảng thời gian của sprint
-        start_date = sprint.start_date.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_date = sprint.end_date.replace(hour=23, minute=59, second=59,
-                                           microsecond=0) if sprint.end_date else datetime.now() + timedelta(days=14)
+        assert sprint.start_date is not None, "Sprint start date must be provided"
+        assert sprint.end_date is not None, "Sprint end date must be provided"
 
-        # Tính tổng điểm ban đầu
-        total_points_initial = sum(issue.estimate_point or 0 for issue in issues)
+        # Đảm bảo start_date và end_date có timezone
+        start_date = sprint.start_date
+        end_date = sprint.end_date
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        else:
+            # Chuyển về timezone gốc
+            start_date = start_date.astimezone(timezone.utc)
+
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+        else:
+            # Chuyển về timezone gốc
+            end_date = end_date.astimezone(timezone.utc)
+
+        log.info("=== START CALCULATING INITIAL POINTS ===")
+        log.info(f"Sprint start date: {start_date}")
+
+        # Tìm các initial issues (issues có trong sprint tại thời điểm sprint bắt đầu)
+        initial_issues = []
+        for issue in issues:
+            if await self._is_issue_in_sprint_at_date(issue, sprint.jira_sprint_id, start_date):
+                initial_issues.append(issue)
+
+        log.info(f"Found {len(initial_issues)} initial issues")
+
+        # Tính tổng điểm ban đầu dựa trên lịch sử story points trước sprint start date
+        total_points_initial = 0
+        for issue in initial_issues:
+            try:
+                log.info(f"Processing issue {issue.key}:")
+                # Lấy lịch sử thay đổi story points
+                points_histories = await self.jira_issue_history_db_service.get_issue_field_history(
+                    issue.jira_issue_id, "story_points"
+                )
+
+                log.info(f"Found {len(points_histories)} story points history entries")
+
+                # Lọc các thay đổi trước sprint start date
+                pre_sprint_changes = [
+                    h for h in points_histories
+                    if h.created_at <= start_date
+                ]
+                log.info(f"created_at: {start_date} and {[h.created_at for h in points_histories]}")
+
+                log.info(f"Found {len(pre_sprint_changes)} changes before sprint start")
+
+                # Sắp xếp theo thời gian, lấy thay đổi gần nhất
+                pre_sprint_changes.sort(key=lambda x: x.created_at, reverse=True)
+
+                if pre_sprint_changes:
+                    # Lấy giá trị story points gần nhất trước sprint start
+                    last_points = pre_sprint_changes[0].new_value
+                    try:
+                        points = float(last_points) if last_points else 0
+                        total_points_initial += points
+                        log.info(
+                            f"Using points from history: {points} (from change at {pre_sprint_changes[0].created_at})")
+                    except (ValueError, TypeError):
+                        log.error(f"Error converting story points value: {last_points}")
+                else:
+                    # Nếu không có lịch sử, sử dụng giá trị hiện tại
+                    points = issue.estimate_point or 0
+                    total_points_initial += points
+                    log.info(f"Using current estimate: {points} (no history found)")
+            except Exception as e:
+                log.error(f"Error calculating initial points for issue {issue.key}: {str(e)}")
+                continue
+
+        log.info("\n=== FINAL RESULT ===")
+        log.info(f"Total initial points: {total_points_initial}")
+        log.info("=== END CALCULATING INITIAL POINTS ===\n")
 
         # Tính toán scope changes và tổng điểm hiện tại
         assert sprint.id is not None, "Sprint ID must be provided"
         scope_changes, daily_scope_points = await self._calculate_scope_changes(
-            issues, start_date, end_date, sprint.id
+            issues, start_date, end_date, sprint.jira_sprint_id
         )
 
         # Tổng điểm hiện tại (có thể thay đổi do scope changes)
@@ -145,49 +219,67 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         # Tính toán dữ liệu hàng ngày cho sprint
         daily_data = []
         for i, day in enumerate(days):
-            # Tính ideal burndown theo tỷ lệ thời gian
-            progress_ratio = i / max(len(days) - 1, 1)  # Tránh chia cho 0
-            ideal_remaining = total_points_initial * (1 - progress_ratio)
+            try:
+                # Tính ideal burndown theo tỷ lệ thời gian
+                progress_ratio = i / max(len(days) - 1, 1)  # Tránh chia cho 0
+                ideal_remaining = total_points_initial * (1 - progress_ratio)
 
-            # Format ngày hiện tại để so sánh với daily_scope_points
-            day_str = day.strftime("%Y-%m-%d")
+                # Format ngày hiện tại để so sánh với daily_scope_points
+                day_str = day.strftime("%Y-%m-%d")
 
-            # Lấy số điểm được thêm vào cho ngày này
-            added_points = daily_scope_points.get(day_str, 0)
+                # Lấy số điểm được thêm vào cho ngày này
+                added_points = daily_scope_points.get(day_str, 0)
 
-            # Tính toán điểm hoàn thành dựa trên trạng thái và hạn của issues
-            # Filter issues có trong sprint tính đến ngày day
-            current_issues = [
-                issue for issue in issues
-                if self._is_issue_in_sprint_at_date(issue, sprint.id, day)
-            ]
+                # Tính toán điểm hoàn thành dựa trên trạng thái và hạn của issues
+                # Filter issues có trong sprint tính đến ngày day
+                log.info(f"Checking issues for day: {day_str}, day timezone: {day.tzinfo}")
+                sprint_issues = []
+                for issue in issues:
+                    try:
+                        is_in_sprint = await self._is_issue_in_sprint_at_date(issue, sprint.jira_sprint_id, day)
+                        if is_in_sprint:
+                            sprint_issues.append(issue)
+                    except Exception as e:
+                        log.error(f"Error checking if issue {issue.key} is in sprint: {str(e)}")
+                        log.error(
+                            f"Issue created_at: {issue.created_at}, tzinfo: {issue.created_at.tzinfo if issue.created_at else None}")
 
-            log.info(f"Day: {day}, issues: {len(issues)}, current issues: {len(current_issues)}")
+                # Tính completed_points - những issues đã Done tính đến ngày day
+                completed_points = 0
+                for issue in sprint_issues:
+                    try:
+                        is_completed = await self._is_issue_completed_at_date(issue, day)
+                        if is_completed:
+                            points = await self._get_issue_points_at_date(issue, day)
+                            completed_points += points
+                            log.info(f"Issue {issue.key} is completed with {points} points on {day_str}")
+                    except Exception as e:
+                        log.error(f"Error checking if issue {issue.key} is completed: {str(e)}")
+                        log.error(
+                            f"Issue status: {issue.status}, updated_at: {issue.updated_at}, tzinfo: {issue.updated_at.tzinfo if issue.updated_at else None}")
 
-            # Tính completed_points - những issues đã Done tính đến ngày day
-            completed_points = sum(
-                (issue.estimate_point or 0)
-                for issue in current_issues
-                if issue.status == JiraIssueStatus.DONE and
-                (issue.updated_at is None or issue.updated_at <= day)
-            )
+                # Tính total points cho đến ngày này
+                total_points_day = total_points_initial
+                for d in range(i + 1):
+                    d_str = days[d].strftime("%Y-%m-%d")
+                    total_points_day += daily_scope_points.get(d_str, 0)
 
-            # Tính total points cho đến ngày này
-            total_points_day = total_points_initial
-            for d in range(i + 1):
-                d_str = days[d].strftime("%Y-%m-%d")
-                total_points_day += daily_scope_points.get(d_str, 0)
+                remaining_points = total_points_day - completed_points
+                # log.info(
+                # f"Day {day_str}: total_points_day={total_points_day}, completed_points={completed_points}, remaining_points={remaining_points}")
 
-            remaining_points = total_points_day - completed_points
-
-            # Tạo daily data
-            daily_data.append(DailySprintData(
-                date=day,
-                remaining_points=remaining_points,
-                completed_points=completed_points,
-                ideal_points=ideal_remaining,
-                added_points=added_points
-            ))
+                # Tạo daily data
+                daily_data.append(DailySprintData(
+                    date=day,
+                    remaining_points=remaining_points,
+                    completed_points=completed_points,
+                    ideal_points=ideal_remaining,
+                    added_points=added_points
+                ))
+            except Exception as e:
+                log.error(f"Error processing day {day}: {str(e)}")
+                log.error(f"Day timezone: {day.tzinfo}")
+                raise
 
         return SprintAnalyticsBaseModel(
             id=sprint.id,
@@ -201,18 +293,60 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
             scope_changes=scope_changes
         )
 
-    def _is_issue_in_sprint_at_date(self, issue: JiraIssueModel, sprint_id: int, date: datetime) -> bool:
+    async def _is_issue_in_sprint_at_date(self, issue: JiraIssueModel, sprint_id: int, date: datetime) -> bool:
         """Kiểm tra xem issue có thuộc sprint vào một ngày cụ thể không"""
-        # Nếu issue không có sprint, return False
-        if not issue.sprints:
+        try:
+            # log.info(
+            #     f"Checking if issue {issue.key} is in sprint {sprint_id} at date {date} with issue created_at {issue.created_at}")
+            # Đảm bảo date có timezone
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=timezone.utc)
+
+            # Nếu issue không có sprint, return False
+            if not issue.sprints:
+                # log.info(f"Issue {issue.key} has no sprints")
+                return False
+
+            # Kiểm tra nếu issue thuộc sprint và được tạo trước hoặc trong ngày đang xét
+            for sprint in issue.sprints:
+                if sprint and sprint.jira_sprint_id == sprint_id:
+                    # Đảm bảo created_at có timezone
+                    created_at = issue.created_at
+                    if created_at and created_at.tzinfo is None:
+                        created_at = created_at.replace(tzinfo=timezone.utc)
+
+                    if created_at and created_at <= date:
+                        # log.info(f"Issue {issue.key} is in sprint {sprint_id} (created at {created_at})")
+                        return True
+
+            # Kiểm tra lịch sử thay đổi sprint
+            sprint_histories = await self.jira_issue_history_db_service.get_issue_field_history(
+                issue.jira_issue_id, "sprint"
+            )
+
+            # log.info(f"Sprint histories for issue {issue.key}: {sprint_histories}")
+
+            # Tìm thời điểm issue được thêm vào sprint
+            for history in sprint_histories:
+                # Đảm bảo created_at có timezone
+                created_at = history.created_at
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+
+                log.info(f"Sprint history: {history.old_value} -> {history.new_value} at {created_at}")
+
+                new_value = history.new_value_parsed
+                if new_value and str(sprint_id) in str(new_value) and created_at <= date:
+                    log.info(f"Issue {issue.key} was added to sprint {sprint_id} at {created_at}")
+                    return True
+
+            log.info(f"Issue {issue.key} is not in sprint {sprint_id} at date {date}")
             return False
-
-        # Kiểm tra nếu issue thuộc sprint và được tạo trước hoặc trong ngày đang xét
-        for sprint in issue.sprints:
-            if sprint and sprint.jira_sprint_id == sprint_id and issue.created_at <= date:
-                return True
-
-        return False
+        except Exception as e:
+            log.error(f"Error in _is_issue_in_sprint_at_date: {str(e)}")
+            log.error(f"Issue: {issue.key}, sprint_id: {sprint_id}, date: {date}")
+            log.error(f"Date timezone: {date.tzinfo}")
+            raise
 
     async def _calculate_scope_changes(
         self,
@@ -222,103 +356,256 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         sprint_id: int
     ) -> Tuple[List[SprintScopeChange], Dict[str, float]]:
         """Tính toán các thay đổi phạm vi dựa trên lịch sử issues"""
-        # Dictionary lưu trữ dữ liệu scope change theo ngày
-        daily_scope_points: Dict[str, float] = {}
-        scope_changes: List[SprintScopeChange] = []
+        try:
+            # Dictionary lưu trữ dữ liệu scope change theo ngày
+            daily_scope_points: Dict[str, float] = {}
+            scope_changes: List[SprintScopeChange] = []
 
-        # Lấy lịch sử thay đổi sprint của tất cả issues
-        sprint_histories = await self.jira_issue_history_db_service.get_sprint_issue_histories(
-            sprint_id=sprint_id,
-            from_date=start_date,
-            to_date=end_date
-        )
+            # # Đảm bảo start_date và end_date có timezone nhất quán
+            # if start_date.tzinfo is None:
+            #     start_date = start_date.replace(tzinfo=timezone.utc)
+            # if end_date.tzinfo is None:
+            #     end_date = end_date.replace(tzinfo=timezone.utc)
 
-        # Filter chỉ lấy các thay đổi liên quan đến sprint và story points
-        sprint_changes = [h for h in sprint_histories if h.field_name == "sprint"]
-        story_point_changes = [h for h in sprint_histories if h.field_name == "story_points"]
+            # Lấy lịch sử thay đổi sprint của tất cả issues
+            log.info(f"Getting sprint issue histories for sprint {sprint_id} from {start_date} to {end_date}")
+            sprint_histories = await self.jira_issue_history_db_service.get_sprint_issue_histories(
+                sprint_id=sprint_id,
+                from_date=start_date,
+                to_date=end_date
+            )
+            log.info(f"Sprint histories: {sprint_histories}")
 
-        # Phân tích thay đổi sprint
-        for change in sprint_changes:
-            # Chỉ xét các thay đổi khi issue được thêm vào sprint
-            new_value = change.new_value_parsed
-            if new_value and str(sprint_id) in str(new_value):
-                # Tìm issue tương ứng
-                issue = next((i for i in issues if i.jira_issue_id == change.jira_issue_id), None)
-                if not issue:
-                    continue
+            # Filter chỉ lấy các thay đổi liên quan đến sprint và story points
+            sprint_changes = [h for h in sprint_histories if h.field_name == "sprint"]
+            story_point_changes = [h for h in sprint_histories if h.field_name == "story_points"]
 
-                # Ngày thay đổi
-                change_date_str = change.created_at.strftime("%Y-%m-%d")
+            log.info(f"Sprint changes: {sprint_changes}")
+            log.info(f"Story point changes: {story_point_changes}")
 
-                # Nếu issue được thêm vào sau khi sprint bắt đầu, đây là scope change
-                if change.created_at > start_date:
-                    points = issue.estimate_point or 0
+            # Phân tích thay đổi sprint
+            for change in sprint_changes:
+                try:
+                    # Chỉ xét các thay đổi khi issue được thêm vào sprint
+                    new_value = change.new_value_parsed
+                    if new_value and str(sprint_id) in str(new_value):
+                        # Tìm issue tương ứng
+                        issue = next((i for i in issues if i.jira_issue_id == change.jira_issue_id), None)
+                        if not issue:
+                            continue
 
-                    # Cập nhật daily scope points
-                    if change_date_str not in daily_scope_points:
-                        daily_scope_points[change_date_str] = 0
-                    daily_scope_points[change_date_str] += points
+                        # Ngày thay đổi
+                        change_date_str = change.created_at.strftime("%Y-%m-%d")
 
-                    # Tạo scope change entry
-                    existing_change = next(
-                        (sc for sc in scope_changes if sc.date.strftime("%Y-%m-%d") == change_date_str),
-                        None
-                    )
+                        # Đảm bảo created_at có timezone
+                        created_at = change.created_at
+                        if created_at.tzinfo is None:
+                            created_at = created_at.replace(tzinfo=timezone.utc)
 
-                    if existing_change:
-                        existing_change.points_added += points
-                        existing_change.issue_keys.append(issue.key)
-                    else:
-                        scope_changes.append(
-                            SprintScopeChange(
-                                date=change.created_at,
-                                points_added=points,
-                                issue_keys=[issue.key]
+                        # Nếu issue được thêm vào sau khi sprint bắt đầu, đây là scope change
+                        if created_at > start_date:
+                            # Lấy số điểm của issue tại thời điểm được thêm vào sprint
+                            points = await self._get_issue_points_at_date(issue, created_at)
+                            log.info(f"Issue {issue.key} added to sprint with {points} points at {created_at}")
+
+                            # Cập nhật daily scope points
+                            if change_date_str not in daily_scope_points:
+                                daily_scope_points[change_date_str] = 0
+                            daily_scope_points[change_date_str] += points
+
+                            # Tạo scope change entry
+                            existing_change = next(
+                                (sc for sc in scope_changes if sc.date.strftime("%Y-%m-%d") == change_date_str),
+                                None
                             )
+
+                            if existing_change:
+                                existing_change.points_added += points
+                                if issue.key not in existing_change.issue_keys:
+                                    existing_change.issue_keys.append(issue.key)
+                            else:
+                                scope_changes.append(
+                                    SprintScopeChange(
+                                        date=change.created_at,
+                                        points_added=points,
+                                        issue_keys=[issue.key]
+                                    )
+                                )
+                except Exception as e:
+                    log.error(f"Error processing sprint change: {str(e)}")
+                    log.error(
+                        f"Change created_at: {change.created_at}, tzinfo: {change.created_at.tzinfo if change.created_at else None}")
+                    log.error(f"Start date: {start_date}, tzinfo: {start_date.tzinfo}")
+                    raise
+
+            # Phân tích thay đổi story points
+            for change in story_point_changes:
+                try:
+                    # Kiểm tra xem issue có thuộc sprint không
+                    issue = next((i for i in issues if i.jira_issue_id == change.jira_issue_id), None)
+                    if not issue:
+                        continue
+
+                    # Ngày thay đổi
+                    change_date_str = change.created_at.strftime("%Y-%m-%d")
+
+                    # Đảm bảo created_at có timezone
+                    created_at = change.created_at
+                    if created_at.tzinfo is None:
+                        created_at = created_at.replace(tzinfo=timezone.utc)
+
+                    # Tính toán điểm thay đổi
+                    old_points = float(change.old_value or 0)
+                    new_points = float(change.new_value or 0)
+                    points_diff = new_points - old_points
+
+                    # Nếu có thay đổi điểm và thời điểm thay đổi sau khi sprint bắt đầu
+                    if points_diff != 0 and created_at > start_date:
+                        log.info(
+                            f"Issue {issue.key} story points changed from {old_points} to {new_points} at {created_at}")
+
+                        # Cập nhật daily scope points
+                        if change_date_str not in daily_scope_points:
+                            daily_scope_points[change_date_str] = 0
+                        daily_scope_points[change_date_str] += points_diff
+
+                        # Tạo hoặc cập nhật scope change entry
+                        existing_change = next(
+                            (sc for sc in scope_changes if sc.date.strftime("%Y-%m-%d") == change_date_str),
+                            None
                         )
 
-        # Phân tích thay đổi story points
-        for change in story_point_changes:
-            # Kiểm tra xem issue có thuộc sprint không
-            issue = next((i for i in issues if i.jira_issue_id == change.jira_issue_id), None)
-            if not issue:
-                continue
+                        if existing_change:
+                            existing_change.points_added += points_diff
+                            if issue.key not in existing_change.issue_keys:
+                                existing_change.issue_keys.append(issue.key)
+                        else:
+                            scope_changes.append(
+                                SprintScopeChange(
+                                    date=change.created_at,
+                                    points_added=points_diff,
+                                    issue_keys=[issue.key]
+                                )
+                            )
+                except Exception as e:
+                    log.error(f"Error processing story point change: {str(e)}")
+                    log.error(
+                        f"Change created_at: {change.created_at}, tzinfo: {change.created_at.tzinfo if change.created_at else None}")
+                    log.error(f"Start date: {start_date}, tzinfo: {start_date.tzinfo}")
+                    raise
 
-            # Ngày thay đổi
-            change_date_str = change.created_at.strftime("%Y-%m-%d")
+            # Sắp xếp scope changes theo ngày
+            scope_changes.sort(key=lambda x: x.date)
 
-            # Tính toán điểm thay đổi
-            old_points = float(change.old_value or 0)
-            new_points = float(change.new_value or 0)
-            points_diff = new_points - old_points
+            return scope_changes, daily_scope_points
+        except Exception as e:
+            log.error(f"Error in _calculate_scope_changes: {str(e)}")
+            log.error(f"Start date: {start_date}, tzinfo: {start_date.tzinfo}")
+            log.error(f"End date: {end_date}, tzinfo: {end_date.tzinfo}")
+            raise
 
-            # Nếu có thay đổi điểm và thời điểm thay đổi sau khi sprint bắt đầu
-            if points_diff != 0 and change.created_at > start_date:
-                # Cập nhật daily scope points
-                if change_date_str not in daily_scope_points:
-                    daily_scope_points[change_date_str] = 0
-                daily_scope_points[change_date_str] += points_diff
+    async def _is_issue_completed_at_date(self, issue: JiraIssueModel, date: datetime) -> bool:
+        """Kiểm tra xem issue đã hoàn thành tại một ngày cụ thể chưa"""
+        try:
+            # Đảm bảo date có timezone
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=timezone.utc)
 
-                # Tạo hoặc cập nhật scope change entry
-                existing_change = next(
-                    (sc for sc in scope_changes if sc.date.strftime("%Y-%m-%d") == change_date_str),
-                    None
-                )
+            # log.info(f"Checking if issue {issue.key} is completed at date {date}")
+            # log.info(f"Issue status: {issue.status}, updated_at: {issue.updated_at}")
 
-                if existing_change:
-                    existing_change.points_added += points_diff
-                    if issue.key not in existing_change.issue_keys:
-                        existing_change.issue_keys.append(issue.key)
-                else:
-                    scope_changes.append(
-                        SprintScopeChange(
-                            date=change.created_at,
-                            points_added=points_diff,
-                            issue_keys=[issue.key]
-                        )
-                    )
+            # Nếu issue đã có trạng thái Done, kiểm tra thời gian cập nhật
+            if issue.status == JiraIssueStatus.DONE and issue.updated_at:
+                # Đảm bảo updated_at có timezone
+                updated_at = issue.updated_at
+                if updated_at.tzinfo is None:
+                    updated_at = updated_at.replace(tzinfo=timezone.utc)
+                if updated_at <= date:
+                    log.info(f"Issue {issue.key} is completed (current status is Done)")
+                    return True
 
-        # Sắp xếp scope changes theo ngày
-        scope_changes.sort(key=lambda x: x.date)
+            # Nếu không, kiểm tra lịch sử thay đổi trạng thái
+            status_histories = await self.jira_issue_history_db_service.get_issue_field_history(
+                issue.jira_issue_id, "status"
+            )
 
-        return scope_changes, daily_scope_points
+            # log.info(f"Status histories for issue {issue.key}: {status_histories}")
+
+            # Danh sách các trạng thái được coi là hoàn thành
+            completed_statuses = [
+                JiraIssueStatus.DONE,
+                "Done",
+                "DONE",
+                "Closed",
+                "CLOSED",
+                "Resolved",
+                "RESOLVED"
+            ]
+
+            # Tìm thời điểm issue được chuyển sang trạng thái hoàn thành
+            for history in status_histories:
+                # Đảm bảo created_at có timezone
+                created_at = history.created_at
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+
+                # log.info(f"Status history: {history.old_value} -> {history.new_value} at {created_at}")
+
+                if (created_at <= date and history.new_value in completed_statuses):
+                    # log.info(f"Issue {issue.key} is completed (status changed to {history.new_value} at {created_at})")
+                    return True
+
+            # log.info(f"Issue {issue.key} is not completed at date {date}")
+            return False
+        except Exception as e:
+            log.error(f"Error in _is_issue_completed_at_date: {str(e)}")
+            log.error(f"Issue: {issue.key}, date: {date}")
+            log.error(f"Date timezone: {date.tzinfo}")
+            raise
+
+    async def _get_issue_points_at_date(self, issue: JiraIssueModel, date: datetime) -> float:
+        """Lấy số điểm của issue tại một ngày cụ thể"""
+        try:
+            log.info(f"Getting issue points at date: {date} for issue: {issue.key}")
+            # Đảm bảo date có timezone
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=timezone.utc)
+
+            # Lấy lịch sử thay đổi story points
+            points_histories = await self.jira_issue_history_db_service.get_issue_field_history(
+                issue.jira_issue_id, "story_points"
+            )
+
+            log.info(f"Story points histories for issue {issue.key}: {points_histories}")
+
+            # Nếu không có lịch sử, sử dụng giá trị hiện tại
+            if not points_histories:
+                log.info(
+                    f"No story points history for issue {issue.key}, using current estimate: {issue.estimate_point or 0}")
+                return issue.estimate_point or 0
+
+            # Tìm giá trị story points tại ngày cụ thể
+            points_at_date = issue.estimate_point or 0
+            for history in points_histories:
+                # Đảm bảo created_at có timezone
+                created_at = history.created_at
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+
+                log.info(f"Story points history: {history.old_value} -> {history.new_value} at {created_at}")
+
+                if created_at <= date:
+                    try:
+                        points_at_date = float(history.new_value or 0)
+                        # log.info(f"Updated points_at_date to {points_at_date} for issue {issue.key}")
+                    except (ValueError, TypeError):
+                        log.error(f"Error converting story points value: {history.new_value}")
+                        # Giữ nguyên giá trị cũ nếu không thể chuyển đổi
+
+            log.info(f"Final points for issue {issue.key} at date {date}: {points_at_date}")
+            return points_at_date
+        except Exception as e:
+            log.error(f"Error in _get_issue_points_at_date: {str(e)}")
+            log.error(f"Issue: {issue.key}, date: {date}")
+            log.error(f"Date timezone: {date.tzinfo}")
+            raise

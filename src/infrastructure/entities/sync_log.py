@@ -1,12 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from sqlmodel import JSON, CheckConstraint, Column, Field
-
-from src.infrastructure.entities.base import BaseEntityWithTimestamps
+from sqlmodel import JSON, CheckConstraint, Column, DateTime, Field, SQLModel
 
 
-class SyncLogEntity(BaseEntityWithTimestamps, table=True):
+class SyncLogEntity(SQLModel, table=True):
     __tablename__ = "sync_logs"
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -25,8 +23,14 @@ class SyncLogEntity(BaseEntityWithTimestamps, table=True):
     error_message: Optional[str] = None
     sender: Optional[int] = Field(default=None, foreign_key="jira_users.user_id")
     source: str
-    created_at: datetime = Field(default_factory=datetime.now)
     status: Optional[str] = None
+
+    # Timestamps
+    created_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True)),
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
 
     __table_args__ = (
         CheckConstraint(

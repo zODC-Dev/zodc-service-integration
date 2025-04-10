@@ -10,7 +10,8 @@ class IJiraUserAPIService(ABC):
         pass
 
     @abstractmethod
-    async def get_user_by_account_id_with_system_user(self, account_id: str) -> Optional[JiraUserModel]:
+    async def get_user_by_account_id_with_admin_auth(self, account_id: str) -> Optional[JiraUserModel]:
+        """Get user by account ID using admin credentials"""
         pass
 
     @abstractmethod

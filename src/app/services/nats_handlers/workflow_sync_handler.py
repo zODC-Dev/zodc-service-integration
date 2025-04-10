@@ -3,8 +3,8 @@ import uuid
 
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.configs.logger import log
-from src.configs.settings import settings
 from src.domain.constants.jira import JiraActionType, JiraIssueType
+from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.nats.replies.workflow_sync import WorkflowSyncReply, WorkflowSyncReplyIssue
@@ -14,6 +14,7 @@ from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
 from src.domain.services.nats_message_handler import INATSRequestHandler
+from src.domain.services.redis_service import IRedisService
 
 
 class WorkflowSyncRequestHandler(INATSRequestHandler):
@@ -22,12 +23,14 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
         jira_issue_service: JiraIssueApplicationService,
         user_repository: IJiraUserRepository,
         jira_sprint_repository: IJiraSprintRepository,
-        workflow_mapping_repository: IWorkflowMappingRepository
+        workflow_mapping_repository: IWorkflowMappingRepository,
+        redis_service: IRedisService
     ):
         self.jira_issue_service = jira_issue_service
         self.user_repository = user_repository
         self.jira_sprint_repository = jira_sprint_repository
         self.workflow_mapping_repository = workflow_mapping_repository
+        self.redis_service = redis_service
 
     async def handle(self, subject: str, message: Dict[str, Any]) -> Dict[str, Any]:
         """Handle workflow sync requests"""
@@ -63,6 +66,9 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             for result_issue in created_issues:
                 node_to_jira_key_map[result_issue.node_id] = result_issue.jira_key
                 log.info(f"Updated mapping: Node ID {result_issue.node_id} -> Jira key {result_issue.jira_key}")
+
+                # Lưu jira_key vào Redis để đánh dấu là system_linked khi webhook được gọi
+                await self._mark_issue_for_system_linking(result_issue.jira_key)
 
             # Process connections between issues - chỉ xử lý sau khi đã có đủ mapping
             if request.connections:
@@ -158,17 +164,44 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             summary=issue.title,
             type=issue_type,
             assignee_id=str(issue.assignee_id),
-            sprint_id=jira_sprint_id  # Sử dụng Jira sprint ID đã được map
+            sprint_id=jira_sprint_id,  # Sử dụng Jira sprint ID đã được map
         )
 
-        # Use system user or first available user with Jira access
-        user_id = await self._get_valid_user_id()
+        if issue.estimate_point:
+            create_dto.estimate_point = issue.estimate_point
 
-        # Create issue via Jira API
-        return await self.jira_issue_service.jira_issue_api_service.create_issue(
-            user_id=user_id,
+        # Sử dụng admin auth để tạo issue
+        jira_issue = await self.jira_issue_service.jira_issue_api_service.create_issue_with_admin_auth(
             issue_data=create_dto
         )
+
+        # Đảm bảo issue được lưu vào DB với is_system_linked=True
+        # Sau khi tạo issue trên Jira, cần cập nhật lại DB (nếu cần)
+        if jira_issue and jira_issue.jira_issue_id:
+            try:
+                # Kiểm tra xem issue đã tồn tại trong DB chưa
+                existing_issue = await self.jira_issue_service.jira_issue_repository.get_by_jira_issue_id(
+                    jira_issue.jira_issue_id
+                )
+
+                # Nếu chưa có trong DB hoặc chưa được đánh dấu là system linked
+                if not existing_issue or not existing_issue.is_system_linked:
+                    # Cập nhật hoặc tạo mới với is_system_linked=True
+                    from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
+
+                    update_dto = JiraIssueDBUpdateDTO(
+                        is_system_linked=True
+                    )
+
+                    await self.jira_issue_service.jira_issue_repository.update(
+                        jira_issue.jira_issue_id, update_dto
+                    )
+                    log.info(f"Marked issue {jira_issue.key} as system linked in database")
+            except Exception as e:
+                log.error(f"Error updating system_linked flag for issue {jira_issue.key}: {str(e)}")
+                # Không raise exception ở đây để không ảnh hưởng đến luồng chính
+
+        return jira_issue
 
     async def _update_issue(self, issue: WorkflowSyncIssue) -> JiraIssueModel:
         """Update an existing issue in Jira"""
@@ -181,15 +214,37 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             assignee_id=str(issue.assignee_id)
         )
 
-        # Use system user or first available user with Jira access
-        user_id = await self._get_valid_user_id()
+        if issue.estimate_point:
+            update_dto.estimate_point = issue.estimate_point
 
-        # Update issue via Jira API
-        return await self.jira_issue_service.jira_issue_api_service.update_issue(
-            user_id=user_id,
+        # Sử dụng admin auth để update issue
+        jira_issue = await self.jira_issue_service.jira_issue_api_service.update_issue_with_admin_auth(
             issue_id=issue.jira_key,
             update=update_dto
         )
+        # Sau khi update, đảm bảo issue được đánh dấu là system linked trong DB
+        if jira_issue and jira_issue.jira_issue_id:
+            try:
+                # Kiểm tra xem issue đã được đánh dấu là system linked chưa
+                existing_issue = await self.jira_issue_service.jira_issue_repository.get_by_jira_issue_id(
+                    jira_issue.jira_issue_id
+                )
+
+                # Nếu chưa được đánh dấu là system linked
+                if existing_issue and not existing_issue.is_system_linked:
+                    # Cập nhật flag is_system_linked
+                    update_db_dto = JiraIssueDBUpdateDTO(
+                        is_system_linked=True
+                    )
+
+                    await self.jira_issue_service.jira_issue_repository.update(
+                        jira_issue.jira_issue_id, update_db_dto
+                    )
+                    log.info(f"Marked updated issue {jira_issue.key} as system linked in database")
+            except Exception as e:
+                log.error(f"Error updating system_linked flag for issue {jira_issue.key}: {str(e)}")
+                # Không raise exception ở đây để không ảnh hưởng đến luồng chính
+        return jira_issue
 
     async def _process_connections(
         self,
@@ -197,7 +252,6 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
         node_to_jira_key_map: Dict[str, str]
     ):
         """Process all connections between issues"""
-        user_id = await self._get_valid_user_id()
         connection_results = []
 
         # Log mapping để dễ debug
@@ -220,9 +274,8 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
                     connection_results.append(False)
                     continue
 
-                # Create "relates to" link between issues
-                success = await self.jira_issue_service.jira_issue_api_service.create_issue_link(
-                    user_id=user_id,
+                # Create "relates to" link between issues using admin auth
+                success = await self.jira_issue_service.jira_issue_api_service.create_issue_link_with_admin_auth(
                     source_issue_id=source_key,
                     target_issue_id=target_key,
                     relationship="Relates"  # Always using "relates to" as requested
@@ -244,13 +297,6 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
         if connections and not any(connection_results):
             raise Exception("Failed to create any connections between issues")
 
-    async def _get_valid_user_id(self) -> int:
-        """Get a valid user ID for Jira API calls"""
-        # In a real implementation, you might want to use a system user or
-        # get the first user with Jira access from the repository
-        # For now, returning a placeholder value
-        return settings.JIRA_SYSTEM_USER_ID
-
     def _map_issue_type(self, issue_type: str) -> str:
         """Map issue type to Jira issue type"""
         # Normalize to uppercase for comparison
@@ -268,3 +314,16 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             # Default to Task if unknown type
             log.warning(f"Unknown issue type: {issue_type}, defaulting to Task")
             return JiraIssueType.TASK.value
+
+    async def _mark_issue_for_system_linking(self, jira_key: str):
+        """Đánh dấu issue cần được liên kết với hệ thống trong Redis"""
+        try:
+            # Tạo key Redis
+            redis_key = f"system_linked:jira_issue:{jira_key}"
+
+            # Lưu vào Redis với TTL 24 giờ (86400 giây)
+            # Sử dụng TTL để tự động cleanup sau một thời gian
+            await self.redis_service.set(redis_key, "true", expiry=86400)
+            log.info(f"Marked issue {jira_key} for system linking in Redis")
+        except Exception as e:
+            log.error(f"Error marking issue {jira_key} for system linking: {str(e)}")

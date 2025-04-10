@@ -1,12 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from typing import Any, List, Optional
-import uuid
 
 from sqlmodel import and_, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
-from src.domain.models.jira_issue_history import IssueHistoryEventModel, JiraIssueHistoryModel
+from src.domain.models.database.jira_issue_history import JiraIssueHistoryDBCreateDTO
+from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 from src.domain.repositories.jira_issue_history_repository import IJiraIssueHistoryRepository
 from src.infrastructure.entities.jira_issue_history import JiraIssueHistoryEntity
 from src.infrastructure.entities.jira_issue_sprint import JiraIssueSprintEntity
@@ -20,12 +20,12 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
     async def get_issue_history(
         self,
-        issue_id: str
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
         try:
             stmt = select(JiraIssueHistoryEntity).where(
-                col(JiraIssueHistoryEntity.jira_issue_id) == issue_id
+                col(JiraIssueHistoryEntity.jira_issue_id) == jira_issue_id
             ).order_by(col(JiraIssueHistoryEntity.created_at))
 
             result = await self.session.exec(stmt)
@@ -38,14 +38,14 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
     async def get_issue_field_history(
         self,
-        issue_id: int,
+        jira_issue_id: str,
         field_name: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi của một trường cụ thể"""
         try:
             stmt = select(JiraIssueHistoryEntity).where(
                 and_(
-                    col(JiraIssueHistoryEntity.jira_issue_id) == issue_id,
+                    col(JiraIssueHistoryEntity.jira_issue_id) == jira_issue_id,
                     col(JiraIssueHistoryEntity.field_name) == field_name
                 )
             ).order_by(col(JiraIssueHistoryEntity.created_at))
@@ -58,45 +58,9 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
             log.error(f"Error getting issue field history: {str(e)}")
             return []
 
-    async def create_history_item(
+    async def create(
         self,
-        jira_issue_id: str,
-        field_name: str,
-        field_type: str,
-        old_value: Optional[str],
-        new_value: Optional[str],
-        old_string: Optional[str],
-        new_string: Optional[str],
-        author_id: Optional[str],
-        created_at: datetime,
-        jira_change_id: Optional[str]
-    ) -> Optional[JiraIssueHistoryModel]:
-        """Tạo một bản ghi lịch sử mới"""
-        try:
-            history_item = JiraIssueHistoryEntity(
-                jira_issue_id=jira_issue_id,
-                field_name=field_name,
-                field_type=field_type,
-                old_value=old_value,
-                new_value=new_value,
-                old_string=old_string,
-                new_string=new_string,
-                author_id=author_id,
-                created_at=created_at,
-                jira_change_id=jira_change_id
-            )
-
-            self.session.add(history_item)
-            await self.session.flush()
-            await self.session.refresh(history_item)
-            return self._entity_to_model(history_item)
-        except Exception as e:
-            log.error(f"Error creating history item: {str(e)}")
-            return None
-
-    async def save_history_event(
-        self,
-        event: IssueHistoryEventModel
+        event: JiraIssueHistoryDBCreateDTO
     ) -> bool:
         """Lưu một sự kiện thay đổi issue bao gồm nhiều thay đổi"""
         try:
@@ -112,24 +76,14 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                 # Lấy thời gian thay đổi nhưng loại bỏ timezone để phù hợp với DB
                 created_at_naive = event.created_at.replace(tzinfo=None)
 
-                # Tính thời điểm 10 giây trước để kiểm tra trùng lặp
-                recent_time_threshold = 10  # seconds
-
                 # Kiểm tra các bản ghi tương tự đã tồn tại
                 try:
                     stmt = (
                         select(JiraIssueHistoryEntity)
                         .where(
-                            JiraIssueHistoryEntity.jira_issue_id == event.jira_issue_id,
-                            JiraIssueHistoryEntity.field_name == change.field,
-                            JiraIssueHistoryEntity.old_value == (
-                                str(change.from_value) if change.from_value is not None else None),
-                            JiraIssueHistoryEntity.new_value == (
-                                str(change.to_value) if change.to_value is not None else None),
-                            # Tìm các thay đổi đã tồn tại trong khoảng thời gian gần đây
-                            # Lưu ý: chỉ sử dụng phép so sánh >=, không trừ datetime
-                            JiraIssueHistoryEntity.created_at >= created_at_naive -
-                            timedelta(seconds=recent_time_threshold)
+                            col(JiraIssueHistoryEntity.jira_issue_id) == event.jira_issue_id,
+                            col(JiraIssueHistoryEntity.jira_change_id) == event.jira_change_id,
+                            col(JiraIssueHistoryEntity.field_name) == change.field
                         )
                     )
 
@@ -153,10 +107,6 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                 old_value = str(change.from_value) if change.from_value is not None else None
                 new_value = str(change.to_value) if change.to_value is not None else None
 
-                # Tạo change_id cụ thể cho thay đổi này với UUID để đảm bảo duy nhất
-                unique_id = str(uuid.uuid4())[:8]
-                change_id = f"{event.jira_change_id}_{change.field}_{unique_id}"
-
                 # Tạo history item mới với created_at đã loại bỏ timezone
                 history_item = JiraIssueHistoryEntity(
                     jira_issue_id=event.jira_issue_id,
@@ -168,7 +118,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                     new_string=change.to_string,
                     author_id=event.author_id,
                     created_at=created_at_naive,  # Đã loại bỏ timezone
-                    jira_change_id=change_id
+                    jira_change_id=event.jira_change_id
                 )
                 self.session.add(history_item)
                 saved_changes += 1
@@ -195,23 +145,35 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
             result = await self.session.exec(sprint_issues_stmt)
             issue_ids = result.all()
 
+            log.info(f"Issue IDs: {issue_ids}")
+
             if not issue_ids:
                 return []
 
             # Tạo query để lấy lịch sử của các issue
             conditions: List[Any] = [col(JiraIssueHistoryEntity.jira_issue_id).in_(issue_ids)]
 
+            # Đảm bảo from_date và to_date có timezone nhất quán
             if from_date:
-                conditions.append(col(JiraIssueHistoryEntity.created_at) >= from_date)
+                # Chuyển đổi từ_date thành datetime không có timezone để so sánh với cột created_at
+                from_date_naive = from_date.replace(tzinfo=None)
+                conditions.append(col(JiraIssueHistoryEntity.created_at) >= from_date_naive)
+                log.info(f"From date (naive): {from_date_naive}")
+
             if to_date:
-                conditions.append(col(JiraIssueHistoryEntity.created_at) <= to_date)
+                # Chuyển đổi to_date thành datetime không có timezone để so sánh với cột created_at
+                to_date_naive = to_date.replace(tzinfo=None)
+                conditions.append(col(JiraIssueHistoryEntity.created_at) <= to_date_naive)
+                log.info(f"To date (naive): {to_date_naive}")
 
             stmt = select(JiraIssueHistoryEntity).where(
                 and_(*conditions)
             ).order_by(col(JiraIssueHistoryEntity.created_at))
 
-            result = await self.session.exec(stmt)
-            history_items = result.all()
+            history_result = await self.session.exec(stmt)
+            history_items = history_result.all()
+
+            # log.info(f"History items: {history_items}")
 
             return [self._entity_to_model(item) for item in history_items]
         except Exception as e:
@@ -230,6 +192,6 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
             old_string=entity.old_string,
             new_string=entity.new_string,
             author_id=entity.author_id,
-            created_at=entity.created_at,
+            created_at=entity.created_at.replace(tzinfo=timezone.utc),
             jira_change_id=entity.jira_change_id
         )

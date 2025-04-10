@@ -33,7 +33,7 @@ class JiraSprintMapper:
                 end_date=cls._parse_datetime(dto.end_date),
                 complete_date=cls._parse_datetime(dto.complete_date),
                 created_at=now,
-                board_id=dto.origin_board_id,
+                board_id=dto.board_id,
                 goal=dto.goal
             )
         except Exception as e:

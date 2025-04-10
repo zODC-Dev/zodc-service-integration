@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Path
 
 from src.app.controllers.jira_sprint_analytics_controller import JiraSprintAnalyticsController
 from src.app.dependencies.auth import get_jwt_claims
-from src.app.dependencies.jira_sprint_analytics import get_sprint_analytics_controller
+from src.app.dependencies.controllers import get_sprint_analytics_controller
 from src.app.schemas.requests.auth import JWTClaims
 from src.app.schemas.requests.gantt_chart import GanttChartRequest
 from src.app.schemas.responses.gantt_chart import GanttChartFeasibilityResponse, GanttChartResponse

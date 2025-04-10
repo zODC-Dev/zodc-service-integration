@@ -66,9 +66,10 @@ class Settings(BaseSettings):
     # Jira dashboard URL
     JIRA_DASHBOARD_URL: str = "https://vphoa.atlassian.net"
 
-    JIRA_SYSTEM_USER_ID: int = 12  # ID của service account
-    JIRA_ADMIN_ORG_ID: str = "1234567890"
-    JIRA_ADMIN_API_KEY: str = "1234567890"
+    # Jira admin credentials for API auth that doesn't expire
+    JIRA_ADMIN_USERNAME: str = "1234567890"
+    JIRA_ADMIN_PASSWORD: str = "1234567890"
+
     # Azure Blob Storage settings
     AZURE_STORAGE_ACCOUNT_CONTAINER_NAME: str = "media-files"
 

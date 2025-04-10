@@ -36,7 +36,7 @@ class SprintCloseWebhookHandler(JiraWebhookHandler):
         log.info(f"Processing sprint close webhook for sprint {sprint_id}")
 
         # Get latest sprint data from Jira API
-        sprint_data = await self.jira_sprint_api_service.get_sprint_by_id_with_system_user(sprint_id)
+        sprint_data = await self.jira_sprint_api_service.get_sprint_by_id_with_admin_auth(sprint_id)
         if not sprint_data:
             log.error(f"Failed to fetch sprint {sprint_id} from Jira API")
             return {"error": f"Failed to fetch sprint {sprint_id}"}

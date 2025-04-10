@@ -67,6 +67,7 @@ class GetJiraIssueResponse(BaseResponse):
     is_system_linked: bool = False
     is_deleted: bool = False
     link_url: Optional[str] = None
+    last_synced_at: datetime
 
     @classmethod
     def from_domain(cls, issue: JiraIssueModel, sprint_number: Optional[int] = None) -> "GetJiraIssueResponse":
@@ -93,7 +94,8 @@ class GetJiraIssueResponse(BaseResponse):
             created_at=issue.created_at,
             is_system_linked=issue.is_system_linked,
             is_deleted=issue.is_deleted,
-            link_url=issue.link_url
+            link_url=issue.link_url,
+            last_synced_at=issue.last_synced_at
         )
 
 

@@ -1,9 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlmodel import Column, DateTime, Field, Relationship
+from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
 
-from src.infrastructure.entities.base import BaseEntityWithTimestamps
 from src.infrastructure.entities.jira_issue_history import JiraIssueHistoryEntity
 from src.infrastructure.entities.jira_issue_sprint import JiraIssueSprintEntity
 
@@ -13,7 +12,7 @@ if TYPE_CHECKING:
     from src.infrastructure.entities.jira_user import JiraUserEntity
 
 
-class JiraIssueEntity(BaseEntityWithTimestamps, table=True):
+class JiraIssueEntity(SQLModel, table=True):
     __tablename__ = "jira_issues"
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -31,11 +30,16 @@ class JiraIssueEntity(BaseEntityWithTimestamps, table=True):
     last_synced_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
     updated_locally: bool = Field(default=False)
     assignee_id: Optional[str] = Field(default=None, foreign_key="jira_users.jira_account_id")
-    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
-    updated_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
     is_system_linked: bool = Field(default=False)
     is_deleted: bool = Field(default=False)
     link_url: Optional[str] = Field(default=None)
+
+    # Timestamps
+    created_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True)),
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
 
     project: "JiraProjectEntity" = Relationship(back_populates="jira_issues")
     sprints: List["JiraSprintEntity"] = Relationship(

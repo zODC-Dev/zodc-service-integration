@@ -198,7 +198,7 @@ class BaseJiraWebhookDTO(BaseModel):
     @classmethod
     def parse_webhook(cls, data: Dict[str, Any]) -> "BaseJiraWebhookDTO":
         """Factory method để tạo đúng loại DTO dựa trên webhook_event"""
-        log.info(f"Parsing webhook data: {data}")
+        # log.info(f"Parsing webhook data: {data}")
         if not data or ("webhookEvent" not in data and "webhook_event" not in data):
             raise ValueError("Invalid webhook payload: missing webhookEvent field")
 

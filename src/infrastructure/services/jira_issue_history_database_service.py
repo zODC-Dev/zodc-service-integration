@@ -2,7 +2,8 @@ from datetime import datetime
 from typing import List, Optional
 
 from src.configs.logger import log
-from src.domain.models.jira_issue_history import IssueHistoryEventModel, JiraIssueHistoryModel
+from src.domain.models.database.jira_issue_history import JiraIssueHistoryDBCreateDTO
+from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 from src.domain.repositories.jira_issue_history_repository import IJiraIssueHistoryRepository
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 
@@ -15,40 +16,40 @@ class JiraIssueHistoryDatabaseService(IJiraIssueHistoryDatabaseService):
 
     async def get_issue_history(
         self,
-        issue_id: str
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
-        return await self.history_repository.get_issue_history(issue_id)
+        return await self.history_repository.get_issue_history(jira_issue_id)
 
     async def get_issue_field_history(
         self,
-        issue_id: int,
+        jira_issue_id: str,
         field_name: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi của một trường cụ thể"""
-        return await self.history_repository.get_issue_field_history(issue_id, field_name)
+        return await self.history_repository.get_issue_field_history(jira_issue_id, field_name)
 
     async def get_issue_status_changes(
         self,
-        issue_id: int
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi trạng thái của issue"""
-        return await self.get_issue_field_history(issue_id, "status")
+        return await self.get_issue_field_history(jira_issue_id, "status")
 
     async def get_issue_sprint_changes(
         self,
-        issue_id: int
+        jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi sprint của issue"""
-        return await self.get_issue_field_history(issue_id, "sprint")
+        return await self.get_issue_field_history(jira_issue_id, "sprint")
 
     async def save_issue_history_event(
         self,
-        event: IssueHistoryEventModel
+        event: JiraIssueHistoryDBCreateDTO
     ) -> None:
         """Lưu một sự kiện thay đổi issue"""
         try:
-            success = await self.history_repository.save_history_event(event)
+            success = await self.history_repository.create(event)
 
             if not success:
                 raise Exception("Failed to save history event")

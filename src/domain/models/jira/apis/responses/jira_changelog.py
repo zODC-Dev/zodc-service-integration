@@ -32,7 +32,7 @@ class JiraChangelogAuthorDTO(BaseModel):
     id: Optional[str] = Field(None, description="ID của tác giả (nếu có)")
 
 
-class JiraChangelogDetailDTO(BaseModel):
+class JiraChangelogDetailAPIGetResponseDTO(BaseModel):
     """DTO đại diện cho một changelog của Jira"""
     id: str = Field(..., description="ID của changelog")
     author: JiraChangelogAuthorDTO = Field(..., description="Tác giả thực hiện thay đổi")
@@ -40,9 +40,9 @@ class JiraChangelogDetailDTO(BaseModel):
     items: List[JiraChangelogItemDTO] = Field(..., description="Danh sách các mục thay đổi")
 
 
-class JiraIssueChangelogResponseDTO(BaseModel):
+class JiraIssueChangelogAPIGetResponseDTO(BaseModel):
     """DTO đại diện cho response của API changelog của Jira"""
-    values: List[JiraChangelogDetailDTO] = Field(default=[], description="Danh sách các changelog")
+    values: List[JiraChangelogDetailAPIGetResponseDTO] = Field(default=[], description="Danh sách các changelog")
     startAt: int = Field(..., description="Vị trí bắt đầu của kết quả trả về")
     maxResults: int = Field(..., description="Số lượng tối đa kết quả được trả về")
     total: int = Field(..., description="Tổng số changelog có sẵn")

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from src.app.controllers.microsoft_calendar_controller import MicrosoftCalendarController
 from src.app.dependencies.auth import require_auth
-from src.app.dependencies.microsoft_calendar import get_microsoft_calendar_controller
+from src.app.dependencies.controllers import get_microsoft_calendar_controller
 from src.app.schemas.responses.microsoft_calendar import MicrosoftCalendarEventsResponse
 from src.domain.constants.roles import SystemRoles
 

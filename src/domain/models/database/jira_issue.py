@@ -24,6 +24,7 @@ class JiraIssueDBCreateDTO(BaseModel):
     updated_at: Optional[datetime] = Field(default_factory=datetime.now)
     sprints: List[JiraSprintModel] = Field(default_factory=list)
     link_url: Optional[str] = None
+    is_system_linked: bool = False
 
     @classmethod
     def _to_domain(cls, entity: 'JiraIssueDBCreateDTO') -> "JiraIssueModel":
@@ -42,7 +43,7 @@ class JiraIssueDBCreateDTO(BaseModel):
             reporter_id=entity.reporter_id,
             last_synced_at=datetime.now(timezone.utc),
             updated_locally=False,
-            is_system_linked=False,
+            is_system_linked=entity.is_system_linked,
             is_deleted=False,
             link_url=entity.link_url,
             sprints=entity.sprints,
@@ -107,7 +108,7 @@ class JiraIssueDBUpdateDTO(BaseModel):
     sprints: Optional[List[JiraSprintModel]] = None
     is_deleted: Optional[bool] = None
     type: Optional[Union[JiraIssueType, str]] = None
-
+    link_url: Optional[str] = None
     @field_validator('status')
     @classmethod
     def validate_status(cls, v):

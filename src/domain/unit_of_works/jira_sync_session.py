@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from src.domain.repositories.jira_issue_history_repository import IJiraIssueHistoryRepository
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
@@ -13,6 +14,7 @@ class IJiraSyncSession(ABC):
     sprint_repository: IJiraSprintRepository
     user_repository: IJiraUserRepository
     sync_log_repository: ISyncLogRepository
+    issue_history_repository: IJiraIssueHistoryRepository
 
     @abstractmethod
     async def __aenter__(self):

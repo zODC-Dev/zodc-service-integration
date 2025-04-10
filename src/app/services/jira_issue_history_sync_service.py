@@ -1,7 +1,9 @@
 
+from typing import List
+
 from src.configs.logger import log
-from src.domain.models.jira.apis.responses.jira_changelog import JiraChangelogDetailDTO
-from src.domain.models.jira_issue_history import IssueHistoryChangeModel, IssueHistoryEventModel
+from src.domain.models.database.jira_issue_history import JiraIssueHistoryChangeDBCreateDTO, JiraIssueHistoryDBCreateDTO
+from src.domain.models.jira.apis.responses.jira_changelog import JiraChangelogDetailAPIGetResponseDTO
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 
@@ -36,7 +38,7 @@ class JiraIssueHistorySyncService:
             log.error(f"Error syncing history for issue {issue_id}: {str(e)}")
             return False
 
-    async def _process_changelog(self, issue_id: str, changelog: JiraChangelogDetailDTO) -> None:
+    async def _process_changelog(self, issue_id: str, changelog: JiraChangelogDetailAPIGetResponseDTO) -> None:
         """Xử lý một changelog entry từ Jira API"""
         try:
             # Lấy thông tin cơ bản về changelog
@@ -50,7 +52,7 @@ class JiraIssueHistorySyncService:
                 return
 
             # Chuyển đổi sang các đối tượng IssueHistoryChangeModel
-            changes = []
+            changes: List[JiraIssueHistoryChangeDBCreateDTO] = []
             for item in items:
                 field = item.field
                 field_type = item.fieldtype
@@ -62,7 +64,7 @@ class JiraIssueHistorySyncService:
                 # Mapping field name nếu cần
                 mapped_field = self._map_field_name(field)
 
-                changes.append(IssueHistoryChangeModel(
+                changes.append(JiraIssueHistoryChangeDBCreateDTO(
                     field=mapped_field,
                     field_type=field_type,
                     from_value=from_value,
@@ -73,9 +75,9 @@ class JiraIssueHistorySyncService:
 
             # Tạo event và lưu vào database
             if changes:
-                event = IssueHistoryEventModel(
+                event = JiraIssueHistoryDBCreateDTO(
                     jira_issue_id=issue_id,
-                    jira_change_id=f"api_{changelog_id}",
+                    jira_change_id=changelog_id,
                     author_id=author_id,
                     created_at=created_at,  # Giữ nguyên datetime với timezone
                     changes=changes
@@ -94,8 +96,8 @@ class JiraIssueHistorySyncService:
             "status": "status",
             "Sprint": "sprint",
             "assignee": "assignee",
-            "Story Points": "story_points",
-            "Actual Point": "actual_point",
+            "Story point estimate": "story_points",
+            "Actual point": "actual_point",
             # Thêm các mapping khác tùy theo nhu cầu
         }
 
