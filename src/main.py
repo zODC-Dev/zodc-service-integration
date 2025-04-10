@@ -29,6 +29,7 @@ from src.app.services.nats_handlers.jira_project_sync_handler import JiraProject
 from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
 from src.app.services.nats_handlers.node_status_sync_handler import NodeStatusSyncHandler
 from src.app.services.nats_handlers.user_message_handler import UserMessageHandler
+from src.app.services.nats_handlers.workflow_edit_handler import WorkflowEditRequestHandler
 from src.app.services.nats_handlers.workflow_sync_handler import WorkflowSyncRequestHandler
 from src.configs.database import get_db, init_db, session_maker
 from src.configs.logger import log
@@ -167,7 +168,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         NATSSubscribeTopic.WORKFLOW_SYNC.value: WorkflowSyncRequestHandler(
             jira_issue_application_service, user_repository, jira_sprint_repository, workflow_mapping_repository, redis_service),
         NATSSubscribeTopic.GANTT_CHART_CALCULATION.value: GanttChartRequestHandler(gantt_chart_service),
-        NATSSubscribeTopic.NODE_STATUS_SYNC.value: NodeStatusSyncHandler(jira_issue_api_service)
+        NATSSubscribeTopic.NODE_STATUS_SYNC.value: NodeStatusSyncHandler(jira_issue_api_service),
+        NATSSubscribeTopic.WORKFLOW_EDIT.value: WorkflowEditRequestHandler(
+            jira_issue_application_service, user_repository, jira_sprint_repository, workflow_mapping_repository, redis_service)
     }
 
     # Initialize and start NATS Event Service

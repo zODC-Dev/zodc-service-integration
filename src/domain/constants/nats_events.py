@@ -18,6 +18,7 @@ class NATSSubscribeTopic(str, Enum):
     JIRA_PROJECT_SYNC = "jira.project.sync.request"
     JIRA_ISSUE_LINK = "jira.issue.link.request"
     WORKFLOW_SYNC = "workflow.sync.request"
+    WORKFLOW_EDIT = "workflow.edit.request"
     GANTT_CHART_CALCULATION = "ganttchart.calculation.request"
     NODE_STATUS_SYNC = "node.status.sync.request"
 

@@ -44,6 +44,7 @@ from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginM
 from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
 from src.app.services.nats_handlers.node_status_sync_handler import NodeStatusSyncHandler
 from src.app.services.nats_handlers.user_message_handler import UserMessageHandler
+from src.app.services.nats_handlers.workflow_edit_handler import WorkflowEditRequestHandler
 from src.app.services.nats_handlers.workflow_sync_handler import WorkflowSyncRequestHandler
 from src.app.services.util_service import UtilService
 from src.configs.redis import get_redis_client
@@ -504,7 +505,10 @@ async def get_nats_event_service(
         NATSSubscribeTopic.GANTT_CHART_CALCULATION.value:
             GanttChartRequestHandler(gantt_chart_service),
         NATSSubscribeTopic.NODE_STATUS_SYNC.value:
-            NodeStatusSyncHandler(jira_issue_api_service)
+            NodeStatusSyncHandler(jira_issue_api_service),
+        NATSSubscribeTopic.WORKFLOW_EDIT.value:
+            WorkflowEditRequestHandler(jira_issue_application_service, user_repository,
+                                       jira_sprint_repository, workflow_mapping_repository, redis_service)
     }
 
     # Create and return service

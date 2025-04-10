@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import json
 from typing import Any, Dict, List, Optional, Type, TypeVar
 
 import aiohttp
@@ -190,3 +191,64 @@ class JiraAPIClient:
             api_model = await self.parse_response_with_model(item, model_class)
             result.append(mapper.to_domain(api_model))
         return result
+
+    async def get_with_admin_auth(
+        self,
+        path: str,
+        params: Optional[Dict[str, Any]] = None,
+        error_msg: str = "Error calling Jira API"
+    ) -> Dict[str, Any]:
+        """Call Jira API GET method with admin authentication
+
+        Args:
+            path: API path to call
+            params: Query parameters
+            error_msg: Error message to log if the request fails
+
+        Returns:
+            Response JSON data
+
+        Raises:
+            JiraRequestError: If the request fails
+        """
+        try:
+            # Sử dụng admin credentials từ cấu hình
+            admin_auth = self._get_admin_headers()
+
+            # Build URL
+            url = f"{self.base_url}{path}"
+
+            # Log request (không bao gồm headers vì có thông tin nhạy cảm)
+            log.info(f"GET {url} with admin auth")
+
+            # Thực hiện request với admin auth
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                async with session.get(
+                    url,
+                    headers=admin_auth,
+                    params=params
+                ) as response:
+                    response_text = await response.text()
+                    status_code = response.status
+
+                    # Kiểm tra nếu request thành công
+                    if status_code < 200 or status_code >= 300:
+                        log.error(f"Jira API request failed with status {status_code}: {response_text}")
+                        raise JiraRequestError(error_msg, status_code, response_text)
+
+                    # Parse JSON response
+                    try:
+                        return json.loads(response_text) if response_text else {}
+                    except json.JSONDecodeError:
+                        log.error(f"Failed to parse JSON response: {response_text}")
+                        return {"raw_response": response_text}
+
+        except (aiohttp.ClientConnectorError, aiohttp.ClientTimeout) as e:
+            log.error(f"Connection error when calling Jira API: {str(e)}")
+            raise JiraRequestError(f"{error_msg}: Connection error", 0, str(e)) from e
+        except JiraRequestError as e:
+            # Re-throw JiraRequestError
+            raise e
+        except Exception as e:
+            log.error(f"Unexpected error when calling Jira API: {str(e)}")
+            raise JiraRequestError(f"{error_msg}: {str(e)}", 0, str(e)) from e

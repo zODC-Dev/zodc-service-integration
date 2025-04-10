@@ -10,7 +10,7 @@ class WorkflowMappingModel(BaseModel):
     workflow_id: str
     transaction_id: str
     project_key: str
-    sprint_id: int
+    sprint_id: Optional[int] = None
     name: Optional[str] = None
     description: Optional[str] = None
     status: str = "active"
