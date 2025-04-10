@@ -6,7 +6,7 @@ on:
       - main
 env:
   SERVICE_NAME: zodc-service-integration
-  VERSION: 0.2.4
+  VERSION: 0.2.5
   REGISTRY_PROJECT: zodc
 
 jobs:
