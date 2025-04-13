@@ -11,6 +11,7 @@ from src.app.controllers.util_controller import UtilController
 from src.app.dependencies.repositories import get_jira_project_repository
 from src.app.dependencies.services import (
     get_gantt_chart_service,
+    get_jira_issue_history_sync_service,
     get_jira_issue_service,
     get_jira_project_application_service,
     get_jira_sprint_database_service,
@@ -34,9 +35,13 @@ from src.domain.services.jira_sprint_database_service import IJiraSprintDatabase
 
 async def get_jira_issue_controller(
     issue_service=Depends(get_jira_issue_service),
+    issue_history_service=Depends(get_jira_issue_history_sync_service),
 ) -> JiraIssueController:
     """Get Jira issue controller"""
-    return JiraIssueController(jira_issue_service=issue_service)
+    return JiraIssueController(
+        jira_issue_service=issue_service,
+        jira_issue_history_service=issue_history_service,
+    )
 
 
 def get_jira_project_controller(

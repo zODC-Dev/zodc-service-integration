@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlmodel import and_, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -8,6 +8,7 @@ from src.configs.logger import log
 from src.domain.models.database.jira_issue_history import JiraIssueHistoryDBCreateDTO
 from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 from src.domain.repositories.jira_issue_history_repository import IJiraIssueHistoryRepository
+from src.infrastructure.entities.jira_issue import JiraIssueEntity
 from src.infrastructure.entities.jira_issue_history import JiraIssueHistoryEntity
 from src.infrastructure.entities.jira_issue_sprint import JiraIssueSprintEntity
 
@@ -17,6 +18,35 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def get_issues_field_history(
+        self,
+        jira_issue_ids: List[str],
+        field_name: str
+    ) -> Dict[str, List[JiraIssueHistoryModel]]:
+        """Lấy lịch sử thay đổi của tất cả issue trong một sprint"""
+        try:
+            stmt = select(JiraIssueHistoryEntity).where(
+                and_(
+                    col(JiraIssueHistoryEntity.jira_issue_id).in_(jira_issue_ids),
+                    col(JiraIssueHistoryEntity.field_name) == field_name
+                )
+            ).order_by(col(JiraIssueHistoryEntity.created_at))
+
+            result = await self.session.exec(stmt)
+            history_items = result.all()
+
+            # Nhóm theo issue_id
+            grouped_items: Dict[str, List[JiraIssueHistoryModel]] = {}
+            for item in history_items:
+                if item.jira_issue_id not in grouped_items:
+                    grouped_items[item.jira_issue_id] = []
+                grouped_items[item.jira_issue_id].append(self._entity_to_model(item))
+
+            return grouped_items
+        except Exception as e:
+            log.error(f"Error getting multi issues field history: {str(e)}")
+            return {}
 
     async def get_issue_history(
         self,
@@ -64,6 +94,16 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
     ) -> bool:
         """Lưu một sự kiện thay đổi issue bao gồm nhiều thay đổi"""
         try:
+            # Check if the issue id is already in the database
+            stmt = select(JiraIssueEntity).where(
+                col(JiraIssueEntity.jira_issue_id) == event.jira_issue_id
+            )
+            result = await self.session.exec(stmt)
+            existing_issue = result.one_or_none()
+            if not existing_issue:
+                log.warning(f"Issue {event.jira_issue_id} does not exist in the database")
+                return False
+
             if not event.changes:
                 log.warning(f"No changes to save for event {event.jira_change_id}")
                 return True

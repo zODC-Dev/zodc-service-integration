@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from src.configs.logger import log
 from src.domain.models.database.jira_issue_history import JiraIssueHistoryDBCreateDTO
@@ -65,3 +65,11 @@ class JiraIssueHistoryDatabaseService(IJiraIssueHistoryDatabaseService):
     ) -> List[JiraIssueHistoryModel]:
         """Lấy lịch sử thay đổi của tất cả issue trong một sprint"""
         return await self.history_repository.get_sprint_issue_histories(sprint_id, from_date, to_date)
+
+    async def get_issues_field_history(
+        self,
+        issue_ids: List[str],
+        field_name: str
+    ) -> Dict[str, List[JiraIssueHistoryModel]]:
+        """Lấy lịch sử thay đổi của tất cả issue trong một sprint"""
+        return await self.history_repository.get_issues_field_history(issue_ids, field_name)

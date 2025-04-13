@@ -37,8 +37,8 @@ class NATSWorkflowServiceClient(IWorkflowServiceClient):
             for conn_data in connections_data:
                 try:
                     connection = GanttChartConnectionModel(
-                        from_issue_key=conn_data.get("from_issue_key"),
-                        to_issue_key=conn_data.get("to_issue_key"),
+                        from_node_id=conn_data.get("from_node_id"),
+                        to_node_id=conn_data.get("to_node_id"),
                         type=conn_data.get("type", "relates to")
                     )
                     connections.append(connection)

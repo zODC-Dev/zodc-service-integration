@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from src.domain.models.database.jira_issue_history import JiraIssueHistoryDBCreateDTO
 from src.domain.models.jira_issue_history import JiraIssueHistoryModel
@@ -57,5 +57,14 @@ class IJiraIssueHistoryDatabaseService(ABC):
         from_date: Optional[datetime] = None,
         to_date: Optional[datetime] = None
     ) -> List[JiraIssueHistoryModel]:
+        """Lấy lịch sử thay đổi của tất cả issue trong một sprint"""
+        pass
+
+    @abstractmethod
+    async def get_issues_field_history(
+        self,
+        issue_ids: List[str],
+        field_name: str
+    ) -> Dict[str, List[JiraIssueHistoryModel]]:
         """Lấy lịch sử thay đổi của tất cả issue trong một sprint"""
         pass

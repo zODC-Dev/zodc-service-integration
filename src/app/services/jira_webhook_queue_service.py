@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 import time
 from typing import Any, Dict, List, Optional, Set, Union
 
-from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
+from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.database import AsyncSessionLocal
 from src.configs.logger import log
@@ -382,7 +382,7 @@ class JiraWebhookQueueService:
             sprint_database_service = JiraSprintDatabaseService(sprint_repo)
             issue_history_repo = SQLAlchemyJiraIssueHistoryRepository(session)
             issue_history_db_service = JiraIssueHistoryDatabaseService(issue_history_repo)
-            issue_history_sync_service = JiraIssueHistorySyncService(
+            issue_history_sync_service = JiraIssueHistoryApplicationService(
                 self.jira_issue_api_service, issue_history_db_service)
             jira_project_repository = SQLAlchemyJiraProjectRepository(session)
             redis_client = await get_redis_client()

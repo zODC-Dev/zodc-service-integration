@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
-from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
+from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueType
 from src.domain.constants.sync import EntityType, OperationType, SourceType
@@ -42,7 +42,7 @@ class JiraProjectApplicationService:
         jira_sprint_db_service: IJiraSprintDatabaseService,
         sync_session: IJiraSyncSession,
         sync_log_repository: ISyncLogRepository,
-        issue_history_sync_service: JiraIssueHistorySyncService
+        issue_history_sync_service: JiraIssueHistoryApplicationService
     ):
         self.jira_project_api_service = jira_project_api_service
         self.jira_project_db_service = jira_project_db_service

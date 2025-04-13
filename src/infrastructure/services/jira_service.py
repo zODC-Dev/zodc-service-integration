@@ -234,7 +234,7 @@ class JiraAPIClient:
                     # Kiểm tra nếu request thành công
                     if status_code < 200 or status_code >= 300:
                         log.error(f"Jira API request failed with status {status_code}: {response_text}")
-                        raise JiraRequestError(error_msg, status_code, response_text)
+                        raise JiraRequestError(status_code, response_text)
 
                     # Parse JSON response
                     try:
@@ -245,10 +245,10 @@ class JiraAPIClient:
 
         except (aiohttp.ClientConnectorError, aiohttp.ClientTimeout) as e:
             log.error(f"Connection error when calling Jira API: {str(e)}")
-            raise JiraRequestError(f"{error_msg}: Connection error", 0, str(e)) from e
+            raise JiraRequestError(500, str(e)) from e
         except JiraRequestError as e:
             # Re-throw JiraRequestError
             raise e
         except Exception as e:
             log.error(f"Unexpected error when calling Jira API: {str(e)}")
-            raise JiraRequestError(f"{error_msg}: {str(e)}", 0, str(e)) from e
+            raise JiraRequestError(500, str(e)) from e

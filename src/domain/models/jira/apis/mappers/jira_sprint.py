@@ -111,7 +111,7 @@ class JiraSprintMapper:
 
             # Handle dictionary
             elif isinstance(item, dict):
-                sprint_id = item.get('id')
+                sprint_id: Optional[int] = item.get('id')
                 if not sprint_id:
                     return None
 

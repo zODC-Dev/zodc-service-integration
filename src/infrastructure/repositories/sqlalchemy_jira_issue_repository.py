@@ -333,6 +333,13 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             log.error(f"Error fetching project issues: {str(e)}")
             raise
 
+    async def get_by_jira_issue_key(self, jira_issue_key: str) -> Optional[JiraIssueModel]:
+        """Get issue by key from database"""
+        query = select(JiraIssueEntity).where(col(JiraIssueEntity.key) == jira_issue_key)
+        result = await self.session.exec(query)
+        entity = result.first()
+        return self._to_domain(entity) if entity else None
+
     async def get_issues_by_keys(self, keys: List[str]) -> List[JiraIssueModel]:
         """Get multiple issues by their Jira keys"""
         try:
