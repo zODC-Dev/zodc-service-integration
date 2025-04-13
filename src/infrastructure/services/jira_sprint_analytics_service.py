@@ -55,7 +55,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
         # Lấy danh sách issues trong sprint
         issues = await self._get_sprint_issues(user_id, project_key, sprint_id)
-        log.info(f"Issues count: {len(issues)}")
+        log.debug(f"Issues count: {len(issues)}")
 
         # Tính toán dữ liệu burndown
         base_model = await self._calculate_sprint_analytics(sprint, issues, project_key)
@@ -128,20 +128,20 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         assert sprint.start_date is not None, "Sprint start date must be provided"
         assert sprint.end_date is not None, "Sprint end date must be provided"
 
-        # Đảm bảo start_date và end_date có timezone
+        # # Đảm bảo start_date và end_date có timezone
         start_date = sprint.start_date
         end_date = sprint.end_date
-        if start_date.tzinfo is None:
-            start_date = start_date.replace(tzinfo=timezone.utc)
-        else:
-            # Chuyển về timezone gốc
-            start_date = start_date.astimezone(timezone.utc)
+        # if start_date.tzinfo is None:
+        #     start_date = start_date.replace(tzinfo=timezone.utc)
+        # else:
+        #     # Chuyển về timezone gốc
+        #     start_date = start_date.astimezone(timezone.utc)
 
-        if end_date.tzinfo is None:
-            end_date = end_date.replace(tzinfo=timezone.utc)
-        else:
-            # Chuyển về timezone gốc
-            end_date = end_date.astimezone(timezone.utc)
+        # if end_date.tzinfo is None:
+        #     end_date = end_date.replace(tzinfo=timezone.utc)
+        # else:
+        #     # Chuyển về timezone gốc
+        #     end_date = end_date.astimezone(timezone.utc)
 
         log.info("=== START CALCULATING INITIAL POINTS ===")
         log.info(f"Sprint start date: {start_date}")

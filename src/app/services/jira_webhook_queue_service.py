@@ -140,13 +140,13 @@ class JiraWebhookQueueService:
 
             # Thêm webhook vào hàng đợi
             await self.queues[entity_id].put((priority, time.time(), parsed_webhook))
-            log.info(f"Added webhook to queue for entity {entity_id}")
+            log.debug(f"Added webhook to queue for entity {entity_id}")
 
             # Khởi động worker mới nếu entity này chưa đang được xử lý
             if entity_id not in self.processing:
                 entity_task = asyncio.create_task(self._process_entity_queue(entity_id))
                 self._track_task(entity_task)
-                log.info(f"Started processing task for entity {entity_id}")
+                log.debug(f"Started processing task for entity {entity_id}")
 
             return True
 
