@@ -3,8 +3,10 @@ from datetime import time
 from fastapi import HTTPException
 
 from src.app.schemas.requests.gantt_chart import GanttChartRequest
+from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.gantt_chart import GanttChartFeasibilityResponse, GanttChartResponse
 from src.app.schemas.responses.jira_sprint_analytics import (
+    BugReportDataResponse,
     SprintBurndownResponse,
     SprintBurnupResponse,
     SprintGoalResponse,
@@ -27,13 +29,17 @@ class JiraSprintAnalyticsController:
         user_id: int,
         project_key: str,
         sprint_id: int,
-    ) -> SprintBurndownResponse:
+    ) -> StandardResponse[SprintBurndownResponse]:
         """Get burndown chart data for a sprint"""
         try:
-            return await self.sprint_analytics_service.get_sprint_burndown_chart(
+            result = await self.sprint_analytics_service.get_sprint_burndown_chart(
                 user_id=user_id,
                 project_key=project_key,
                 sprint_id=sprint_id
+            )
+            return StandardResponse(
+                data=result,
+                message="Sprint burndown chart data retrieved successfully"
             )
         except ValueError as e:
             log.error(f"Error getting sprint burndown chart: {str(e)}")
@@ -47,13 +53,17 @@ class JiraSprintAnalyticsController:
         user_id: int,
         project_key: str,
         sprint_id: int,
-    ) -> SprintBurnupResponse:
+    ) -> StandardResponse[SprintBurnupResponse]:
         """Get burnup chart data for a sprint"""
         try:
-            return await self.sprint_analytics_service.get_sprint_burnup_chart(
+            result = await self.sprint_analytics_service.get_sprint_burnup_chart(
                 user_id=user_id,
                 project_key=project_key,
                 sprint_id=sprint_id
+            )
+            return StandardResponse(
+                data=result,
+                message="Sprint burnup chart data retrieved successfully"
             )
         except ValueError as e:
             log.error(f"Error getting sprint burnup chart: {str(e)}")
@@ -67,19 +77,47 @@ class JiraSprintAnalyticsController:
         user_id: int,
         project_key: str,
         sprint_id: int,
-    ) -> SprintGoalResponse:
+    ) -> StandardResponse[SprintGoalResponse]:
         """Get sprint goal data for a sprint"""
         try:
-            return await self.sprint_analytics_service.get_sprint_goal(
+            result = await self.sprint_analytics_service.get_sprint_goal(
                 user_id=user_id,
                 project_key=project_key,
                 sprint_id=sprint_id
+            )
+            return StandardResponse(
+                data=result,
+                message="Sprint goal data retrieved successfully"
             )
         except ValueError as e:
             log.error(f"Error getting sprint goal: {str(e)}")
             raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:
             log.error(f"Error getting sprint goal: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+    async def get_bug_report(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: int,
+    ) -> StandardResponse[BugReportDataResponse]:
+        """Get bug report data for a sprint"""
+        try:
+            result = await self.sprint_analytics_service.get_bug_report(
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
+            )
+            return StandardResponse(
+                data=result,
+                message="Bug report data retrieved successfully"
+            )
+        except ValueError as e:
+            log.error(f"Error getting bug report: {str(e)}")
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        except Exception as e:
+            log.error(f"Error getting bug report: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e)) from e
 
     async def get_sprint_gantt_chart(

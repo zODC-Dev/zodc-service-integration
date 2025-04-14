@@ -1,6 +1,11 @@
 from abc import ABC, abstractmethod
 
-from src.domain.models.jira_sprint_analytics import SprintBurndownModel, SprintBurnupModel, SprintGoalModel
+from src.domain.models.jira_sprint_analytics import (
+    BugReportDataModel,
+    SprintBurndownModel,
+    SprintBurnupModel,
+    SprintGoalModel,
+)
 
 
 class IJiraSprintAnalyticsService(ABC):
@@ -34,4 +39,14 @@ class IJiraSprintAnalyticsService(ABC):
         sprint_id: int
     ) -> SprintGoalModel:
         """Lấy dữ liệu sprint goal cho một sprint"""
+        pass
+
+    @abstractmethod
+    async def get_bug_report_data(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: int
+    ) -> BugReportDataModel:
+        """Lấy dữ liệu báo cáo bug cho một sprint"""
         pass

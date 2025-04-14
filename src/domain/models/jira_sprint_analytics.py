@@ -1,8 +1,10 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
+
+from src.domain.models.apis.jira_user import JiraAssigneeResponse
 
 
 class SprintAnalyticsType(str, Enum):
@@ -105,3 +107,37 @@ class SprintGoalModel(BaseModel):
     to_do_tasks: TaskReportModel
     added_points: float
     total_points: float
+
+
+class BugPriorityCountModel(BaseModel):
+    """Model for bug priority count data"""
+    lowest: int
+    low: int
+    medium: int
+    high: int
+    highest: int
+
+
+class BugChartModel(BaseModel):
+    """Model for bug chart data"""
+    priority: BugPriorityCountModel
+    total: int
+
+
+class BugTaskModel(BaseModel):
+    """Model for bug task data"""
+    id: str
+    key: str
+    link: str
+    summary: str
+    points: float
+    priority: str
+    assignee: Optional[JiraAssigneeResponse] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class BugReportDataModel(BaseModel):
+    """Model for bug report data"""
+    bugs: List[BugTaskModel]
+    bugs_chart: List[BugChartModel]

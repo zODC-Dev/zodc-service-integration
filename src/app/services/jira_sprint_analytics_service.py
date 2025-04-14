@@ -1,12 +1,17 @@
 from typing import List
 
 from src.app.schemas.responses.jira_sprint_analytics import (
+    BugChartResponse,
+    BugPriorityCountResponse,
+    BugReportDataResponse,
+    BugTaskResponse,
     SprintBurndownResponse,
     SprintBurnupResponse,
     SprintGoalResponse,
     TaskReportResponse,
 )
 from src.configs.logger import log
+from src.domain.models.apis.jira_user import JiraAssigneeResponse
 from src.domain.services.jira_sprint_analytics_service import IJiraSprintAnalyticsService
 
 
@@ -115,24 +120,86 @@ class JiraSprintAnalyticsApplicationService:
             return SprintGoalResponse(
                 id=goal_data.id,
                 goal=goal_data.goal,
-                completedTasks=TaskReportResponse(
-                    numberOfTasks=goal_data.completed_tasks.number_of_tasks,
+                completed_tasks=TaskReportResponse(
+                    number_of_tasks=goal_data.completed_tasks.number_of_tasks,
                     percentage=goal_data.completed_tasks.percentage,
                     points=goal_data.completed_tasks.points
                 ),
-                inProgressTasks=TaskReportResponse(
-                    numberOfTasks=goal_data.in_progress_tasks.number_of_tasks,
+                in_progress_tasks=TaskReportResponse(
+                    number_of_tasks=goal_data.in_progress_tasks.number_of_tasks,
                     percentage=goal_data.in_progress_tasks.percentage,
                     points=goal_data.in_progress_tasks.points
                 ),
-                toDoTasks=TaskReportResponse(
-                    numberOfTasks=goal_data.to_do_tasks.number_of_tasks,
+                to_do_tasks=TaskReportResponse(
+                    number_of_tasks=goal_data.to_do_tasks.number_of_tasks,
                     percentage=goal_data.to_do_tasks.percentage,
                     points=goal_data.to_do_tasks.points
                 ),
-                addedPoints=goal_data.added_points,
-                totalPoints=goal_data.total_points
+                added_points=goal_data.added_points,
+                total_points=goal_data.total_points
             )
         except Exception as e:
             log.error(f"Error getting sprint goal: {str(e)}")
+            raise
+
+    async def get_bug_report(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: int
+    ) -> BugReportDataResponse:
+        """Lấy dữ liệu báo cáo bug cho một sprint"""
+        try:
+            bug_data = await self.sprint_analytics_service.get_bug_report_data(
+                user_id, project_key, sprint_id
+            )
+
+            # Chuyển đổi domain model sang response DTO
+            bug_tasks = []
+            for bug in bug_data.bugs:
+                # Create assignee response if assignee exists
+                assignee_response = None
+                if bug.assignee:
+                    assignee_response = JiraAssigneeResponse(
+                        id=bug.assignee.id,
+                        jira_account_id=bug.assignee.jira_account_id,
+                        email=bug.assignee.email,
+                        avatar_url=bug.assignee.avatar_url,
+                        name=bug.assignee.name,
+                        is_system_user=bug.assignee.is_system_user
+                    )
+
+                bug_task = BugTaskResponse(
+                    id=bug.id,
+                    key=bug.key,
+                    link=bug.link,
+                    summary=bug.summary,
+                    points=bug.points,
+                    priority=bug.priority,
+                    assignee=assignee_response,
+                    created_at=bug.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    updated_at=bug.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+                )
+                bug_tasks.append(bug_task)
+
+            bug_charts = []
+            for chart in bug_data.bugs_chart:
+                bug_chart = BugChartResponse(
+                    priority=BugPriorityCountResponse(
+                        lowest=chart.priority.lowest,
+                        low=chart.priority.low,
+                        medium=chart.priority.medium,
+                        high=chart.priority.high,
+                        highest=chart.priority.highest
+                    ),
+                    total=chart.total
+                )
+                bug_charts.append(bug_chart)
+
+            return BugReportDataResponse(
+                bugs=bug_tasks,
+                bugs_chart=bug_charts
+            )
+        except Exception as e:
+            log.error(f"Error getting bug report: {str(e)}")
             raise

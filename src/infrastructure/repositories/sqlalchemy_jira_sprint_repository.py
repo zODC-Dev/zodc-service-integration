@@ -195,5 +195,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             complete_date=sprint.complete_date,
             created_at=sprint.created_at,
             updated_at=sprint.updated_at,
+            goal=sprint.goal,
+            board_id=sprint.board_id,
             id=sprint.id
         )

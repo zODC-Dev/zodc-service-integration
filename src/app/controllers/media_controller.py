@@ -1,3 +1,4 @@
+import urllib.parse
 from uuid import UUID
 
 from fastapi import HTTPException, UploadFile
@@ -40,14 +41,14 @@ class MediaController:
             log.info(f"Media: {media}")
 
             # Properly encode the filename for Content-Disposition header
-            # encoded_filename = urllib.parse.quote(media.filename)
+            encoded_filename = urllib.parse.quote(media.filename)
 
             return StreamingResponse(
                 content=file_stream,
                 media_type=media.content_type,
                 headers={
                     "Access-Control-Expose-Headers": "*",
-                    "Content-Disposition": f"attachment; filename={media.filename}; filesize1={media.size}; filetype={media.content_type}"
+                    "Content-Disposition": f"attachment; filename={encoded_filename}; filesize={media.size}; filetype={media.content_type}"
                 }
             )
         except HTTPException:

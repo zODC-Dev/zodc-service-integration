@@ -1,12 +1,18 @@
-from datetime import datetime, timedelta, timezone
+
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from src.configs.logger import log
-from src.domain.constants.jira import JiraIssueStatus, JiraSprintState
+from src.domain.constants.jira import JiraIssueStatus, JiraIssueType, JiraSprintState
+from src.domain.models.apis.jira_user import JiraAssigneeResponse
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_sprint_analytics import (
+    BugChartModel,
+    BugPriorityCountModel,
+    BugReportDataModel,
+    BugTaskModel,
     DailySprintData,
     SprintAnalyticsBaseModel,
     SprintBurndownModel,
@@ -180,12 +186,85 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         # Tạo và trả về SprintGoalModel
         return SprintGoalModel(
             id=str(sprint_id),
-            goal=sprint.goal or "No goal set",
+            goal=sprint.goal or "",
             completed_tasks=completed_tasks,
             in_progress_tasks=in_progress_tasks,
             to_do_tasks=to_do_tasks,
             added_points=round(added_points, 2),
             total_points=round(total_points, 2)
+        )
+
+    async def get_bug_report_data(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: int
+    ) -> BugReportDataModel:
+        """Lấy dữ liệu báo cáo bug cho một sprint"""
+        # Lấy thông tin sprint
+        sprint = await self._get_sprint_details(sprint_id)
+        if not sprint:
+            log.error(f"Không tìm thấy sprint {sprint_id}")
+            raise ValueError(f"Sprint {sprint_id} not found")
+
+        # Lấy danh sách issues trong sprint
+        issues = await self._get_sprint_issues(user_id, project_key, sprint_id)
+
+        # Lọc các issues là bug
+        bug_issues = [issue for issue in issues if issue.type == JiraIssueType.BUG]
+
+        # Phân loại bugs theo priority
+        priority_bugs = {
+            "lowest": [],
+            "low": [],
+            "medium": [],
+            "high": [],
+            "highest": []
+        }
+
+        for bug in bug_issues:
+            priority = bug.priority.name.lower() if bug.priority else "medium"
+            if priority in priority_bugs:
+                priority_bugs[priority].append(bug)
+            else:
+                # Default to medium if priority is not recognized
+                priority_bugs["medium"].append(bug)
+
+        # Tạo BugPriorityCountModel
+        priority_count = BugPriorityCountModel(
+            lowest=len(priority_bugs["lowest"]),
+            low=len(priority_bugs["low"]),
+            medium=len(priority_bugs["medium"]),
+            high=len(priority_bugs["high"]),
+            highest=len(priority_bugs["highest"])
+        )
+
+        # Tạo BugChartModel
+        bug_chart = BugChartModel(
+            priority=priority_count,
+            total=len(bug_issues)
+        )
+
+        # Tạo danh sách BugTaskModel
+        bug_tasks = []
+        for bug in bug_issues:
+            bug_task = BugTaskModel(
+                id=str(bug.jira_issue_id),
+                key=bug.key,
+                link=bug.link_url or f"https://jira.example.com/browse/{bug.key}",  # Use link_url if available
+                summary=bug.summary,
+                points=bug.estimate_point or 0,
+                priority=bug.priority.name if bug.priority else "Medium",
+                assignee=JiraAssigneeResponse.from_domain(bug.assignee) if bug.assignee else None,
+                created_at=bug.created_at,
+                updated_at=bug.updated_at
+            )
+            bug_tasks.append(bug_task)
+
+        # Tạo và trả về BugReportDataModel
+        return BugReportDataModel(
+            bugs=bug_tasks,
+            bugs_chart=[bug_chart]  # For now, we only have one chart
         )
 
     async def _get_sprint_details(self, sprint_id: int) -> Optional[JiraSprintModel]:
@@ -403,10 +482,6 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
     ) -> bool:
         """Kiểm tra xem issue có thuộc sprint vào một ngày cụ thể không"""
         try:
-            # Đảm bảo date có timezone
-            if date.tzinfo is None:
-                date = date.replace(tzinfo=timezone.utc)
-
             # Nếu issue không có sprint, return False
             if not issue.sprints:
                 return False
@@ -416,9 +491,6 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
                 if sprint and sprint.jira_sprint_id == sprint_id:
                     # Đảm bảo created_at có timezone
                     created_at = issue.created_at
-                    if created_at and created_at.tzinfo is None:
-                        created_at = created_at.replace(tzinfo=timezone.utc)
-
                     if created_at and created_at <= date:
                         return True
 
@@ -432,8 +504,6 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
             for history in sprint_histories:
                 # Đảm bảo created_at có timezone
                 created_at = history.created_at
-                # if created_at.tzinfo is None:
-                #     created_at = created_at.replace(tzinfo=timezone.utc)
 
                 new_value = history.new_value_parsed
                 if new_value and str(sprint_id) in str(new_value) and created_at <= date:
