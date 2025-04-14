@@ -92,10 +92,10 @@ class JiraWebhookQueueService:
 
             # Nếu dữ liệu là dictionary (dữ liệu thô), thử phân tích
             if isinstance(webhook_data, dict):
-                log.info("Received raw webhook data, parsing...")
+                log.debug("Received raw webhook data, parsing...")
                 try:
                     parsed_webhook = BaseJiraWebhookDTO.parse_webhook(webhook_data)
-                    log.info(f"Successfully parsed raw webhook as {type(parsed_webhook).__name__}")
+                    log.debug(f"Successfully parsed raw webhook as {type(parsed_webhook).__name__}")
                 except Exception as e:
                     log.error(f"Failed to parse webhook: {str(e)}")
                     return False
