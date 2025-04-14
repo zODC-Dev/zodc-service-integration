@@ -268,8 +268,8 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         )
 
     async def _get_sprint_details(self, sprint_id: int) -> Optional[JiraSprintModel]:
-        """Lấy thông tin chi tiết của sprint"""
-        return await self.jira_sprint_db_service.get_sprint_by_jira_sprint_id(sprint_id)
+        """Lấy thông tin chi tiết của sprint bằng id"""
+        return await self.jira_sprint_db_service.get_sprint_by_id(sprint_id)
 
     async def _get_sprint_issues(self, user_id: int, project_key: str, sprint_id: int) -> List[JiraIssueModel]:
         """Lấy danh sách issues trong sprint"""
