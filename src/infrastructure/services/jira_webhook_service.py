@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
+from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_webhook_handlers.issue_create_webhook_handler import IssueCreateWebhookHandler
 from src.app.services.jira_webhook_handlers.issue_delete_webhook_handler import IssueDeleteWebhookHandler
 from src.app.services.jira_webhook_handlers.issue_update_webhook_handler import IssueUpdateWebhookHandler
@@ -35,7 +35,7 @@ class JiraWebhookService:
         jira_issue_api_service: IJiraIssueAPIService,
         jira_sprint_api_service: IJiraSprintAPIService,
         sprint_database_service: IJiraSprintDatabaseService,
-        issue_history_sync_service: JiraIssueHistorySyncService,
+        issue_history_sync_service: JiraIssueHistoryApplicationService,
         jira_project_repository: IJiraProjectRepository,
         redis_service: IRedisService
     ):

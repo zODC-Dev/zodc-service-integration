@@ -4,7 +4,7 @@ from sqlmodel import col, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
-from src.domain.exceptions.user_exceptions import UserCreationError, UserNotFoundError
+from src.domain.exceptions.user_exceptions import UserCreationError, UserNotFoundError, UserUpdateError
 from src.domain.models.database.jira_user import JiraUserDBCreateDTO, JiraUserDBUpdateDTO
 from src.domain.models.jira_user import JiraUserModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
@@ -48,10 +48,10 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
         """Update user by ID"""
         try:
             # Get existing user
-            result = await self.session.execute(
+            result = await self.session.exec(
                 select(JiraUserEntity).where(col(JiraUserEntity.user_id) == user_id)
             )
-            user_entity = result.scalars().first()
+            user_entity = result.first()
 
             if not user_entity:
                 log.warning(f"User with ID {user_id} not found")
@@ -83,14 +83,13 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
         """Update user by Jira account ID"""
         try:
             # Get existing user
-            result = await self.session.execute(
+            result = await self.session.exec(
                 select(JiraUserEntity).where(col(JiraUserEntity.jira_account_id) == account_id)
             )
-            user_entity = result.scalars().first()
+            user_entity = result.first()
 
             if not user_entity:
-                log.warning(f"User with account ID {account_id} not found")
-                return None
+                raise UserNotFoundError(f"User with account ID {account_id} not found")
 
             # Update fields
             update_data = user_data.model_dump(exclude_unset=True)
@@ -112,15 +111,15 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
         except Exception as e:
             await self.session.rollback()
             log.error(f"Error updating user by account ID: {str(e)}")
-            raise
+            raise UserUpdateError(f"Error updating user by account ID: {str(e)}") from e
 
     async def get_user_by_id(self, user_id: int) -> Optional[JiraUserModel]:
         """Get user by ID"""
         try:
-            result = await self.session.execute(
+            result = await self.session.exec(
                 select(JiraUserEntity).where(col(JiraUserEntity.user_id) == user_id)
             )
-            user_entity = result.scalars().first()
+            user_entity = result.first()
 
             if not user_entity:
                 return None
@@ -133,10 +132,10 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
     async def get_user_by_jira_account_id(self, account_id: str) -> Optional[JiraUserModel]:
         """Get user by Jira account ID"""
         try:
-            result = await self.session.execute(
+            result = await self.session.exec(
                 select(JiraUserEntity).where(col(JiraUserEntity.jira_account_id) == account_id)
             )
-            user_entity = result.scalars().first()
+            user_entity = result.first()
 
             if not user_entity:
                 return None
@@ -151,10 +150,10 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
         try:
             # For now, just return all users
             # In a real implementation, you would have a project-user association
-            result = await self.session.execute(
+            result = await self.session.exec(
                 select(JiraUserEntity)
             )
-            user_entities = result.scalars().all()
+            user_entities = result.all()
 
             return [JiraUserModel.model_validate(user) for user in user_entities]
         except Exception as e:
@@ -165,7 +164,7 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
         """Search users by display name or email"""
         try:
             search_pattern = f"%{search_term}%"
-            result = await self.session.execute(
+            result = await self.session.exec(
                 select(JiraUserEntity).where(
                     or_(
                         col(JiraUserEntity.name).ilike(search_pattern),
@@ -173,7 +172,7 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
                     )
                 )
             )
-            user_entities = result.scalars().all()
+            user_entities = result.all()
 
             return [JiraUserModel.model_validate(user) for user in user_entities]
         except Exception as e:
@@ -183,10 +182,10 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
     async def get_all_users(self) -> List[JiraUserModel]:
         """Get all users"""
         try:
-            result = await self.session.execute(
+            result = await self.session.exec(
                 select(JiraUserEntity)
             )
-            user_entities = result.scalars().all()
+            user_entities = result.all()
 
             return [JiraUserModel.model_validate(user) for user in user_entities]
         except Exception as e:

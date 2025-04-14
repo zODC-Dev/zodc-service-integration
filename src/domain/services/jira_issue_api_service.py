@@ -3,7 +3,10 @@ from typing import List, Optional, Union
 
 from src.domain.constants.jira import JiraIssueStatus
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
-from src.domain.models.jira.apis.responses.jira_changelog import JiraIssueChangelogAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_changelog import (
+    JiraIssueChangelogAPIGetResponseDTO,
+    JiraIssueChangelogBulkFetchAPIGetResponseDTO,
+)
 from src.domain.models.jira_issue import JiraIssueModel
 
 
@@ -61,4 +64,14 @@ class IJiraIssueAPIService(ABC):
     @abstractmethod
     async def delete_issue_link_with_admin_auth(self, link_id: str) -> bool:
         """Delete an issue link by its ID using admin authentication"""
+        pass
+
+    @abstractmethod
+    async def bulk_get_issue_changelog_with_admin_auth(self, issue_ids: List[str]) -> JiraIssueChangelogBulkFetchAPIGetResponseDTO:
+        """Bulk get issue changelog with admin auth"""
+        pass
+
+    @abstractmethod
+    async def bulk_get_issues_with_admin_auth(self, issue_ids: List[str]) -> List[JiraIssueModel]:
+        """Bulk get issues with admin auth"""
         pass

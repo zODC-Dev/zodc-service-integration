@@ -160,6 +160,7 @@ class JiraAPIClient:
     async def post(self, endpoint: str, user_id: Optional[int] = None, data: Dict[str, Any] = None, error_msg: str = "Error creating new data on Jira") -> Dict[str, Any]:
         """Perform HTTP POST request"""
         url = f"{self.base_url}{endpoint}"
+        log.info(f"POST {url} with data: {data}")
         return await self.request_with_retry("POST", url, user_id, json_data=data, error_msg=error_msg)
 
     async def put(self, endpoint: str, user_id: Optional[int] = None, data: Dict[str, Any] = None, error_msg: str = "Error updating data on Jira") -> Dict[str, Any]:
@@ -234,7 +235,7 @@ class JiraAPIClient:
                     # Kiểm tra nếu request thành công
                     if status_code < 200 or status_code >= 300:
                         log.error(f"Jira API request failed with status {status_code}: {response_text}")
-                        raise JiraRequestError(error_msg, status_code, response_text)
+                        raise JiraRequestError(status_code, response_text)
 
                     # Parse JSON response
                     try:
@@ -245,10 +246,10 @@ class JiraAPIClient:
 
         except (aiohttp.ClientConnectorError, aiohttp.ClientTimeout) as e:
             log.error(f"Connection error when calling Jira API: {str(e)}")
-            raise JiraRequestError(f"{error_msg}: Connection error", 0, str(e)) from e
+            raise JiraRequestError(500, str(e)) from e
         except JiraRequestError as e:
             # Re-throw JiraRequestError
             raise e
         except Exception as e:
             log.error(f"Unexpected error when calling Jira API: {str(e)}")
-            raise JiraRequestError(f"{error_msg}: {str(e)}", 0, str(e)) from e
+            raise JiraRequestError(500, str(e)) from e

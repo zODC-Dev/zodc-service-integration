@@ -2,18 +2,18 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
-from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
+from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueType
 from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.database.jira_issue import JiraIssueDBCreateDTO, JiraIssueDBUpdateDTO
+from src.domain.models.database.jira_issue_history import JiraIssueHistoryDBCreateDTO
 from src.domain.models.database.jira_project import JiraProjectDBCreateDTO, JiraProjectDBUpdateDTO
 from src.domain.models.database.jira_sprint import JiraSprintDBCreateDTO, JiraSprintDBUpdateDTO
 from src.domain.models.database.jira_user import JiraUserDBCreateDTO, JiraUserDBUpdateDTO
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira_issue import JiraIssueModel
-from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 from src.domain.models.jira_project import JiraProjectModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
@@ -24,6 +24,7 @@ from src.domain.models.nats.replies.jira_project import (
 )
 from src.domain.models.nats.requests.jira_project import JiraProjectSyncNATSRequestDTO
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
+from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
 from src.domain.services.jira_project_database_service import IJiraProjectDatabaseService
@@ -41,8 +42,9 @@ class JiraProjectApplicationService:
         jira_issue_db_service: IJiraIssueDatabaseService,
         jira_sprint_db_service: IJiraSprintDatabaseService,
         sync_session: IJiraSyncSession,
+        jira_issue_api_service: IJiraIssueAPIService,
+        jira_issue_history_service: JiraIssueHistoryApplicationService,
         sync_log_repository: ISyncLogRepository,
-        issue_history_sync_service: JiraIssueHistorySyncService
     ):
         self.jira_project_api_service = jira_project_api_service
         self.jira_project_db_service = jira_project_db_service
@@ -50,7 +52,8 @@ class JiraProjectApplicationService:
         self.jira_sprint_db_service = jira_sprint_db_service
         self.sync_session = sync_session
         self.sync_log_repository = sync_log_repository
-        self.issue_history_sync_service = issue_history_sync_service
+        self.jira_issue_api_service = jira_issue_api_service
+        self.jira_issue_history_service = jira_issue_history_service
 
     async def get_project_issues(
         self,
@@ -163,9 +166,11 @@ class JiraProjectApplicationService:
                 log.info(f"Successfully synced {len(issues)} issues")
 
                 # Sync changelog
-                # log.info("Syncing project changelog...")
-                # changelog = await self._sync_project_changelog(request.user_id, request.project_key, session)
-                # log.info(f"Successfully synced {len(changelog)} changelog")
+                log.info("Syncing project changelog...")
+                issue_ids = [issue.jira_issue_id for issue in issues]
+                log.info(f"Syncing changelog for {len(issue_ids)} issues")
+                # issue_ids = ['10383', '10382', '10381', '10380', '10379']
+                await self._sync_project_changelog(issue_ids, session)
 
                 # Create sync log
                 await self._create_sync_log(request.user_id, project)
@@ -257,7 +262,6 @@ class JiraProjectApplicationService:
                     existing_user = await session.user_repository.get_user_by_jira_account_id(
                         jira_user.jira_account_id
                     )
-                    log.info(f"Existing user: {existing_user} {jira_user.jira_account_id}")
 
                     if existing_user and existing_user.jira_account_id:
                         # Update existing user if needed
@@ -468,16 +472,28 @@ class JiraProjectApplicationService:
             log.error(f"Error creating sync log for project {project.key}: {str(e)}")
             # Don't raise the error as this is not critical for sync process
 
-    async def _sync_project_changelog(self, user_id: int, project_key: str, session: IJiraSyncSession) -> List[JiraIssueHistoryModel]:
+    async def _sync_project_changelog(self, issue_ids: List[str], session: IJiraSyncSession) -> None:
         """Sync issues changelog from Jira API to database"""
         try:
-            issues = await self.jira_project_api_service.get_project_issues(user_id, project_key)
-            for issue in issues:
-                try:
-                    await self.issue_history_sync_service.sync_issue_history(issue.jira_issue_id)
-                    log.info(f"Successfully synced history for issue {issue.jira_issue_id} from Jira API")
-                except Exception as e:
-                    log.error(f"Error syncing history for issue {issue.jira_issue_id}: {str(e)}")
+            changelog_response = await self.jira_issue_api_service.bulk_get_issue_changelog_with_admin_auth(issue_ids)
+
+            # Xử lý và lưu từng changelog
+            for issue_changelog in changelog_response.issue_changelogs:
+                for changelog in issue_changelog.change_histories:
+                    changes = await self.jira_issue_history_service.convert_api_changelog_to_db_changelog(issue_changelog.issue_id, changelog)
+                    # Tạo event và lưu vào database
+                    if changes:
+                        event = JiraIssueHistoryDBCreateDTO(
+                            jira_issue_id=issue_changelog.issue_id,
+                            jira_change_id=changelog.id,
+                            author_id=changelog.author.id,
+                            created_at=changelog.created,  # Giữ nguyên datetime với timezone
+                            changes=changes
+                        )
+
+                        # Lưu vào database
+                        await session.issue_history_repository.create(event)
         except Exception as e:
             log.error(f"Error syncing project changelog: {str(e)}")
+            await session.abort()
             raise

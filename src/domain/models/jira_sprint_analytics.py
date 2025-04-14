@@ -1,8 +1,10 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
+
+from src.domain.models.apis.jira_user import JiraAssigneeResponse
 
 
 class SprintAnalyticsType(str, Enum):
@@ -87,3 +89,55 @@ class SprintBurnupModel(SprintAnalyticsBaseModel):
     def get_scope_line(self) -> List[float]:
         """Lấy scope line cho burnup chart (tổng số điểm theo thời gian)"""
         return [data.completed_points + data.remaining_points for data in self.daily_data]
+
+
+class TaskReportModel(BaseModel):
+    """Model for task report data"""
+    number_of_tasks: int
+    percentage: float
+    points: float
+
+
+class SprintGoalModel(BaseModel):
+    """Model for sprint goal data"""
+    id: str
+    goal: str
+    completed_tasks: TaskReportModel
+    in_progress_tasks: TaskReportModel
+    to_do_tasks: TaskReportModel
+    added_points: float
+    total_points: float
+
+
+class BugPriorityCountModel(BaseModel):
+    """Model for bug priority count data"""
+    lowest: int
+    low: int
+    medium: int
+    high: int
+    highest: int
+
+
+class BugChartModel(BaseModel):
+    """Model for bug chart data"""
+    priority: BugPriorityCountModel
+    total: int
+
+
+class BugTaskModel(BaseModel):
+    """Model for bug task data"""
+    id: str
+    key: str
+    link: str
+    summary: str
+    points: float
+    priority: str
+    assignee: Optional[JiraAssigneeResponse] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class BugReportDataModel(BaseModel):
+    """Model for bug report data"""
+    bugs: List[BugTaskModel]
+    bugs_chart: List[BugChartModel]

@@ -72,3 +72,7 @@ class JiraIssueDatabaseService(IJiraIssueDatabaseService):
             search=search,
             limit=limit
         )
+
+    async def get_issue_by_key(self, issue_key: str) -> Optional[JiraIssueModel]:
+        """Get issue by key from database"""
+        return await self.issue_repository.get_by_jira_issue_key(issue_key)

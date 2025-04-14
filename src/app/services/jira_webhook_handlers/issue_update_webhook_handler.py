@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
+from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
@@ -22,7 +22,7 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         jira_issue_repository: IJiraIssueRepository,
         sync_log_repository: ISyncLogRepository,
         jira_issue_api_service: IJiraIssueAPIService,
-        issue_history_sync_service: JiraIssueHistorySyncService
+        issue_history_sync_service: JiraIssueHistoryApplicationService
     ):
         self.jira_issue_repository = jira_issue_repository
         self.sync_log_repository = sync_log_repository

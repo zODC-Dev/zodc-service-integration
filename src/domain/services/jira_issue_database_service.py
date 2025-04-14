@@ -43,3 +43,8 @@ class IJiraIssueDatabaseService(ABC):
     ) -> List[JiraIssueModel]:
         """Get project issues from database"""
         pass
+
+    @abstractmethod
+    async def get_issue_by_key(self, issue_key: str) -> Optional[JiraIssueModel]:
+        """Get issue by key from database"""
+        pass

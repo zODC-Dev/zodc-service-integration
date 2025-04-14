@@ -14,6 +14,7 @@ class JiraSprintAPIGetResponseDTO(BaseModel):
     complete_date: Optional[str] = Field(None, alias="completeDate")
     created_date: Optional[str] = Field(None, alias="createdDate")
     board_id: Optional[int] = Field(None, alias="boardId")
+    origin_board_id: Optional[int] = Field(None, alias="originBoardId")
     goal: Optional[str] = None
 
     class Config:

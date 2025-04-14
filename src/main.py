@@ -17,7 +17,7 @@ from src.app.routers.media_router import router as media_router
 from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
 from src.app.routers.util_router import router as util_router
 from src.app.services.gantt_chart_service import GanttChartApplicationService
-from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
+from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.nats_event_service import NATSEventService
@@ -53,6 +53,7 @@ from src.infrastructure.services.jira_project_api_service import JiraProjectAPIS
 from src.infrastructure.services.jira_project_database_service import JiraProjectDatabaseService
 from src.infrastructure.services.jira_service import JiraAPIClient
 from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
+from src.infrastructure.services.jira_user_database_service import JiraUserDatabaseService
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.nats_workflow_service_client import NATSWorkflowServiceClient
 from src.infrastructure.services.redis_service import RedisService
@@ -127,15 +128,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     jira_sprint_database_service = JiraSprintDatabaseService(jira_sprint_repository)
     issue_history_repository = SQLAlchemyJiraIssueHistoryRepository(db)
     issue_history_db_service = JiraIssueHistoryDatabaseService(issue_history_repository)
-    issue_history_sync_service = JiraIssueHistorySyncService(jira_issue_api_service, issue_history_db_service)
-    jira_project_application_service = JiraProjectApplicationService(
-        jira_project_api_service,
-        jira_project_database_service,
+    jira_user_db_service = JiraUserDatabaseService(user_repository)
+    issue_history_sync_service = JiraIssueHistoryApplicationService(
+        jira_issue_api_service,
+        issue_history_db_service,
         jira_issue_database_service,
-        jira_sprint_database_service,
-        sync_session,
-        sync_log_repository,
-        issue_history_sync_service
+        jira_user_db_service
+    )
+    jira_project_application_service = JiraProjectApplicationService(
+        jira_project_api_service=jira_project_api_service,
+        jira_project_db_service=jira_project_database_service,
+        jira_issue_db_service=jira_issue_database_service,
+        jira_sprint_db_service=jira_sprint_database_service,
+        sync_session=sync_session,
+        sync_log_repository=sync_log_repository,
+        jira_issue_api_service=jira_issue_api_service,
+        jira_issue_history_service=issue_history_sync_service
     )
 
     workflow_mapping_repository = SQLAlchemyWorkflowMappingRepository(db)

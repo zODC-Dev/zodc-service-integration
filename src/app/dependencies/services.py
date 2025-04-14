@@ -16,7 +16,7 @@ from src.app.dependencies.repositories import (
     get_workflow_mapping_repository,
 )
 from src.app.services.gantt_chart_service import GanttChartApplicationService
-from src.app.services.jira_issue_history_sync_service import JiraIssueHistorySyncService
+from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.jira_sprint_analytics_service import JiraSprintAnalyticsApplicationService
@@ -186,6 +186,26 @@ async def get_jira_sprint_service(
         jira_sprint_database_service=jira_sprint_database_service
     )
 
+# ============================ JIRA USER SERVICE ===========================================
+
+
+async def get_jira_user_api_service(
+    jira_api_client=Depends(get_jira_api_client),
+    jira_api_admin_client=Depends(get_jira_api_admin_client)
+) -> IJiraUserAPIService:
+    """Get Jira user API service"""
+    return JiraUserAPIService(
+        client=jira_api_client,
+        admin_client=jira_api_admin_client
+    )
+
+
+async def get_jira_user_database_service(
+    user_repository: IJiraUserRepository = Depends(get_jira_user_repository)
+) -> IJiraUserDatabaseService:
+    """Get Jira user database service"""
+    return JiraUserDatabaseService(user_repository)
+
 # ============================ JIRA ISSUE HISTORY DATABASE SERVICE ===========================================
 
 
@@ -239,10 +259,17 @@ async def get_jira_issue_service(
 
 async def get_jira_issue_history_sync_service(
     jira_issue_api_service=Depends(get_jira_issue_api_service),
-    jira_issue_history_database_service=Depends(get_jira_issue_history_database_service)
-) -> JiraIssueHistorySyncService:
+    jira_issue_history_database_service=Depends(get_jira_issue_history_database_service),
+    jira_issue_database_service=Depends(get_jira_issue_database_service),
+    jira_user_database_service=Depends(get_jira_user_database_service)
+) -> JiraIssueHistoryApplicationService:
     """Get Jira issue history sync service"""
-    return JiraIssueHistorySyncService(jira_issue_api_service, jira_issue_history_database_service)
+    return JiraIssueHistoryApplicationService(
+        jira_issue_api_service=jira_issue_api_service,
+        issue_history_db_service=jira_issue_history_database_service,
+        jira_issue_db_service=jira_issue_database_service,
+        jira_user_db_service=jira_user_database_service
+    )
 
 # ============================ JIRA PROJECT ===========================================
 
@@ -269,17 +296,19 @@ def get_jira_project_application_service(
     jira_sprint_db_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service),
     sync_session: IJiraSyncSession = Depends(get_sqlalchemy_jira_sync_session),
     sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository),
-    issue_history_sync_service: JiraIssueHistorySyncService = Depends(get_jira_issue_history_sync_service)
+    jira_issue_api_service: IJiraIssueAPIService = Depends(get_jira_issue_api_service),
+    jira_issue_history_service: JiraIssueHistoryApplicationService = Depends(get_jira_issue_history_sync_service)
 ) -> JiraProjectApplicationService:
     """Get Jira project application service instance."""
     return JiraProjectApplicationService(
-        jira_project_api_service,
-        jira_project_db_service,
-        jira_issue_db_service,
-        jira_sprint_db_service,
-        sync_session,
-        sync_log_repository,
-        issue_history_sync_service
+        jira_project_api_service=jira_project_api_service,
+        jira_project_db_service=jira_project_db_service,
+        jira_issue_db_service=jira_issue_db_service,
+        jira_sprint_db_service=jira_sprint_db_service,
+        sync_session=sync_session,
+        sync_log_repository=sync_log_repository,
+        jira_issue_api_service=jira_issue_api_service,
+        jira_issue_history_service=jira_issue_history_service
     )
 
 
@@ -307,25 +336,6 @@ async def get_sprint_analytics_application_service(
     """Get the sprint analytics application service"""
     return JiraSprintAnalyticsApplicationService(sprint_analytics_service)
 
-# ============================ JIRA USER SERVICE ===========================================
-
-
-async def get_jira_user_api_service(
-    jira_api_client=Depends(get_jira_api_client),
-    jira_api_admin_client=Depends(get_jira_api_admin_client)
-) -> IJiraUserAPIService:
-    """Get Jira user API service"""
-    return JiraUserAPIService(
-        client=jira_api_client,
-        admin_client=jira_api_admin_client
-    )
-
-
-async def get_jira_user_database_service(
-    user_repository: IJiraUserRepository = Depends(get_jira_user_repository)
-) -> IJiraUserDatabaseService:
-    """Get Jira user database service"""
-    return JiraUserDatabaseService(user_repository)
 
 # ============================ GANTT CHART SERVICE ===========================================
 

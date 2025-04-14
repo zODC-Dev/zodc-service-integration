@@ -1,6 +1,17 @@
 from enum import Enum
 
 
+class JiraIssueFieldId(str, Enum):
+    """Enum cho các loại field trong Jira Issue"""
+    STATUS = 'status'
+    SPRINT = 'sprint'
+    ASSIGNEE = 'assignee'
+    STORY_POINTS = 'story_points'
+    SUMMARY = 'summary'
+    DESCRIPTION = 'description'
+    REPORTER = 'reporter'
+
+
 class JiraIssueType(Enum):
     TASK = "Task"
     STORY = "Story"

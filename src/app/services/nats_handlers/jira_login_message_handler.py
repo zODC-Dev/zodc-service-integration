@@ -39,6 +39,7 @@ class JiraLoginMessageHandler(INATSMessageHandler):
                     jira_account_id=event.jira_account_id,
                     avatar_url=event.avatar_url
                 )
+                assert user.user_id is not None, "User ID is required"
                 await self.user_repository.update_user(user.user_id, user_update)
                 log.info(f"Updated Jira link for existing user {user.jira_account_id}")
 
