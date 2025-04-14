@@ -53,3 +53,7 @@ class JiraIssueAPIGetResponseDTO(JiraAPIResponseBase):
     key: str
     self: str
     fields: JiraAPIIssueFieldsResponse
+
+
+class JiraIssueBulkFetchAPIGetResponseDTO(JiraAPIResponseBase):
+    issues: List[JiraIssueAPIGetResponseDTO]

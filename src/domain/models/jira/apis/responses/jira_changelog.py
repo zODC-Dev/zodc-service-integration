@@ -47,3 +47,16 @@ class JiraIssueChangelogAPIGetResponseDTO(BaseModel):
     maxResults: int = Field(..., description="Số lượng tối đa kết quả được trả về")
     total: int = Field(..., description="Tổng số changelog có sẵn")
     isLast: bool = Field(..., description="Có phải là trang cuối cùng không")
+
+
+class IssueChangelogAPIGetResponseDTO(BaseModel):
+    """DTO đại diện cho response của API changelog của Jira"""
+    issue_id: str = Field(..., description="ID của issue", alias="issueId")
+    change_histories: List[JiraChangelogDetailAPIGetResponseDTO] = Field(
+        default=[], description="Danh sách các changelog", alias="changeHistories")
+
+
+class JiraIssueChangelogBulkFetchAPIGetResponseDTO(BaseModel):
+    """DTO đại diện cho response của API changelog của Jira"""
+    issue_changelogs: List[IssueChangelogAPIGetResponseDTO] = Field(
+        default=[], description="Danh sách các changelog", alias="issueChangeLogs")

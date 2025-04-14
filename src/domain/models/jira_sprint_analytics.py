@@ -87,3 +87,21 @@ class SprintBurnupModel(SprintAnalyticsBaseModel):
     def get_scope_line(self) -> List[float]:
         """Lấy scope line cho burnup chart (tổng số điểm theo thời gian)"""
         return [data.completed_points + data.remaining_points for data in self.daily_data]
+
+
+class TaskReportModel(BaseModel):
+    """Model for task report data"""
+    number_of_tasks: int
+    percentage: float
+    points: float
+
+
+class SprintGoalModel(BaseModel):
+    """Model for sprint goal data"""
+    id: str
+    goal: str
+    completed_tasks: TaskReportModel
+    in_progress_tasks: TaskReportModel
+    to_do_tasks: TaskReportModel
+    added_points: float
+    total_points: float

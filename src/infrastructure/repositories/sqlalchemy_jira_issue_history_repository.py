@@ -134,16 +134,11 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                     # Nếu lỗi khi kiểm tra, giả định không có trùng lặp
                     existing_item = None
 
-                # Nếu đã có thay đổi tương tự gần đây, bỏ qua
+                # If the change already exists, skip
                 if existing_item:
-                    log.info(
-                        f"Skipping duplicate change for issue {event.jira_issue_id}, field '{change.field}' "
-                        f"from '{change.from_value}' to '{change.to_value}' "
-                        f"(existing change ID: {existing_item.jira_change_id}, created at: {existing_item.created_at})"
-                    )
                     continue
 
-                # Chuyển đổi các giá trị không phải string sang string
+                # Convert non-string values to string
                 old_value = str(change.from_value) if change.from_value is not None else None
                 new_value = str(change.to_value) if change.to_value is not None else None
 
@@ -163,11 +158,24 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                 self.session.add(history_item)
                 saved_changes += 1
 
-            log.info(f"Saved {saved_changes} out of {len(event.changes)} changes for issue {event.jira_issue_id}")
             return True
 
         except Exception as e:
             log.error(f"Error saving history event: {str(e)}")
+            return False
+
+    async def bulk_create(
+        self,
+        events: List[JiraIssueHistoryDBCreateDTO]
+    ) -> bool:
+        """Bulk create issue history"""
+        try:
+            for event in events:
+                await self.create(event)
+            await self.session.commit()
+            return True
+        except Exception as e:
+            log.error(f"Error bulk creating issue history: {str(e)}")
             return False
 
     async def get_sprint_issue_histories(
@@ -182,6 +190,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
             sprint_issues_stmt = select(JiraIssueSprintEntity.jira_issue_id).where(
                 JiraIssueSprintEntity.jira_sprint_id == sprint_id
             )
+
             result = await self.session.exec(sprint_issues_stmt)
             issue_ids = result.all()
 

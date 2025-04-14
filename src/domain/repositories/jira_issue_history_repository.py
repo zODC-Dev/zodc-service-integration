@@ -44,6 +44,14 @@ class IJiraIssueHistoryRepository(ABC):
         pass
 
     @abstractmethod
+    async def bulk_create(
+        self,
+        events: List[JiraIssueHistoryDBCreateDTO]
+    ) -> bool:
+        """Bulk create issue history"""
+        pass
+
+    @abstractmethod
     async def get_sprint_issue_histories(
         self,
         sprint_id: int,

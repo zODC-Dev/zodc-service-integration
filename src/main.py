@@ -136,13 +136,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         jira_user_db_service
     )
     jira_project_application_service = JiraProjectApplicationService(
-        jira_project_api_service,
-        jira_project_database_service,
-        jira_issue_database_service,
-        jira_sprint_database_service,
-        sync_session,
-        sync_log_repository,
-        issue_history_sync_service
+        jira_project_api_service=jira_project_api_service,
+        jira_project_db_service=jira_project_database_service,
+        jira_issue_db_service=jira_issue_database_service,
+        jira_sprint_db_service=jira_sprint_database_service,
+        sync_session=sync_session,
+        sync_log_repository=sync_log_repository,
+        jira_issue_api_service=jira_issue_api_service,
+        jira_issue_history_service=issue_history_sync_service
     )
 
     workflow_mapping_repository = SQLAlchemyWorkflowMappingRepository(db)

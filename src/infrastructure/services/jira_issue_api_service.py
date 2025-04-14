@@ -6,8 +6,14 @@ from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JiraIssueStatu
 from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.jira.apis.mappers.jira_issue import JiraIssueMapper
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
-from src.domain.models.jira.apis.responses.jira_changelog import JiraIssueChangelogAPIGetResponseDTO
-from src.domain.models.jira.apis.responses.jira_issue import JiraIssueAPIGetResponseDTO
+from src.domain.models.jira.apis.responses.jira_changelog import (
+    JiraIssueChangelogAPIGetResponseDTO,
+    JiraIssueChangelogBulkFetchAPIGetResponseDTO,
+)
+from src.domain.models.jira.apis.responses.jira_issue import (
+    JiraIssueAPIGetResponseDTO,
+    JiraIssueBulkFetchAPIGetResponseDTO,
+)
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
@@ -912,3 +918,35 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         except Exception as e:
             log.error(f"Error deleting issue link with ID {link_id}: {str(e)}")
             return False
+
+    async def bulk_get_issue_changelog_with_admin_auth(self, issue_ids: List[str]) -> JiraIssueChangelogBulkFetchAPIGetResponseDTO:
+        """Get changelog for multiple issues"""
+        client_to_use = self.admin_client or self.client
+
+        # body = JiraIssueHistoryBulkFetchRequestDTO(
+        #     issue_ids_or_keys=issue_ids
+        # )
+
+        response_data = await client_to_use.post(
+            "/rest/api/3/changelog/bulkfetch",
+            None,  # Không cần user_id
+            # body.model_dump_json(by_alias=True, exclude_none=True),
+            {"issueIdsOrKeys": issue_ids},
+            error_msg=f"Error when getting changelog for issues {issue_ids}"
+        )
+
+        return JiraIssueChangelogBulkFetchAPIGetResponseDTO.model_validate(response_data)
+
+    async def bulk_get_issues_with_admin_auth(self, issue_ids: List[str]) -> List[JiraIssueModel]:
+        """Bulk get issues with admin auth"""
+        client_to_use = self.admin_client or self.client
+
+        response_data = await client_to_use.post(
+            "/rest/api/3/issue/bulkfetch",
+            None,  # Không cần user_id
+            {"issueIdsOrKeys": issue_ids},
+            error_msg=f"Error when getting issues {issue_ids}"
+        )
+
+        issues = JiraIssueBulkFetchAPIGetResponseDTO.model_validate(response_data)
+        return [JiraIssueMapper.to_domain_issue(issue) for issue in issues.issues]

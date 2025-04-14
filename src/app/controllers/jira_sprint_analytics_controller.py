@@ -4,7 +4,11 @@ from fastapi import HTTPException
 
 from src.app.schemas.requests.gantt_chart import GanttChartRequest
 from src.app.schemas.responses.gantt_chart import GanttChartFeasibilityResponse, GanttChartResponse
-from src.app.schemas.responses.jira_sprint_analytics import SprintBurndownResponse, SprintBurnupResponse
+from src.app.schemas.responses.jira_sprint_analytics import (
+    SprintBurndownResponse,
+    SprintBurnupResponse,
+    SprintGoalResponse,
+)
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_sprint_analytics_service import JiraSprintAnalyticsApplicationService
 from src.configs.logger import log
@@ -56,6 +60,26 @@ class JiraSprintAnalyticsController:
             raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:
             log.error(f"Error getting sprint burnup chart: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+    async def get_sprint_goal(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: int,
+    ) -> SprintGoalResponse:
+        """Get sprint goal data for a sprint"""
+        try:
+            return await self.sprint_analytics_service.get_sprint_goal(
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
+            )
+        except ValueError as e:
+            log.error(f"Error getting sprint goal: {str(e)}")
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        except Exception as e:
+            log.error(f"Error getting sprint goal: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e)) from e
 
     async def get_sprint_gantt_chart(

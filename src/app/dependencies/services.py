@@ -296,17 +296,19 @@ def get_jira_project_application_service(
     jira_sprint_db_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service),
     sync_session: IJiraSyncSession = Depends(get_sqlalchemy_jira_sync_session),
     sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository),
-    issue_history_sync_service: JiraIssueHistoryApplicationService = Depends(get_jira_issue_history_sync_service)
+    jira_issue_api_service: IJiraIssueAPIService = Depends(get_jira_issue_api_service),
+    jira_issue_history_service: JiraIssueHistoryApplicationService = Depends(get_jira_issue_history_sync_service)
 ) -> JiraProjectApplicationService:
     """Get Jira project application service instance."""
     return JiraProjectApplicationService(
-        jira_project_api_service,
-        jira_project_db_service,
-        jira_issue_db_service,
-        jira_sprint_db_service,
-        sync_session,
-        sync_log_repository,
-        issue_history_sync_service
+        jira_project_api_service=jira_project_api_service,
+        jira_project_db_service=jira_project_db_service,
+        jira_issue_db_service=jira_issue_db_service,
+        jira_sprint_db_service=jira_sprint_db_service,
+        sync_session=sync_session,
+        sync_log_repository=sync_log_repository,
+        jira_issue_api_service=jira_issue_api_service,
+        jira_issue_history_service=jira_issue_history_service
     )
 
 

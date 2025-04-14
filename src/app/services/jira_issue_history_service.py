@@ -43,7 +43,19 @@ class JiraIssueHistoryApplicationService:
 
             # Xử lý và lưu từng changelog
             for changelog in changelog_response.values:
-                await self._process_changelog(issue_id, changelog)
+                changes = await self.convert_api_changelog_to_db_changelog(issue_id, changelog)
+                # Tạo event và lưu vào database
+                if changes:
+                    event = JiraIssueHistoryDBCreateDTO(
+                        jira_issue_id=issue_id,
+                        jira_change_id=changelog.id,
+                        author_id=changelog.author.accountId,
+                        created_at=changelog.created,  # Giữ nguyên datetime với timezone
+                        changes=changes
+                    )
+
+                    # Lưu vào database
+                    await self.issue_history_db_service.save_issue_history_event(event)
 
             log.info(f"Successfully synced {len(changelog_response.values)} changelog entries for issue {issue_id}")
             return True
@@ -51,14 +63,9 @@ class JiraIssueHistoryApplicationService:
             log.error(f"Error syncing history for issue {issue_id}: {str(e)}")
             return False
 
-    async def _process_changelog(self, issue_id: str, changelog: JiraChangelogDetailAPIGetResponseDTO) -> None:
-        """Xử lý một changelog entry từ Jira API"""
+    async def convert_api_changelog_to_db_changelog(self, issue_id: str, changelog: JiraChangelogDetailAPIGetResponseDTO) -> List[JiraIssueHistoryChangeDBCreateDTO]:
+        """Convert changelog from Jira API to database changelog"""
         try:
-            # Lấy thông tin cơ bản về changelog
-            changelog_id = changelog.id
-            author_id = changelog.author.accountId
-            created_at = changelog.created  # Đây là datetime với timezone
-
             # Lấy các thay đổi từ changelog
             items = changelog.items
             if not items:
@@ -86,22 +93,11 @@ class JiraIssueHistoryApplicationService:
                     to_string=to_string
                 ))
 
-            # Tạo event và lưu vào database
-            if changes:
-                event = JiraIssueHistoryDBCreateDTO(
-                    jira_issue_id=issue_id,
-                    jira_change_id=changelog_id,
-                    author_id=author_id,
-                    created_at=created_at,  # Giữ nguyên datetime với timezone
-                    changes=changes
-                )
-
-                # Lưu vào database
-                await self.issue_history_db_service.save_issue_history_event(event)
-                log.info(f"Saved changelog {changelog_id} with {len(changes)} changes for issue {issue_id}")
+            return changes
 
         except Exception as e:
             log.error(f"Error processing changelog {changelog.id} for issue {issue_id}: {str(e)}")
+            return []
 
     def _map_field_name(self, jira_field_name: str) -> str:
         """Map tên field từ Jira về tên field trong hệ thống của chúng ta"""

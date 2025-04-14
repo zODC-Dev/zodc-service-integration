@@ -6,7 +6,11 @@ from src.app.dependencies.controllers import get_sprint_analytics_controller
 from src.app.schemas.requests.auth import JWTClaims
 from src.app.schemas.requests.gantt_chart import GanttChartRequest
 from src.app.schemas.responses.gantt_chart import GanttChartFeasibilityResponse, GanttChartResponse
-from src.app.schemas.responses.jira_sprint_analytics import SprintBurndownResponse, SprintBurnupResponse
+from src.app.schemas.responses.jira_sprint_analytics import (
+    SprintBurndownResponse,
+    SprintBurnupResponse,
+    SprintGoalResponse,
+)
 
 router = APIRouter()
 
@@ -45,6 +49,26 @@ async def get_sprint_burnup_chart(
 ):
     """Get burnup chart data for a sprint"""
     return await controller.get_sprint_burnup_chart(
+        user_id=int(claims.sub),
+        project_key=project_key,
+        sprint_id=sprint_id
+    )
+
+
+@router.get(
+    "/{project_key}/sprints/{sprint_id}/analytics/goal",
+    response_model=SprintGoalResponse,
+    summary="Get sprint goal data for a sprint",
+    description="Returns data about sprint goals, task completion status, and points"
+)
+async def get_sprint_goal(
+    project_key: str = Path(..., description="Project key"),
+    sprint_id: int = Path(..., description="Sprint ID"),
+    claims: JWTClaims = Depends(get_jwt_claims),
+    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller)
+):
+    """Get sprint goal data for a sprint"""
+    return await controller.get_sprint_goal(
         user_id=int(claims.sub),
         project_key=project_key,
         sprint_id=sprint_id

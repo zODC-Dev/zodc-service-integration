@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 
 from fastapi import HTTPException, UploadFile
 
+from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.models.database.media import MediaDBCreateDTO
 from src.domain.models.media import MediaModel
@@ -28,6 +29,8 @@ class MediaService:
         )
 
         media_id = uuid4()
+
+        log.info(f"Media ID in create: {media_id}")
 
         # Create media record
         media = MediaDBCreateDTO(

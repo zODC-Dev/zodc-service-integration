@@ -50,3 +50,27 @@ class SprintBurnupResponse(BaseSprintAnalyticsResponse):
 
     class Config:
         populate_by_name = True
+
+
+class TaskReportResponse(BaseModel):
+    """Response schema for task report data"""
+    numberOfTasks: int
+    percentage: float
+    points: float
+
+    class Config:
+        populate_by_name = True
+
+
+class SprintGoalResponse(BaseResponse):
+    """Response schema for sprint goal data"""
+    id: str
+    goal: str
+    completedTasks: TaskReportResponse
+    inProgressTasks: TaskReportResponse
+    toDoTasks: TaskReportResponse
+    addedPoints: float
+    totalPoints: float
+
+    class Config:
+        populate_by_name = True

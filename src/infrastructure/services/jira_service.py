@@ -160,6 +160,7 @@ class JiraAPIClient:
     async def post(self, endpoint: str, user_id: Optional[int] = None, data: Dict[str, Any] = None, error_msg: str = "Error creating new data on Jira") -> Dict[str, Any]:
         """Perform HTTP POST request"""
         url = f"{self.base_url}{endpoint}"
+        log.info(f"POST {url} with data: {data}")
         return await self.request_with_retry("POST", url, user_id, json_data=data, error_msg=error_msg)
 
     async def put(self, endpoint: str, user_id: Optional[int] = None, data: Dict[str, Any] = None, error_msg: str = "Error updating data on Jira") -> Dict[str, Any]:

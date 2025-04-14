@@ -1,6 +1,11 @@
 from typing import List
 
-from src.app.schemas.responses.jira_sprint_analytics import SprintBurndownResponse, SprintBurnupResponse
+from src.app.schemas.responses.jira_sprint_analytics import (
+    SprintBurndownResponse,
+    SprintBurnupResponse,
+    SprintGoalResponse,
+    TaskReportResponse,
+)
 from src.configs.logger import log
 from src.domain.services.jira_sprint_analytics_service import IJiraSprintAnalyticsService
 
@@ -92,4 +97,42 @@ class JiraSprintAnalyticsApplicationService:
             )
         except Exception as e:
             log.error(f"Error getting sprint burnup chart: {str(e)}")
+            raise
+
+    async def get_sprint_goal(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: int
+    ) -> SprintGoalResponse:
+        """Lấy dữ liệu sprint goal cho một sprint"""
+        try:
+            goal_data = await self.sprint_analytics_service.get_sprint_goal_data(
+                user_id, project_key, sprint_id
+            )
+
+            # Chuyển đổi domain model sang response DTO
+            return SprintGoalResponse(
+                id=goal_data.id,
+                goal=goal_data.goal,
+                completedTasks=TaskReportResponse(
+                    numberOfTasks=goal_data.completed_tasks.number_of_tasks,
+                    percentage=goal_data.completed_tasks.percentage,
+                    points=goal_data.completed_tasks.points
+                ),
+                inProgressTasks=TaskReportResponse(
+                    numberOfTasks=goal_data.in_progress_tasks.number_of_tasks,
+                    percentage=goal_data.in_progress_tasks.percentage,
+                    points=goal_data.in_progress_tasks.points
+                ),
+                toDoTasks=TaskReportResponse(
+                    numberOfTasks=goal_data.to_do_tasks.number_of_tasks,
+                    percentage=goal_data.to_do_tasks.percentage,
+                    points=goal_data.to_do_tasks.points
+                ),
+                addedPoints=goal_data.added_points,
+                totalPoints=goal_data.total_points
+            )
+        except Exception as e:
+            log.error(f"Error getting sprint goal: {str(e)}")
             raise
