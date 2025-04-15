@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
+from src.domain.constants.jira import JiraIssueStatus
 from src.domain.models.apis.jira_user import JiraAssigneeResponse
 
 
@@ -132,6 +133,7 @@ class BugTaskModel(BaseModel):
     summary: str
     points: float
     priority: str
+    status: JiraIssueStatus
     assignee: Optional[JiraAssigneeResponse] = None
     created_at: datetime
     updated_at: datetime
