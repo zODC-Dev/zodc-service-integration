@@ -41,13 +41,7 @@ class JiraProjectController:
         limit: int = 50
     ) -> StandardResponse[List[GetJiraIssueResponse]]:
         try:
-            # Thay vì gọi API service, gọi database service
-            current_sprint: Optional[JiraSprintModel] = None
-            if not sprint_id and not is_backlog:
-                current_sprint = await self.jira_sprint_database_service.get_current_sprint(project_key)
-                log.info(f"Current sprint: {current_sprint}")
-                if current_sprint:
-                    sprint_id = current_sprint.jira_sprint_id
+            # Sprint id is system sprint id, not sprint id in Jira
 
             log.info(f"User {user_id} is fetching issues for project {project_key} from database")
             issues = await self.jira_project_service.get_project_issues(
@@ -59,10 +53,14 @@ class JiraProjectController:
                 search=search,
                 limit=limit
             )
+
+            current_sprint: Optional[JiraSprintModel] = None
+            if sprint_id:
+                current_sprint = await self.jira_sprint_database_service.get_sprint_by_id(sprint_id)
+
             return StandardResponse(
                 message="Issues fetched successfully from database",
-                data=[GetJiraIssueResponse.from_domain(issue, int(
-                    sprint_id) if sprint_id else None) for issue in issues]
+                data=[GetJiraIssueResponse.from_domain(issue, current_sprint) for issue in issues]
             )
         except Exception as e:
             log.error(f"Error fetching issues from database: {str(e)}")

@@ -70,14 +70,11 @@ class GetJiraIssueResponse(BaseResponse):
     last_synced_at: datetime
 
     @classmethod
-    def from_domain(cls, issue: JiraIssueModel, sprint_number: Optional[int] = None) -> "GetJiraIssueResponse":
+    def from_domain(cls, issue: JiraIssueModel, sprint: Optional[JiraSprintModel] = None) -> "GetJiraIssueResponse":
 
         current_sprint: Optional[JiraIssueSprintResponse] = None
-        if issue.sprints and sprint_number:
-            current_sprint = JiraIssueSprintResponse.from_domain(
-                next((sprint for sprint in issue.sprints if (
-                    sprint and sprint.jira_sprint_id == sprint_number)), None)
-            )
+        if sprint:
+            current_sprint = JiraIssueSprintResponse.from_domain(sprint)
 
         return cls(
             id=issue.id,

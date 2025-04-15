@@ -290,7 +290,10 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                     query = query.join(
                         JiraIssueSprintEntity,
                         col(JiraIssueEntity.jira_issue_id) == col(JiraIssueSprintEntity.jira_issue_id)
-                    ).where(col(JiraIssueSprintEntity.jira_sprint_id) == sprint_id)
+                    ).join(
+                        JiraSprintEntity,
+                        col(JiraIssueSprintEntity.jira_sprint_id) == col(JiraSprintEntity.jira_sprint_id)
+                    ).where(col(JiraSprintEntity.id) == sprint_id)
                 elif is_backlog:
                     # Issues without any sprint are in backlog
                     query = query.outerjoin(
