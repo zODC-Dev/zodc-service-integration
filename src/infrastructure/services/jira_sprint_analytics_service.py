@@ -214,7 +214,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         bug_issues = [issue for issue in issues if issue.type == JiraIssueType.BUG]
 
         # Phân loại bugs theo priority
-        priority_bugs = {
+        priority_bugs: Dict[str, List[JiraIssueModel]] = {
             "lowest": [],
             "low": [],
             "medium": [],

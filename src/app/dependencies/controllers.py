@@ -1,5 +1,6 @@
 from fastapi import Depends
 
+from src.app.services.system_config_service import SystemConfigApplicationService
 from src.app.controllers.jira_issue_controller import JiraIssueController
 from src.app.controllers.jira_project_controller import JiraProjectController
 from src.app.controllers.jira_sprint_analytics_controller import JiraSprintAnalyticsController
@@ -7,6 +8,7 @@ from src.app.controllers.jira_sprint_controller import JiraSprintController
 from src.app.controllers.jira_webhook_controller import JiraWebhookController
 from src.app.controllers.media_controller import MediaController
 from src.app.controllers.microsoft_calendar_controller import MicrosoftCalendarController
+from src.app.controllers.system_config_controller import SystemConfigController
 from src.app.controllers.util_controller import UtilController
 from src.app.dependencies.repositories import get_jira_project_repository
 from src.app.dependencies.services import (
@@ -19,6 +21,7 @@ from src.app.dependencies.services import (
     get_media_service,
     get_microsoft_calendar_application_service,
     get_sprint_analytics_application_service,
+    get_system_config_service,
     get_util_service,
     get_webhook_queue_service,
     get_webhook_service,
@@ -94,3 +97,12 @@ async def get_jira_sprint_controller(
 ) -> JiraSprintController:
     """Get Jira sprint controller"""
     return JiraSprintController(sprint_service=sprint_service)
+
+
+def get_system_config_controller(
+    system_config_service: SystemConfigApplicationService = Depends(get_system_config_service)
+) -> SystemConfigController:
+    """Get the SystemConfigController instance"""
+    return SystemConfigController(
+        system_config_service=system_config_service
+    )

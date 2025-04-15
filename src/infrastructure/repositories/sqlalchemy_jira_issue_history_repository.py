@@ -118,7 +118,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
                 # Kiểm tra các bản ghi tương tự đã tồn tại
                 try:
-                    stmt = (
+                    history_stmt = (
                         select(JiraIssueHistoryEntity)
                         .where(
                             col(JiraIssueHistoryEntity.jira_issue_id) == event.jira_issue_id,
@@ -127,7 +127,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                         )
                     )
 
-                    result = await self.session.exec(stmt)
+                    result = await self.session.exec(history_stmt)
                     existing_item = result.one_or_none()
                 except Exception as e:
                     log.error(f"Error checking for existing history item: {str(e)}")
