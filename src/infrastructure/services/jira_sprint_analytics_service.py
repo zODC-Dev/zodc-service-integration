@@ -255,6 +255,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
                 summary=bug.summary,
                 points=bug.estimate_point or 0,
                 priority=bug.priority.name if bug.priority else "Medium",
+                status=bug.status,
                 assignee=JiraAssigneeResponse.from_domain(bug.assignee) if bug.assignee else None,
                 created_at=bug.created_at,
                 updated_at=bug.updated_at

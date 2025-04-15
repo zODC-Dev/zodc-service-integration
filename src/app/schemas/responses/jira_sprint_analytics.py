@@ -108,6 +108,7 @@ class BugTaskResponse(BaseModel):
     summary: str
     points: float
     priority: str
+    status: str
     assignee: Optional[JiraAssigneeResponse] = None
     created_at: str
     updated_at: str

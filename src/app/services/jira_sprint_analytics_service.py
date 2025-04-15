@@ -177,6 +177,7 @@ class JiraSprintAnalyticsApplicationService:
                     points=bug.points,
                     priority=bug.priority,
                     assignee=assignee_response,
+                    status=bug.status.value,
                     created_at=bug.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                     updated_at=bug.updated_at.strftime("%Y-%m-%d %H:%M:%S")
                 )
