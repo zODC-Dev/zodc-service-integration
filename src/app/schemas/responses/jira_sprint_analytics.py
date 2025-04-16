@@ -38,7 +38,7 @@ class BaseSprintAnalyticsResponse(BaseResponse):
 class SprintBurndownResponse(BaseSprintAnalyticsResponse):
     """Response schema cho Burndown Chart API"""
     ideal_burndown: List[float] = Field(..., alias="idealBurndown")
-    actual_burndown: List[float] = Field(..., alias="actualBurndown")
+    actual_burndown: List[float | None] = Field(..., alias="actualBurndown")
 
     class Config:
         populate_by_name = True
@@ -47,7 +47,7 @@ class SprintBurndownResponse(BaseSprintAnalyticsResponse):
 class SprintBurnupResponse(BaseSprintAnalyticsResponse):
     """Response schema cho Burnup Chart API"""
     ideal_burnup: List[float] = Field(..., alias="idealBurnup")
-    actual_burnup: List[float] = Field(..., alias="actualBurnup")
+    actual_burnup: List[float | None] = Field(..., alias="actualBurnup")
     scope_line: List[float] = Field(..., alias="scopeLine")
 
     class Config:

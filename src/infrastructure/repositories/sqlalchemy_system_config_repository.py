@@ -6,10 +6,10 @@ from sqlalchemy.sql import desc
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.configs.logger import log
 from src.domain.models.system_config import ConfigScope, ConfigType, SystemConfigModel
 from src.domain.repositories.system_config_repository import ISystemConfigRepository
 from src.infrastructure.entities.system_config import SystemConfigEntity
-from src.configs.logger import log
 
 
 class SqlAlchemySystemConfigRepository(ISystemConfigRepository):

@@ -1,6 +1,5 @@
 from fastapi import Depends
 
-from src.app.services.system_config_service import SystemConfigApplicationService
 from src.app.controllers.jira_issue_controller import JiraIssueController
 from src.app.controllers.jira_project_controller import JiraProjectController
 from src.app.controllers.jira_sprint_analytics_controller import JiraSprintAnalyticsController
@@ -31,6 +30,7 @@ from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.jira_sprint_analytics_service import JiraSprintAnalyticsApplicationService
 from src.app.services.media_service import MediaService
 from src.app.services.microsoft_calendar_service import MicrosoftCalendarApplicationService
+from src.app.services.system_config_service import SystemConfigApplicationService
 from src.app.services.util_service import UtilService
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
