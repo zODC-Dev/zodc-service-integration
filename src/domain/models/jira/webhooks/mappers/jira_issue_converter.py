@@ -40,7 +40,7 @@ class JiraIssueConverter:
             reporter_id=issue_data.reporter_id,
             estimate_point=issue_data.estimate_point,
             actual_point=issue_data.actual_point,
-            updated_at=issue_data.updated_at,
+            updated_at=datetime.now(timezone.utc),
             last_synced_at=datetime.now(timezone.utc),
             link_url=issue_data.link_url,
             sprints=issue_data.sprints

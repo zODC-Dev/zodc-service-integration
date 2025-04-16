@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 
 from src.app.schemas.responses.jira_sprint_analytics import (
@@ -37,6 +38,23 @@ class JiraSprintAnalyticsApplicationService:
                 user_id, project_key, sprint_id
             )
 
+            # Get current date
+            current_date = datetime.now().date()
+
+            # Process actual burndown - set values to None for future dates
+            actual_burndown = []
+            dates = burndown_data.get_dates_list()
+            raw_actual_burndown = burndown_data.get_actual_burndown()
+
+            for i, date_str in enumerate(dates):
+                date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                if date <= current_date:
+                    # For dates up to today, use actual value
+                    actual_burndown.append(round(raw_actual_burndown[i], 2))
+                else:
+                    # For future dates, use None
+                    actual_burndown.append(None)
+
             # Chuyển đổi domain model sang response DTO với các giá trị đã làm tròn
             return SprintBurndownResponse(
                 sprint_name=burndown_data.name,
@@ -44,9 +62,9 @@ class JiraSprintAnalyticsApplicationService:
                 end_date=burndown_data.end_date.strftime("%Y-%m-%d"),
                 total_points_initial=round(burndown_data.total_points_initial, 2),
                 total_points_current=round(burndown_data.total_points_current, 2),
-                dates=burndown_data.get_dates_list(),
+                dates=dates,
                 ideal_burndown=self._round_float_list(burndown_data.get_ideal_burndown()),
-                actual_burndown=self._round_float_list(burndown_data.get_actual_burndown()),
+                actual_burndown=actual_burndown,
                 added_points=self._round_float_list(burndown_data.get_added_points()),
                 scope_changes=[
                     {
@@ -79,6 +97,29 @@ class JiraSprintAnalyticsApplicationService:
                 for i, _ in enumerate(burnup_data.daily_data)
             ]
 
+            # Get current date
+            current_date = datetime.now().date()
+
+            # Process actual burnup - set values to None for future dates
+            actual_burnup = []
+            dates = burnup_data.get_dates_list()
+            raw_actual_burnup = burnup_data.get_actual_burnup()
+
+            # Process scope line - set values to None for future dates
+            scope_line = []
+            raw_scope_line = burnup_data.get_scope_line()
+
+            for i, date_str in enumerate(dates):
+                date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                if date <= current_date:
+                    # For dates up to today, use actual value
+                    actual_burnup.append(round(raw_actual_burnup[i], 2))
+                    scope_line.append(round(raw_scope_line[i], 2))
+                else:
+                    # For future dates, use None
+                    actual_burnup.append(None)
+                    scope_line.append(round(raw_scope_line[i], 2))  # Keep scope line values for future dates
+
             # Chuyển đổi domain model sang response DTO với các giá trị đã làm tròn
             return SprintBurnupResponse(
                 sprint_name=burnup_data.name,
@@ -86,10 +127,10 @@ class JiraSprintAnalyticsApplicationService:
                 end_date=burnup_data.end_date.strftime("%Y-%m-%d"),
                 total_points_initial=round(burnup_data.total_points_initial, 2),
                 total_points_current=round(burnup_data.total_points_current, 2),
-                dates=burnup_data.get_dates_list(),
+                dates=dates,
                 ideal_burnup=self._round_float_list(ideal_burnup),
-                actual_burnup=self._round_float_list(burnup_data.get_actual_burnup()),
-                scope_line=self._round_float_list(burnup_data.get_scope_line()),
+                actual_burnup=actual_burnup,
+                scope_line=scope_line,
                 added_points=self._round_float_list(burnup_data.get_added_points()),
                 scope_changes=[
                     {
@@ -176,8 +217,8 @@ class JiraSprintAnalyticsApplicationService:
                     summary=bug.summary,
                     points=bug.points,
                     priority=bug.priority,
-                    assignee=assignee_response,
                     status=bug.status.value,
+                    assignee=assignee_response,
                     created_at=bug.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                     updated_at=bug.updated_at.strftime("%Y-%m-%d %H:%M:%S")
                 )

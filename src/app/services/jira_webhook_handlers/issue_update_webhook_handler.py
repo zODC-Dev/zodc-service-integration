@@ -5,7 +5,6 @@ from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebh
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
 from src.domain.constants.sync import EntityType, OperationType, SourceType
-from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
 from src.domain.models.jira.webhooks.mappers.jira_issue_converter import JiraIssueConverter
@@ -75,21 +74,3 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
             "issue_id": issue_id,
             "updated": updated_issue is not None
         }
-
-    async def _handle_conflict(self, issue_id: str, remote_updated_at, local_updated_at):
-        """Handle conflict when both remote and local changes exist"""
-        log.warning(
-            f"Conflict detected for issue {issue_id}. "
-            f"Remote updated_at: {remote_updated_at}, Local last_synced_at: {local_updated_at}"
-        )
-        # Implement your conflict resolution strategy here
-
-    async def _update_sync_status(self, issue_id: str, updated_at):
-        """Update the sync status of an issue"""
-        await self.jira_issue_repository.update(
-            issue_id,
-            JiraIssueDBUpdateDTO(
-                last_synced_at=updated_at,
-                updated_locally=False
-            )
-        )

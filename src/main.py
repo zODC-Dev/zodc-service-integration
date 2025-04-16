@@ -15,6 +15,7 @@ from src.app.routers.jira_sprint_router import router as jira_sprint_router
 from src.app.routers.jira_webhook_router import router as jira_webhook_router
 from src.app.routers.media_router import router as media_router
 from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
+from src.app.routers.system_config_router import router as system_config_router
 from src.app.routers.util_router import router as util_router
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
@@ -313,7 +314,7 @@ app.include_router(jira_sprint_analytics_router, prefix=settings.API_V1_STR +
 app.include_router(jira_sprint_router, prefix=settings.API_V1_STR +
                    "/jira/sprint", tags=["jira_sprint"])
 app.include_router(media_router, prefix=settings.API_V1_STR + "/media", tags=["media"])
-
+app.include_router(system_config_router, prefix=settings.API_V1_STR + "/configs", tags=["system_config"])
 if __name__ == "__main__":
     import uvicorn
 

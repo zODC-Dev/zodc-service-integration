@@ -109,6 +109,8 @@ class JiraIssueDBUpdateDTO(BaseModel):
     is_deleted: Optional[bool] = None
     type: Optional[Union[JiraIssueType, str]] = None
     link_url: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
     @field_validator('status')
     @classmethod
     def validate_status(cls, v):
@@ -144,6 +146,7 @@ class JiraIssueDBUpdateDTO(BaseModel):
             actual_point=domain.actual_point,
             last_synced_at=domain.last_synced_at,
             updated_locally=domain.updated_locally,
+            updated_at=domain.updated_at,
             is_system_linked=domain.is_system_linked,
             is_deleted=domain.is_deleted,
             type=domain.type,

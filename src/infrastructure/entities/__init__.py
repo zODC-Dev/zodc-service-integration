@@ -8,6 +8,7 @@ from .jira_user import JiraUserEntity
 from .media import MediaEntity
 from .refresh_token import RefreshTokenEntity
 from .sync_log import SyncLogEntity
+from .system_config import SystemConfigEntity
 
 # Update forward references
 BaseEntity.model_rebuild()
@@ -21,3 +22,4 @@ JiraIssueSprintEntity.model_rebuild()
 JiraIssueHistoryEntity.model_rebuild()
 SyncLogEntity.model_rebuild()
 MediaEntity.model_rebuild()
+SystemConfigEntity.model_rebuild()

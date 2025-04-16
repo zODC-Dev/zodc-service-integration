@@ -13,6 +13,7 @@ from src.app.dependencies.repositories import (
     get_refresh_token_repository,
     get_sqlalchemy_jira_sync_session,
     get_sync_log_repository,
+    get_system_config_repository,
     get_workflow_mapping_repository,
 )
 from src.app.services.gantt_chart_service import GanttChartApplicationService
@@ -46,6 +47,7 @@ from src.app.services.nats_handlers.node_status_sync_handler import NodeStatusSy
 from src.app.services.nats_handlers.user_message_handler import UserMessageHandler
 from src.app.services.nats_handlers.workflow_edit_handler import WorkflowEditRequestHandler
 from src.app.services.nats_handlers.workflow_sync_handler import WorkflowSyncRequestHandler
+from src.app.services.system_config_service import SystemConfigApplicationService
 from src.app.services.util_service import UtilService
 from src.configs.redis import get_redis_client
 from src.domain.constants.nats_events import NATSSubscribeTopic
@@ -56,6 +58,7 @@ from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.media_repository import IMediaRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
+from src.domain.repositories.system_config_repository import ISystemConfigRepository
 from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
 from src.domain.services.gantt_chart_calculator_service import IGanttChartCalculatorService
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
@@ -526,4 +529,13 @@ async def get_nats_event_service(
         nats_service=nats_service,
         message_handlers=message_handlers,
         request_handlers=request_handlers
+    )
+
+
+def get_system_config_service(
+    system_config_repository: ISystemConfigRepository = Depends(get_system_config_repository)
+) -> SystemConfigApplicationService:
+    """Get system config service"""
+    return SystemConfigApplicationService(
+        system_config_repository=system_config_repository
     )

@@ -9,6 +9,7 @@ from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.media_repository import IMediaRepository
 from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
+from src.domain.repositories.system_config_repository import ISystemConfigRepository
 from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
 from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
 from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import (
@@ -21,6 +22,7 @@ from src.infrastructure.repositories.sqlalchemy_jira_user_repository import SQLA
 from src.infrastructure.repositories.sqlalchemy_media_repository import SQLAlchemyMediaRepository
 from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
+from src.infrastructure.repositories.sqlalchemy_system_config_repository import SqlAlchemySystemConfigRepository
 from src.infrastructure.repositories.sqlalchemy_workflow_mapping_repository import SQLAlchemyWorkflowMappingRepository
 from src.infrastructure.unit_of_works.sqlalchemy_jira_sync_session import SQLAlchemyJiraSyncSession
 
@@ -73,3 +75,8 @@ async def get_workflow_mapping_repository(session=Depends(get_db)) -> IWorkflowM
 async def get_sqlalchemy_jira_sync_session(session=Depends(get_db)) -> IJiraSyncSession:
     """Get Jira sync session instance."""
     return SQLAlchemyJiraSyncSession(session_maker=session)
+
+
+async def get_system_config_repository(session=Depends(get_db)) -> ISystemConfigRepository:
+    """Get system config repository"""
+    return SqlAlchemySystemConfigRepository(session=session)
