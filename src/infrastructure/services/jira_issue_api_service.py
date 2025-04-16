@@ -949,4 +949,4 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         )
 
         issues = JiraIssueBulkFetchAPIGetResponseDTO.model_validate(response_data)
-        return [JiraIssueMapper.to_domain_issue(issue) for issue in issues.issues]
+        return [JiraIssueMapper.to_domain(issue) for issue in issues.issues]

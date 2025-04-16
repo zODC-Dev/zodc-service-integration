@@ -103,7 +103,6 @@ class JiraIssueMapper:
 
             # Create link URL
             # project_key = api_response.key.split("-")[0]
-            log.info(f"Sprints in mapper: {sprints}")
             board_id = sprints[0].board_id if sprints else None
             link_url: Optional[str] = None
             if board_id:
@@ -143,7 +142,6 @@ class JiraIssueMapper:
     @staticmethod
     def _map_sprint(api_sprint: JiraSprintAPIGetResponseDTO, project_key: str) -> Optional[JiraSprintModel]:
         try:
-            log.info(f"API sprint: {api_sprint}")
             now = datetime.now(timezone.utc)
             return JiraSprintModel(
                 jira_sprint_id=api_sprint.id,
