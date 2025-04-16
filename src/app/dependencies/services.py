@@ -37,6 +37,7 @@ from src.app.services.jira_webhook_handlers.user_update_webhook_handler import U
 from src.app.services.jira_webhook_queue_service import JiraWebhookQueueService
 from src.app.services.media_service import MediaService
 from src.app.services.microsoft_calendar_service import MicrosoftCalendarApplicationService
+from src.app.services.nats_application_service import NATSApplicationService
 from src.app.services.nats_event_service import NATSEventService
 from src.app.services.nats_handlers.gantt_chart_handler import GanttChartRequestHandler
 from src.app.services.nats_handlers.jira_issue_link_handler import JiraIssueLinkRequestHandler
@@ -112,6 +113,13 @@ async def get_nats_service() -> INATSService:
 async def get_redis_service(redis_client: Redis = Depends(get_redis_client)):
     """Dependency for redis repository"""
     return RedisService(redis_client=redis_client)
+
+
+async def get_nats_application_service(
+    nats_service: INATSService = Depends(get_nats_service)
+) -> NATSApplicationService:
+    """Get NATS application service for publishing events"""
+    return NATSApplicationService(nats_service=nats_service)
 
 
 # ============================ TOKEN SCHEDULER SERVICE ===========================================
@@ -380,15 +388,17 @@ async def get_webhook_handlers(
     user_database_service=Depends(get_jira_user_database_service),
     issue_history_sync_service=Depends(get_jira_issue_history_sync_service),
     jira_project_repository=Depends(get_jira_project_repository),
-    redis_service=Depends(get_redis_service)
+    redis_service=Depends(get_redis_service),
+    nats_application_service=Depends(get_nats_application_service),
+    jira_sprint_repository=Depends(get_jira_sprint_repository)
 ) -> List[JiraWebhookHandler]:
     """Get list of webhook handlers with dependencies"""
     return [
         # Issue handlers
         IssueCreateWebhookHandler(jira_issue_repository, sync_log_repository,
                                   jira_issue_api_service, jira_project_repository, redis_service),
-        IssueUpdateWebhookHandler(jira_issue_repository, sync_log_repository,
-                                  jira_issue_api_service, issue_history_sync_service),
+        IssueUpdateWebhookHandler(jira_issue_repository=jira_issue_repository, sync_log_repository=sync_log_repository,
+                                  jira_issue_api_service=jira_issue_api_service, issue_history_sync_service=issue_history_sync_service, nats_application_service=nats_application_service, jira_sprint_repository=jira_sprint_repository),
         IssueDeleteWebhookHandler(jira_issue_repository, sync_log_repository),
 
         # Sprint handlers
@@ -413,11 +423,23 @@ async def get_webhook_service(
     sprint_database_service=Depends(get_jira_sprint_database_service),
     issue_history_sync_service=Depends(get_jira_issue_history_sync_service),
     jira_project_repository=Depends(get_jira_project_repository),
-    redis_service=Depends(get_redis_service)
+    redis_service=Depends(get_redis_service),
+    nats_application_service=Depends(get_nats_application_service),
+    jira_sprint_repository=Depends(get_jira_sprint_repository)
 ) -> JiraWebhookService:
     """Get Jira webhook service"""
-    return JiraWebhookService(jira_issue_repository, sync_log_repository, jira_issue_api_service, jira_sprint_api_service, sprint_database_service, issue_history_sync_service, jira_project_repository, redis_service)
-    # yield JiraWebhookService(jira_issue_repository, sync_log_repository, jira_issue_api_service, jira_sprint_api_service, sprint_database_service)
+    return JiraWebhookService(
+        jira_issue_repository,
+        sync_log_repository,
+        jira_issue_api_service,
+        jira_sprint_api_service,
+        sprint_database_service,
+        issue_history_sync_service,
+        jira_project_repository,
+        redis_service,
+        nats_application_service,
+        jira_sprint_repository
+    )
 
 
 async def get_webhook_queue_service(

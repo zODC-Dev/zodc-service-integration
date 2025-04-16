@@ -92,7 +92,7 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
 
     def _build_dependency_map(self, connections: List[GanttChartConnectionModel]) -> Dict[str, Dict[str, str]]:
         """Build dependency map from connections with dependency types"""
-        dependency_map = {}
+        dependency_map: Dict[str, Dict[str, str]] = {}
 
         for connection in connections:
             source = connection.from_node_id
@@ -165,9 +165,9 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
     ) -> List[TaskScheduleModel]:
         """Calculate start and end times for each task"""
         log.debug(f"[GANTT-CALC] Calculating task times for {len(sorted_tasks)} tasks")
-        result = []
-        task_end_times = {}  # Map of node_id to end time
-        task_start_times = {}  # Map of node_id to start time
+        result: List[TaskScheduleModel] = []
+        task_end_times: Dict[str, datetime] = {}  # Map of node_id to end time
+        task_start_times: Dict[str, datetime] = {}  # Map of node_id to start time
 
         # Set work day start and end times
         work_start = config.start_work_hour
@@ -189,7 +189,7 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
             # If it's a story with subtasks, calculate estimate as sum of subtasks
             if node_id in hierarchy_map:
                 child_tasks = hierarchy_map[node_id]
-                child_estimate = 0
+                child_estimate: float = 0
                 for child_id in child_tasks:
                     if child_id in issues_map:
                         child_estimate += issues_map[child_id].estimate_points
