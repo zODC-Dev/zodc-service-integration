@@ -258,6 +258,7 @@ class JiraProjectApplicationService:
             synced_users = []
             for jira_user in jira_users:
                 try:
+                    assert jira_user.jira_account_id is not None, "Jira account ID is required"
                     # Check if user exists by jira_account_id
                     existing_user = await session.user_repository.get_user_by_jira_account_id(
                         jira_user.jira_account_id

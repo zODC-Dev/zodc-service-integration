@@ -22,9 +22,12 @@ from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository im
 from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
 from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
 from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQLAlchemyJiraSprintRepository
+from src.infrastructure.repositories.sqlalchemy_jira_user_repository import SQLAlchemyJiraUserRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
+from src.infrastructure.services.jira_issue_database_service import JiraIssueDatabaseService
 from src.infrastructure.services.jira_issue_history_database_service import JiraIssueHistoryDatabaseService
 from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
+from src.infrastructure.services.jira_user_database_service import JiraUserDatabaseService
 from src.infrastructure.services.jira_webhook_service import JiraWebhookService
 from src.infrastructure.services.redis_service import RedisService
 
@@ -379,11 +382,14 @@ class JiraWebhookQueueService:
             issue_repo = SQLAlchemyJiraIssueRepository(session)
             sync_log_repo = SQLAlchemySyncLogRepository(session)
             sprint_repo = SQLAlchemyJiraSprintRepository(session)
+            user_repo = SQLAlchemyJiraUserRepository(session)
+            jira_issue_db_service = JiraIssueDatabaseService(issue_repo)
+            jira_user_db_service = JiraUserDatabaseService(user_repo)
             sprint_database_service = JiraSprintDatabaseService(sprint_repo)
             issue_history_repo = SQLAlchemyJiraIssueHistoryRepository(session)
             issue_history_db_service = JiraIssueHistoryDatabaseService(issue_history_repo)
             issue_history_sync_service = JiraIssueHistoryApplicationService(
-                self.jira_issue_api_service, issue_history_db_service)
+                self.jira_issue_api_service, issue_history_db_service, jira_issue_db_service, jira_user_db_service)
             jira_project_repository = SQLAlchemyJiraProjectRepository(session)
             redis_client = await get_redis_client()
             redis_service = RedisService(redis_client)
