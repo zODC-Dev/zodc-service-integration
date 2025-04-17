@@ -2,7 +2,6 @@ from typing import List
 
 from fastapi import Depends
 
-from src.app.services.nats_application_service import NATSApplicationService
 from src.app.dependencies.container import DependencyContainer
 from src.app.dependencies.repositories import (
     get_jira_issue_repository,
@@ -35,6 +34,7 @@ from src.app.services.jira_webhook_handlers.user_update_webhook_handler import U
 from src.app.services.jira_webhook_queue_service import JiraWebhookQueueService
 from src.app.services.media_service import MediaApplicationService
 from src.app.services.microsoft_calendar_service import MicrosoftCalendarApplicationService
+from src.app.services.nats_application_service import NATSApplicationService
 from src.app.services.nats_event_service import NATSEventService
 from src.app.services.system_config_service import SystemConfigApplicationService
 from src.app.services.util_service import UtilService

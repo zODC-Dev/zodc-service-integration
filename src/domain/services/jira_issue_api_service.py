@@ -79,8 +79,7 @@ class IJiraIssueAPIService(ABC):
 
     @abstractmethod
     async def update_issue_assignee_with_admin_auth(self, issue_key: str, assignee_account_id: str, user_id: int) -> bool:
-        """
-        Update the assignee of a Jira issue
+        """Update the assignee of a Jira issue
 
         Args:
             issue_key: The Jira issue key
