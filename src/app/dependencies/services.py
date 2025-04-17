@@ -1,17 +1,15 @@
-from typing import List, Mapping
+from typing import List
 
 from fastapi import Depends
-from redis import Redis
 
+from src.app.services.nats_application_service import NATSApplicationService
+from src.app.dependencies.container import DependencyContainer
 from src.app.dependencies.repositories import (
-    get_jira_issue_history_repository,
     get_jira_issue_repository,
     get_jira_project_repository,
     get_jira_sprint_repository,
     get_jira_user_repository,
     get_media_repository,
-    get_refresh_token_repository,
-    get_sqlalchemy_jira_sync_session,
     get_sync_log_repository,
     get_system_config_repository,
     get_workflow_mapping_repository,
@@ -35,51 +33,27 @@ from src.app.services.jira_webhook_handlers.user_create_webhook_handler import U
 from src.app.services.jira_webhook_handlers.user_delete_webhook_handler import UserDeleteWebhookHandler
 from src.app.services.jira_webhook_handlers.user_update_webhook_handler import UserUpdateWebhookHandler
 from src.app.services.jira_webhook_queue_service import JiraWebhookQueueService
-from src.app.services.media_service import MediaService
+from src.app.services.media_service import MediaApplicationService
 from src.app.services.microsoft_calendar_service import MicrosoftCalendarApplicationService
-from src.app.services.nats_application_service import NATSApplicationService
 from src.app.services.nats_event_service import NATSEventService
-from src.app.services.nats_handlers.gantt_chart_handler import GanttChartRequestHandler
-from src.app.services.nats_handlers.jira_issue_link_handler import JiraIssueLinkRequestHandler
-from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueSyncRequestHandler
-from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
-from src.app.services.nats_handlers.microsoft_login_message_handler import MicrosoftLoginMessageHandler
-from src.app.services.nats_handlers.node_status_sync_handler import NodeStatusSyncHandler
-from src.app.services.nats_handlers.user_message_handler import UserMessageHandler
-from src.app.services.nats_handlers.workflow_edit_handler import WorkflowEditRequestHandler
-from src.app.services.nats_handlers.workflow_sync_handler import WorkflowSyncRequestHandler
 from src.app.services.system_config_service import SystemConfigApplicationService
 from src.app.services.util_service import UtilService
-from src.configs.redis import get_redis_client
-from src.domain.constants.nats_events import NATSSubscribeTopic
-from src.domain.repositories.jira_issue_history_repository import IJiraIssueHistoryRepository
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
-from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.media_repository import IMediaRepository
-from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
-from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.repositories.system_config_repository import ISystemConfigRepository
 from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
 from src.domain.services.gantt_chart_calculator_service import IGanttChartCalculatorService
-from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
-from src.domain.services.jira_project_database_service import IJiraProjectDatabaseService
 from src.domain.services.jira_sprint_analytics_service import IJiraSprintAnalyticsService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
 from src.domain.services.jira_user_api_service import IJiraUserAPIService
-from src.domain.services.jira_user_database_service import IJiraUserDatabaseService
-from src.domain.services.nats_event_service import INATSEventService
-from src.domain.services.nats_message_handler import INATSRequestHandler
 from src.domain.services.nats_service import INATSService
-from src.domain.services.redis_service import IRedisService
-from src.domain.services.token_refresh_service import ITokenRefreshService
 from src.domain.services.token_scheduler_service import ITokenSchedulerService
 from src.domain.services.workflow_service_client import IWorkflowServiceClient
-from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
 from src.infrastructure.services.azure_blob_storage_service import AzureBlobStorageService
 from src.infrastructure.services.excel_file_service import ExcelFileService
 from src.infrastructure.services.gantt_chart_calculator_service import GanttChartCalculatorService
@@ -105,41 +79,126 @@ from src.infrastructure.services.token_scheduler_service import TokenSchedulerSe
 # ============================ COMMON SERVICES =================================================
 
 
-async def get_nats_service() -> INATSService:
-    """Get Nats service"""
-    return NATSService()
+def get_redis_service() -> RedisService:
+    """Get Redis service from container"""
+    container = DependencyContainer.get_instance()
+    return container.redis_service
 
 
-async def get_redis_service(redis_client: Redis = Depends(get_redis_client)):
-    """Dependency for redis repository"""
-    return RedisService(redis_client=redis_client)
+def get_nats_service() -> NATSService:
+    """Get NATS service from container"""
+    container = DependencyContainer.get_instance()
+    return container.nats_service
 
 
-async def get_nats_application_service(
-    nats_service: INATSService = Depends(get_nats_service)
-) -> NATSApplicationService:
-    """Get NATS application service for publishing events"""
-    return NATSApplicationService(nats_service=nats_service)
+def get_nats_application_service() -> NATSApplicationService:
+    """Get NATS application service from container"""
+    container = DependencyContainer.get_instance()
+    return container.nats_application_service
+
+
+def get_jira_issue_api_service() -> JiraIssueAPIService:
+    """Get Jira Issue API service from container"""
+    container = DependencyContainer.get_instance()
+    return container.jira_issue_api_service
+
+
+def get_jira_project_api_service() -> JiraProjectAPIService:
+    """Get Jira Project API service from container"""
+    container = DependencyContainer.get_instance()
+    return container.jira_project_api_service
+
+
+def get_jira_issue_database_service() -> JiraIssueDatabaseService:
+    """Get Jira Issue database service from container"""
+    container = DependencyContainer.get_instance()
+    return container.jira_issue_database_service
+
+
+def get_jira_project_database_service() -> JiraProjectDatabaseService:
+    """Get Jira Project database service from container"""
+    container = DependencyContainer.get_instance()
+    return container.jira_project_database_service
+
+
+def get_jira_sprint_database_service() -> JiraSprintDatabaseService:
+    """Get Jira Sprint database service from container"""
+    container = DependencyContainer.get_instance()
+    return container.jira_sprint_database_service
+
+
+def get_jira_issue_history_database_service() -> JiraIssueHistoryDatabaseService:
+    """Get Jira Issue History database service from container"""
+    container = DependencyContainer.get_instance()
+    return container.issue_history_db_service
+
+
+def get_jira_user_database_service() -> JiraUserDatabaseService:
+    """Get Jira User database service from container"""
+    container = DependencyContainer.get_instance()
+    return container.jira_user_db_service
+
+
+def get_jira_issue_application_service() -> JiraIssueApplicationService:
+    """Get Jira Issue application service from container"""
+    container = DependencyContainer.get_instance()
+    return container.jira_issue_application_service
+
+
+def get_jira_project_application_service() -> JiraProjectApplicationService:
+    """Get Jira Project application service from container"""
+    container = DependencyContainer.get_instance()
+    return container.jira_project_application_service
+
+
+def get_jira_issue_history_application_service() -> JiraIssueHistoryApplicationService:
+    """Get Jira Issue History application service from container"""
+    container = DependencyContainer.get_instance()
+    return container.issue_history_sync_service
+
+
+def get_gantt_chart_application_service() -> GanttChartApplicationService:
+    """Get Gantt Chart application service from container"""
+    container = DependencyContainer.get_instance()
+    return container.gantt_chart_service
+
+
+def get_nats_event_service() -> NATSEventService:
+    """Get NATS Event service from container"""
+    container = DependencyContainer.get_instance()
+    return container.nats_event_service
+
+
+def get_token_refresh_service() -> TokenRefreshService:
+    """Get Token Refresh service from container"""
+    container = DependencyContainer.get_instance()
+    return container.token_refresh_service
+
+
+def get_token_scheduler_service() -> TokenSchedulerService:
+    """Get Token Scheduler service from container"""
+    container = DependencyContainer.get_instance()
+    return container.token_scheduler_service
 
 
 # ============================ TOKEN SCHEDULER SERVICE ===========================================
 
 
-async def get_token_refresh_service(
-    refresh_token_repository: IRefreshTokenRepository = Depends(get_refresh_token_repository),
-    redis_service: IRedisService = Depends(get_redis_service),
-    user_repository: IJiraUserRepository = Depends(get_jira_user_repository)
-) -> ITokenRefreshService:
-    """Get the token refresh service."""
-    return TokenRefreshService(refresh_token_repository=refresh_token_repository, redis_service=redis_service, user_repository=user_repository)
+# async def get_token_refresh_service(
+#     refresh_token_repository: IRefreshTokenRepository = Depends(get_refresh_token_repository),
+#     redis_service: IRedisService = Depends(get_redis_service),
+#     user_repository: IJiraUserRepository = Depends(get_jira_user_repository)
+# ) -> ITokenRefreshService:
+#     """Get the token refresh service."""
+#     return TokenRefreshService(refresh_token_repository=refresh_token_repository, redis_service=redis_service, user_repository=user_repository)
 
 
-async def get_token_scheduler_service(
-    token_refresh_service: ITokenRefreshService = Depends(get_token_refresh_service),
-    refresh_token_repository: IRefreshTokenRepository = Depends(get_refresh_token_repository)
-) -> TokenSchedulerService:
-    """Get the token scheduler service."""
-    return TokenSchedulerService(token_refresh_service=token_refresh_service, refresh_token_repository=refresh_token_repository)
+# async def get_token_scheduler_service(
+#     token_refresh_service: ITokenRefreshService = Depends(get_token_refresh_service),
+#     refresh_token_repository: IRefreshTokenRepository = Depends(get_refresh_token_repository)
+# ) -> TokenSchedulerService:
+#     """Get the token scheduler service."""
+#     return TokenSchedulerService(token_refresh_service=token_refresh_service, refresh_token_repository=refresh_token_repository)
 
 # ============================ JIRA API CLIENT =================================================
 
@@ -180,11 +239,11 @@ async def get_jira_sprint_api_service(
     )
 
 
-async def get_jira_sprint_database_service(
-    sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository)
-) -> IJiraSprintDatabaseService:
-    """Get Jira sprint database service"""
-    return JiraSprintDatabaseService(sprint_repository)
+# async def get_jira_sprint_database_service(
+#     sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository)
+# ) -> IJiraSprintDatabaseService:
+#     """Get Jira sprint database service"""
+#     return JiraSprintDatabaseService(sprint_repository)
 
 
 async def get_jira_sprint_service(
@@ -213,40 +272,40 @@ async def get_jira_user_api_service(
     )
 
 
-async def get_jira_user_database_service(
-    user_repository: IJiraUserRepository = Depends(get_jira_user_repository)
-) -> IJiraUserDatabaseService:
-    """Get Jira user database service"""
-    return JiraUserDatabaseService(user_repository)
+# async def get_jira_user_database_service(
+#     user_repository: IJiraUserRepository = Depends(get_jira_user_repository)
+# ) -> IJiraUserDatabaseService:
+#     """Get Jira user database service"""
+#     return JiraUserDatabaseService(user_repository)
 
 # ============================ JIRA ISSUE HISTORY DATABASE SERVICE ===========================================
 
 
-async def get_jira_issue_history_database_service(
-    jira_issue_history_repository: IJiraIssueHistoryRepository = Depends(get_jira_issue_history_repository)
-) -> IJiraIssueHistoryDatabaseService:
-    """Get the Jira issue history database service"""
-    return JiraIssueHistoryDatabaseService(jira_issue_history_repository)
+# async def get_jira_issue_history_database_service(
+#     jira_issue_history_repository: IJiraIssueHistoryRepository = Depends(get_jira_issue_history_repository)
+# ) -> IJiraIssueHistoryDatabaseService:
+#     """Get the Jira issue history database service"""
+#     return JiraIssueHistoryDatabaseService(jira_issue_history_repository)
 
 
-async def get_jira_issue_api_service(
-    jira_api_client=Depends(get_jira_api_client),
-    jira_api_admin_client=Depends(get_jira_api_admin_client),
-    user_repository=Depends(get_jira_user_repository)
-) -> JiraIssueAPIService:
-    """Get Jira issue API service"""
-    return JiraIssueAPIService(
-        client=jira_api_client,
-        user_repository=user_repository,
-        admin_client=jira_api_admin_client
-    )
+# async def get_jira_issue_api_service(
+#     jira_api_client=Depends(get_jira_api_client),
+#     jira_api_admin_client=Depends(get_jira_api_admin_client),
+#     user_repository=Depends(get_jira_user_repository)
+# ) -> JiraIssueAPIService:
+#     """Get Jira issue API service"""
+#     return JiraIssueAPIService(
+#         client=jira_api_client,
+#         user_repository=user_repository,
+#         admin_client=jira_api_admin_client
+#     )
 
 
-async def get_jira_issue_database_service(
-    issue_repository=Depends(get_jira_issue_repository)
-) -> JiraIssueDatabaseService:
-    """Get Jira issue database service"""
-    return JiraIssueDatabaseService(issue_repository=issue_repository)
+# async def get_jira_issue_database_service(
+#     issue_repository=Depends(get_jira_issue_repository)
+# ) -> JiraIssueDatabaseService:
+#     """Get Jira issue database service"""
+#     return JiraIssueDatabaseService(issue_repository=issue_repository)
 
 
 async def get_jira_issue_service(
@@ -287,42 +346,42 @@ async def get_jira_issue_history_sync_service(
 # ============================ JIRA PROJECT ===========================================
 
 
-def get_jira_project_api_service(
-    jira_api_client: JiraAPIClient = Depends(get_jira_api_client),
-    user_repository: IJiraUserRepository = Depends(get_jira_user_repository)
-) -> IJiraProjectAPIService:
-    """Get Jira project API service instance."""
-    return JiraProjectAPIService(jira_api_client, user_repository)
+# def get_jira_project_api_service(
+#     jira_api_client: JiraAPIClient = Depends(get_jira_api_client),
+#     user_repository: IJiraUserRepository = Depends(get_jira_user_repository)
+# ) -> IJiraProjectAPIService:
+#     """Get Jira project API service instance."""
+#     return JiraProjectAPIService(jira_api_client, user_repository)
 
 
-async def get_jira_project_database_service(
-    project_repository=Depends(get_jira_project_repository)
-) -> IJiraProjectDatabaseService:
-    """Get Jira project database service instance."""
-    return JiraProjectDatabaseService(project_repository)
+# async def get_jira_project_database_service(
+#     project_repository=Depends(get_jira_project_repository)
+# ) -> IJiraProjectDatabaseService:
+#     """Get Jira project database service instance."""
+#     return JiraProjectDatabaseService(project_repository)
 
 
-def get_jira_project_application_service(
-    jira_project_api_service: IJiraProjectAPIService = Depends(get_jira_project_api_service),
-    jira_project_db_service: IJiraProjectDatabaseService = Depends(get_jira_project_database_service),
-    jira_issue_db_service: IJiraIssueDatabaseService = Depends(get_jira_issue_database_service),
-    jira_sprint_db_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service),
-    sync_session: IJiraSyncSession = Depends(get_sqlalchemy_jira_sync_session),
-    sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository),
-    jira_issue_api_service: IJiraIssueAPIService = Depends(get_jira_issue_api_service),
-    jira_issue_history_service: JiraIssueHistoryApplicationService = Depends(get_jira_issue_history_sync_service)
-) -> JiraProjectApplicationService:
-    """Get Jira project application service instance."""
-    return JiraProjectApplicationService(
-        jira_project_api_service=jira_project_api_service,
-        jira_project_db_service=jira_project_db_service,
-        jira_issue_db_service=jira_issue_db_service,
-        jira_sprint_db_service=jira_sprint_db_service,
-        sync_session=sync_session,
-        sync_log_repository=sync_log_repository,
-        jira_issue_api_service=jira_issue_api_service,
-        jira_issue_history_service=jira_issue_history_service
-    )
+# def get_jira_project_application_service(
+#     jira_project_api_service: IJiraProjectAPIService = Depends(get_jira_project_api_service),
+#     jira_project_db_service: IJiraProjectDatabaseService = Depends(get_jira_project_database_service),
+#     jira_issue_db_service: IJiraIssueDatabaseService = Depends(get_jira_issue_database_service),
+#     jira_sprint_db_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service),
+#     sync_session: IJiraSyncSession = Depends(get_sqlalchemy_jira_sync_session),
+#     sync_log_repository: ISyncLogRepository = Depends(get_sync_log_repository),
+#     jira_issue_api_service: IJiraIssueAPIService = Depends(get_jira_issue_api_service),
+#     jira_issue_history_service: JiraIssueHistoryApplicationService = Depends(get_jira_issue_history_sync_service)
+# ) -> JiraProjectApplicationService:
+#     """Get Jira project application service instance."""
+#     return JiraProjectApplicationService(
+#         jira_project_api_service=jira_project_api_service,
+#         jira_project_db_service=jira_project_db_service,
+#         jira_issue_db_service=jira_issue_db_service,
+#         jira_sprint_db_service=jira_sprint_db_service,
+#         sync_session=sync_session,
+#         sync_log_repository=sync_log_repository,
+#         jira_issue_api_service=jira_issue_api_service,
+#         jira_issue_history_service=jira_issue_history_service
+#     )
 
 
 # ============================ JIRA SPRINT ANALYTICS SERVICE ===========================================
@@ -427,7 +486,7 @@ async def get_webhook_service(
     issue_history_sync_service=Depends(get_jira_issue_history_sync_service),
     jira_project_repository=Depends(get_jira_project_repository),
     redis_service=Depends(get_redis_service),
-    nats_application_service=Depends(get_nats_application_service),
+    nats_application_service=Depends(get_nats_service),
     jira_sprint_repository=Depends(get_jira_sprint_repository)
 ) -> JiraWebhookService:
     """Get Jira webhook service"""
@@ -460,9 +519,9 @@ async def get_webhook_queue_service(
 async def get_media_service(
     media_repository: IMediaRepository = Depends(get_media_repository),
     blob_storage_service: AzureBlobStorageService = Depends(AzureBlobStorageService)
-) -> MediaService:
+) -> MediaApplicationService:
     """Get the media service"""
-    return MediaService(
+    return MediaApplicationService(
         media_repository=media_repository,
         blob_storage_service=blob_storage_service
     )
@@ -503,58 +562,58 @@ async def get_microsoft_calendar_application_service(
 # ============================ NATS =================================================
 
 
-async def get_nats_event_service(
-    request_handlers: Mapping[str, INATSRequestHandler],
-    nats_service: INATSService = Depends(get_nats_service),
-    redis_service: IRedisService = Depends(get_redis_service),
-    user_repository: IJiraUserRepository = Depends(get_jira_user_repository),
-    refresh_token_repository: IRefreshTokenRepository = Depends(get_refresh_token_repository),
-    jira_issue_application_service: JiraIssueApplicationService = Depends(get_jira_issue_service),
-    jira_sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository),
-    workflow_mapping_repository: IWorkflowMappingRepository = Depends(get_workflow_mapping_repository),
-    gantt_chart_service: GanttChartApplicationService = Depends(get_gantt_chart_service),
-    jira_issue_api_service: IJiraIssueAPIService = Depends(get_jira_issue_api_service)
-) -> INATSEventService:
-    """Get NATS event service with all handlers configured"""
-    # Configure message handlers
-    message_handlers = {
-        NATSSubscribeTopic.USER_EVENT.value:
-            UserMessageHandler(redis_service),
-        NATSSubscribeTopic.MICROSOFT_LOGIN.value:
-            MicrosoftLoginMessageHandler(redis_service, user_repository, refresh_token_repository),
-        NATSSubscribeTopic.JIRA_LOGIN.value:
-            JiraLoginMessageHandler(user_repository, refresh_token_repository, redis_service),
-    }
+# async def get_nats_event_service(
+#     request_handlers: Mapping[str, INATSRequestHandler],
+#     nats_service: INATSService = Depends(get_nats_service),
+#     redis_service: IRedisService = Depends(get_redis_service),
+#     user_repository: IJiraUserRepository = Depends(get_jira_user_repository),
+#     refresh_token_repository: IRefreshTokenRepository = Depends(get_refresh_token_repository),
+#     jira_issue_application_service: JiraIssueApplicationService = Depends(get_jira_issue_service),
+#     jira_sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository),
+#     workflow_mapping_repository: IWorkflowMappingRepository = Depends(get_workflow_mapping_repository),
+#     gantt_chart_service: GanttChartApplicationService = Depends(get_gantt_chart_service),
+#     jira_issue_api_service: IJiraIssueAPIService = Depends(get_jira_issue_api_service)
+# ) -> INATSEventService:
+#     """Get NATS event service with all handlers configured"""
+#     # Configure message handlers
+#     message_handlers = {
+#         NATSSubscribeTopic.USER_EVENT.value:
+#             UserMessageHandler(redis_service),
+#         NATSSubscribeTopic.MICROSOFT_LOGIN.value:
+#             MicrosoftLoginMessageHandler(redis_service, user_repository, refresh_token_repository),
+#         NATSSubscribeTopic.JIRA_LOGIN.value:
+#             JiraLoginMessageHandler(user_repository, refresh_token_repository, redis_service),
+#     }
 
-    # Configure request handlers
-    request_handlers = {
-        NATSSubscribeTopic.JIRA_ISSUE_SYNC.value:
-            JiraIssueSyncRequestHandler(jira_issue_application_service),
-        NATSSubscribeTopic.JIRA_ISSUE_LINK.value:
-            JiraIssueLinkRequestHandler(jira_issue_application_service),
-        NATSSubscribeTopic.WORKFLOW_SYNC.value:
-            WorkflowSyncRequestHandler(
-                jira_issue_application_service,
-                user_repository,
-                jira_sprint_repository,
-                workflow_mapping_repository,
-                redis_service
-            ),
-        NATSSubscribeTopic.GANTT_CHART_CALCULATION.value:
-            GanttChartRequestHandler(gantt_chart_service),
-        NATSSubscribeTopic.NODE_STATUS_SYNC.value:
-            NodeStatusSyncHandler(jira_issue_api_service),
-        NATSSubscribeTopic.WORKFLOW_EDIT.value:
-            WorkflowEditRequestHandler(jira_issue_application_service, user_repository,
-                                       jira_sprint_repository, workflow_mapping_repository, redis_service)
-    }
+#     # Configure request handlers
+#     request_handlers = {
+#         NATSSubscribeTopic.JIRA_ISSUE_SYNC.value:
+#             JiraIssueSyncRequestHandler(jira_issue_application_service),
+#         NATSSubscribeTopic.JIRA_ISSUE_LINK.value:
+#             JiraIssueLinkRequestHandler(jira_issue_application_service),
+#         NATSSubscribeTopic.WORKFLOW_SYNC.value:
+#             WorkflowSyncRequestHandler(
+#                 jira_issue_application_service,
+#                 user_repository,
+#                 jira_sprint_repository,
+#                 workflow_mapping_repository,
+#                 redis_service
+#             ),
+#         NATSSubscribeTopic.GANTT_CHART_CALCULATION.value:
+#             GanttChartRequestHandler(gantt_chart_service),
+#         NATSSubscribeTopic.NODE_STATUS_SYNC.value:
+#             NodeStatusSyncHandler(jira_issue_api_service),
+#         NATSSubscribeTopic.WORKFLOW_EDIT.value:
+#             WorkflowEditRequestHandler(jira_issue_application_service, user_repository,
+#                                        jira_sprint_repository, workflow_mapping_repository, redis_service)
+#     }
 
-    # Create and return service
-    return NATSEventService(
-        nats_service=nats_service,
-        message_handlers=message_handlers,
-        request_handlers=request_handlers
-    )
+#     # Create and return service
+#     return NATSEventService(
+#         nats_service=nats_service,
+#         message_handlers=message_handlers,
+#         request_handlers=request_handlers
+#     )
 
 
 def get_system_config_service(

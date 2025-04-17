@@ -3,11 +3,10 @@ from contextlib import asynccontextmanager
 import time
 from typing import Any, Dict, List, Optional, Set, Union
 
-from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
+from src.app.dependencies.container import DependencyContainer
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.database import AsyncSessionLocal
 from src.configs.logger import log
-from src.configs.redis import get_redis_client
 from src.domain.constants.jira import JiraWebhookEvent
 from src.domain.models.jira.webhooks.jira_webhook import (
     BaseJiraWebhookDTO,
@@ -16,20 +15,7 @@ from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
-from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import (
-    SQLAlchemyJiraIssueHistoryRepository,
-)
-from src.infrastructure.repositories.sqlalchemy_jira_issue_repository import SQLAlchemyJiraIssueRepository
-from src.infrastructure.repositories.sqlalchemy_jira_project_repository import SQLAlchemyJiraProjectRepository
-from src.infrastructure.repositories.sqlalchemy_jira_sprint_repository import SQLAlchemyJiraSprintRepository
-from src.infrastructure.repositories.sqlalchemy_jira_user_repository import SQLAlchemyJiraUserRepository
-from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
-from src.infrastructure.services.jira_issue_database_service import JiraIssueDatabaseService
-from src.infrastructure.services.jira_issue_history_database_service import JiraIssueHistoryDatabaseService
-from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
-from src.infrastructure.services.jira_user_database_service import JiraUserDatabaseService
 from src.infrastructure.services.jira_webhook_service import JiraWebhookService
-from src.infrastructure.services.redis_service import RedisService
 
 
 class JiraWebhookQueueService:
@@ -378,32 +364,26 @@ class JiraWebhookQueueService:
     async def _get_webhook_service(self):
         """Tạo webhook service mới với session database mới"""
         async with AsyncSessionLocal() as session:
-            # Tạo repositories với session mới
-            issue_repo = SQLAlchemyJiraIssueRepository(session)
-            sync_log_repo = SQLAlchemySyncLogRepository(session)
-            sprint_repo = SQLAlchemyJiraSprintRepository(session)
-            user_repo = SQLAlchemyJiraUserRepository(session)
-            jira_issue_db_service = JiraIssueDatabaseService(issue_repo)
-            jira_user_db_service = JiraUserDatabaseService(user_repo)
-            sprint_database_service = JiraSprintDatabaseService(sprint_repo)
-            issue_history_repo = SQLAlchemyJiraIssueHistoryRepository(session)
-            issue_history_db_service = JiraIssueHistoryDatabaseService(issue_history_repo)
-            issue_history_sync_service = JiraIssueHistoryApplicationService(
-                self.jira_issue_api_service, issue_history_db_service, jira_issue_db_service, jira_user_db_service)
-            jira_project_repository = SQLAlchemyJiraProjectRepository(session)
-            redis_client = await get_redis_client()
-            redis_service = RedisService(redis_client)
-            # Tạo webhook service
+            # Sử dụng factory để tạo handlers và services
+            handlers, services = await DependencyContainer.create_webhook_handlers(session)
+
+            # Tạo webhook service với các handlers đã tạo
             webhook_service = JiraWebhookService(
-                jira_issue_repository=issue_repo, sync_log_repository=sync_log_repo, jira_issue_api_service=self.jira_issue_api_service, jira_sprint_api_service=self.jira_sprint_api_service, sprint_database_service=sprint_database_service, issue_history_sync_service=issue_history_sync_service, jira_project_repository=jira_project_repository, redis_service=redis_service, jira_sprint_repository=sprint_repo)
+                jira_issue_repository=services['issue_repo'],
+                sync_log_repository=services['sync_log_repo'],
+                jira_issue_api_service=services['jira_issue_api_service'],
+                jira_sprint_api_service=services['jira_sprint_api_service'],
+                sprint_database_service=services['sprint_database_service'],
+                issue_history_sync_service=services['issue_history_sync_service'],
+                jira_project_repository=services['project_repo'],
+                redis_service=services['redis_service'],
+                jira_sprint_repository=services['sprint_repo'],
+                nats_application_service=services['nats_application_service'],
+                handlers=handlers
+            )
 
             try:
                 yield webhook_service
-                # Session sẽ được commit khi kết thúc context nếu không có exception
-            except Exception as e:
-                # Session sẽ được rollback tự động bởi get_db_session khi có exception
-                log.error(f"Error in webhook service: {str(e)}")
-                raise
             finally:
                 await session.close()
 

@@ -11,7 +11,7 @@ from src.domain.repositories.media_repository import IMediaRepository
 from src.domain.services.blob_storage_service import IBlobStorageService
 
 
-class MediaService:
+class MediaApplicationService:
     def __init__(
         self,
         media_repository: IMediaRepository,

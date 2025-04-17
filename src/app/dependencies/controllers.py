@@ -28,7 +28,7 @@ from src.app.dependencies.services import (
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.jira_sprint_analytics_service import JiraSprintAnalyticsApplicationService
-from src.app.services.media_service import MediaService
+from src.app.services.media_service import MediaApplicationService
 from src.app.services.microsoft_calendar_service import MicrosoftCalendarApplicationService
 from src.app.services.system_config_service import SystemConfigApplicationService
 from src.app.services.util_service import UtilService
@@ -73,7 +73,7 @@ async def get_webhook_controller(
 
 
 async def get_media_controller(
-    media_service: MediaService = Depends(get_media_service)
+    media_service: MediaApplicationService = Depends(get_media_service)
 ) -> MediaController:
     """Get the media controller"""
     return MediaController(media_service=media_service)

@@ -16,6 +16,8 @@ from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.nats_service import INATSService
+from src.domain.constants.sync import EntityType, OperationType, SourceType
+from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 
 
 class JiraIssueApplicationService:
@@ -195,3 +197,89 @@ class JiraIssueApplicationService:
                 ))
 
         return results
+
+    async def update_issue_assignee(self, user_id: int, issue_key: str, assignee_account_id: str) -> bool:
+        """
+        Update the assignee of a Jira issue
+
+        Args:
+            user_id: ID of the user performing the action
+            issue_key: The Jira issue key
+            assignee_account_id: The Jira account ID of the new assignee
+
+        Returns:
+            bool: Whether the update was successful
+        """
+        try:
+            # Call Jira API to update assignee
+            result = await self.jira_issue_api_service.update_issue_assignee_with_admin_auth(
+                issue_key=issue_key,
+                assignee_account_id=assignee_account_id,
+                user_id=user_id
+            )
+
+            # Create sync log entry
+            await self.sync_log_repository.create_sync_log(
+                SyncLogDBCreateDTO(
+                    entity_type=EntityType.ISSUE,
+                    entity_id=issue_key,
+                    operation=OperationType.UPDATE,
+                    request_payload={
+                        "assignee_account_id": assignee_account_id,
+                    },
+                    response_status=200 if result else 500,
+                    response_body={
+                        "success": result
+                    },
+                    source=SourceType.NATS,
+                    sender=user_id,
+                    error_message=None if result else "Failed to update assignee"
+                )
+            )
+
+            return result
+
+        except Exception as e:
+            # Log error and create sync log entry
+            log.error(f"Error updating assignee for issue {issue_key}: {str(e)}")
+
+            # Record failed sync attempt
+            await self.sync_log_repository.create_sync_log(
+                SyncLogDBCreateDTO(
+                    entity_type=EntityType.ISSUE,
+                    entity_id=issue_key,
+                    operation=OperationType.UPDATE,
+                    request_payload={
+                        "assignee_account_id": assignee_account_id,
+                    },
+                    response_status=500,
+                    response_body={},
+                    source=SourceType.NATS,
+                    sender=user_id,
+                    error_message=str(e)
+                )
+            )
+
+            raise
+
+    async def remove_issue_link(self, link_id: str) -> bool:
+        """
+        Remove a link between two issues
+
+        Args:
+            user_id: ID of the user performing the action
+            issue_key: The Jira issue key
+            link_type: The type of link to remove
+
+        Returns:
+            bool: Whether the link was removed successfully
+        """
+        try:
+            # Call Jira API to remove link
+            result = await self.jira_issue_api_service.delete_issue_link_with_admin_auth(
+                link_id=link_id
+            )
+            return result
+        except Exception as e:
+            log.error(f"Error removing link for issue {link_id}: {str(e)}")
+            return False

@@ -21,6 +21,7 @@ class NATSSubscribeTopic(str, Enum):
     WORKFLOW_EDIT = "workflow.edit.request"
     GANTT_CHART_CALCULATION = "ganttchart.calculation.request"
     NODE_STATUS_SYNC = "node.status.sync.request"
+    JIRA_ISSUE_REASSIGN = "jira.issue.reassign.request"
 
 
 class NATSPublishTopic(str, Enum):
@@ -30,3 +31,4 @@ class NATSPublishTopic(str, Enum):
     JIRA_ISSUE_UPDATE_ERROR = "jira.issue.update.error"
     JIRA_PROJECT_SYNC_RESULT = "jira.project.sync.result"
     JIRA_ISSUE_UPDATE = "jira.issue.update"
+    JIRA_ISSUE_REASSIGN_RESULT = "jira.issue.reassign.result"

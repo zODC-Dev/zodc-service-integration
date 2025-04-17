@@ -1,9 +1,7 @@
 from datetime import time
 from typing import List, Optional, Union
 
-from sqlalchemy import and_
-from sqlalchemy.sql import desc
-from sqlmodel import col, select
+from sqlmodel import and_, col, desc, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
@@ -12,7 +10,7 @@ from src.domain.repositories.system_config_repository import ISystemConfigReposi
 from src.infrastructure.entities.system_config import SystemConfigEntity
 
 
-class SqlAlchemySystemConfigRepository(ISystemConfigRepository):
+class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
     """Repository for system configuration"""
 
     def __init__(self, session: AsyncSession):
