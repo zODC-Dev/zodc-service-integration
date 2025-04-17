@@ -189,12 +189,14 @@ async def get_jira_sprint_database_service(
 
 async def get_jira_sprint_service(
     jira_sprint_api_service: IJiraSprintAPIService = Depends(get_jira_sprint_api_service),
-    jira_sprint_database_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service)
+    jira_sprint_database_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service),
+    jira_issue_repository: IJiraIssueRepository = Depends(get_jira_issue_repository)
 ) -> JiraSprintApplicationService:
     """Get Jira sprint application service"""
     return JiraSprintApplicationService(
         jira_sprint_api_service=jira_sprint_api_service,
-        jira_sprint_database_service=jira_sprint_database_service
+        jira_sprint_database_service=jira_sprint_database_service,
+        jira_issue_repository=jira_issue_repository
     )
 
 # ============================ JIRA USER SERVICE ===========================================
@@ -405,7 +407,8 @@ async def get_webhook_handlers(
         SprintCreateWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service),
         SprintUpdateWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service),
         SprintStartWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service),
-        SprintCloseWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service),
+        SprintCloseWebhookHandler(sprint_database_service, sync_log_repository,
+                                  jira_sprint_api_service, jira_issue_repository),
         SprintDeleteWebhookHandler(sprint_database_service, sync_log_repository, jira_sprint_api_service),
 
         # User handlers

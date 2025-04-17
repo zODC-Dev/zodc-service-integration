@@ -8,6 +8,7 @@ from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.models.database.jira_sprint import JiraSprintDBUpdateDTO
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira.webhooks.jira_webhook import JiraSprintWebhookDTO
+from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
@@ -20,11 +21,13 @@ class SprintCloseWebhookHandler(JiraWebhookHandler):
         self,
         sprint_database_service: IJiraSprintDatabaseService,
         sync_log_repository: ISyncLogRepository,
-        jira_sprint_api_service: IJiraSprintAPIService
+        jira_sprint_api_service: IJiraSprintAPIService,
+        jira_issue_repository: IJiraIssueRepository
     ):
         self.sprint_database_service = sprint_database_service
         self.sync_log_repository = sync_log_repository
         self.jira_sprint_api_service = jira_sprint_api_service
+        self.jira_issue_repository = jira_issue_repository
 
     async def can_handle(self, webhook_event: str) -> bool:
         """Check if this handler can process the given webhook event"""
@@ -56,6 +59,9 @@ class SprintCloseWebhookHandler(JiraWebhookHandler):
         if not updated_sprint:
             return {"error": f"Failed to update sprint {sprint_id}"}
 
+        # Reset is_system_linked flag for all issues in this sprint
+        await self.reset_system_linked_flag(updated_sprint.id)
+
         # Log sync event
         await self.sync_log_repository.create_sync_log(
             SyncLogDBCreateDTO(
@@ -74,3 +80,19 @@ class SprintCloseWebhookHandler(JiraWebhookHandler):
             "sprint_id": sprint_id,
             "closed": True
         }
+
+    async def reset_system_linked_flag(self, sprint_id: int) -> None:
+        """Reset is_system_linked flag for all issues in a sprint"""
+        try:
+            # Since sprint_id here is Jira's sprint ID, we need to use our database ID
+            db_sprint_id = sprint_id
+            if db_sprint_id:
+                updated_count = await self.jira_issue_repository.reset_system_linked_for_sprint(db_sprint_id)
+                log.info(
+                    f"Reset is_system_linked flag for {updated_count} issues in sprint {sprint_id} (DB ID: {db_sprint_id})")
+            else:
+                log.warning(f"Could not reset is_system_linked flag for issues: no DB ID found for sprint {sprint_id}")
+        except Exception as e:
+            log.error(f"Error resetting is_system_linked flag for issues in sprint {sprint_id}: {str(e)}")
+            # We don't want to fail the webhook handling if resetting flags fails
+            # So just log the error and continue
