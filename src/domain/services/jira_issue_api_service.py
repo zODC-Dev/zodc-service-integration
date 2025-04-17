@@ -8,6 +8,7 @@ from src.domain.models.jira.apis.responses.jira_changelog import (
     JiraIssueChangelogBulkFetchAPIGetResponseDTO,
 )
 from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_issue_link import JiraIssueLinkModel
 
 
 class IJiraIssueAPIService(ABC):
@@ -74,4 +75,31 @@ class IJiraIssueAPIService(ABC):
     @abstractmethod
     async def bulk_get_issues_with_admin_auth(self, issue_ids: List[str]) -> List[JiraIssueModel]:
         """Bulk get issues with admin auth"""
+        pass
+
+    @abstractmethod
+    async def update_issue_assignee_with_admin_auth(self, issue_key: str, assignee_account_id: str, user_id: int) -> bool:
+        """
+        Update the assignee of a Jira issue
+
+        Args:
+            issue_key: The Jira issue key
+            assignee_account_id: The Jira account ID of the new assignee
+            user_id: The user ID making the request
+
+        Returns:
+            bool: Whether the update was successful
+        """
+        pass
+
+    @abstractmethod
+    async def get_issue_links_with_admin_auth(self, issue_key: str) -> List[JiraIssueLinkModel]:
+        """Get links for an issue using admin auth
+
+        Args:
+            issue_key: The key of the issue to get links for
+
+        Returns:
+            List of issue link models
+        """
         pass

@@ -5,6 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from redis.asyncio import Redis
 
+from src.app.services.nats_application_service import NATSApplicationService
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_issue_service import JiraIssueApplicationService
@@ -53,6 +54,7 @@ from src.infrastructure.services.redis_service import RedisService
 from src.infrastructure.services.token_refresh_service import TokenRefreshService
 from src.infrastructure.services.token_scheduler_service import TokenSchedulerService
 from src.infrastructure.unit_of_works.sqlalchemy_jira_sync_session import SQLAlchemyJiraSyncSession
+from src.app.services.nats_handlers.jira_issue_reassign_handler import JiraIssueReassignRequestHandler
 
 
 class DependencyContainer:
@@ -104,7 +106,7 @@ class DependencyContainer:
     nats_event_service: Optional[NATSEventService] = None
     media_application_service: Optional[MediaApplicationService] = None
     system_config_application_service: Optional[SystemConfigApplicationService] = None
-
+    nats_application_service: Optional[NATSApplicationService] = None
     # Handlers
     message_handlers: Dict = {}
     request_handlers: Dict = {}
@@ -235,6 +237,8 @@ class DependencyContainer:
             instance.workflow_service_client
         )
 
+        instance.nats_application_service = NATSApplicationService(instance.nats_service)
+
         # Initialize NATS handlers
         instance.message_handlers = {
             NATSSubscribeTopic.USER_EVENT.value: UserMessageHandler(instance.redis_service),
@@ -280,6 +284,10 @@ class DependencyContainer:
                 instance.jira_sprint_repository,
                 instance.workflow_mapping_repository,
                 instance.redis_service
+            ),
+            NATSSubscribeTopic.JIRA_ISSUE_REASSIGN.value: JiraIssueReassignRequestHandler(
+                instance.jira_issue_application_service,
+                instance.jira_user_repository
             )
         }
 
@@ -358,6 +366,7 @@ class DependencyContainer:
         from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
         from src.infrastructure.services.jira_user_database_service import JiraUserDatabaseService
         from src.infrastructure.services.redis_service import RedisService
+        from src.app.services.nats_application_service import NATSApplicationService
 
         # Tạo các repositories cần thiết
         issue_repo = SQLAlchemyJiraIssueRepository(session)
@@ -400,7 +409,7 @@ class DependencyContainer:
             # Issue handlers
             IssueCreateWebhookHandler(issue_repo, sync_log_repo, jira_issue_api_service, project_repo, redis_service),
             IssueUpdateWebhookHandler(issue_repo, sync_log_repo, jira_issue_api_service,
-                                      issue_history_sync_service, container.nats_service, sprint_repo),
+                                      issue_history_sync_service, container.nats_application_service, sprint_repo),
             IssueDeleteWebhookHandler(issue_repo, sync_log_repo),
 
             # Sprint handlers

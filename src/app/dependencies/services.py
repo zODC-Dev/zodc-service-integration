@@ -2,6 +2,7 @@ from typing import List
 
 from fastapi import Depends
 
+from src.app.services.nats_application_service import NATSApplicationService
 from src.app.dependencies.container import DependencyContainer
 from src.app.dependencies.repositories import (
     get_jira_issue_repository,
@@ -88,6 +89,12 @@ def get_nats_service() -> NATSService:
     """Get NATS service from container"""
     container = DependencyContainer.get_instance()
     return container.nats_service
+
+
+def get_nats_application_service() -> NATSApplicationService:
+    """Get NATS application service from container"""
+    container = DependencyContainer.get_instance()
+    return container.nats_application_service
 
 
 def get_jira_issue_api_service() -> JiraIssueAPIService:
@@ -443,7 +450,7 @@ async def get_webhook_handlers(
     issue_history_sync_service=Depends(get_jira_issue_history_sync_service),
     jira_project_repository=Depends(get_jira_project_repository),
     redis_service=Depends(get_redis_service),
-    nats_application_service=Depends(get_nats_service),
+    nats_application_service=Depends(get_nats_application_service),
     jira_sprint_repository=Depends(get_jira_sprint_repository)
 ) -> List[JiraWebhookHandler]:
     """Get list of webhook handlers with dependencies"""

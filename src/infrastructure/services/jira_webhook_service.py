@@ -57,38 +57,38 @@ class JiraWebhookService:
 
         # Sử dụng handlers được cung cấp hoặc tạo mới
         self.handlers = handlers or []
-        if not self.handlers:
-            self._init_handlers()
+        # if not self.handlers:
+        #     self._init_handlers()
 
-    def _init_handlers(self) -> None:
-        """Initialize webhook handlers"""
-        # Issue handlers
-        issue_handlers = [
-            IssueCreateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
-                                      self.jira_issue_api_service, self.jira_project_repository, self.redis_service),
-            IssueUpdateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
-                                      self.jira_issue_api_service, self.issue_history_sync_service, self.nats_application_service, self.jira_sprint_repository),
-            IssueDeleteWebhookHandler(self.jira_issue_repository, self.sync_log_repository)
-        ]
+    # def _init_handlers(self) -> None:
+    #     """Initialize webhook handlers"""
+    #     # Issue handlers
+    #     issue_handlers = [
+    #         IssueCreateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
+    #                                   self.jira_issue_api_service, self.jira_project_repository, self.redis_service),
+    #         IssueUpdateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
+    #                                   self.jira_issue_api_service, self.issue_history_sync_service, self.nats_application_service, self.jira_sprint_repository),
+    #         IssueDeleteWebhookHandler(self.jira_issue_repository, self.sync_log_repository)
+    #     ]
 
-        # Sprint handlers - only add if sprint_database_service is provided
-        sprint_handlers = []
-        if self.sprint_database_service:
-            sprint_handlers = [
-                SprintCreateWebhookHandler(self.sprint_database_service, self.sync_log_repository,
-                                           self.jira_sprint_api_service),
-                SprintUpdateWebhookHandler(self.sprint_database_service, self.sync_log_repository,
-                                           self.jira_sprint_api_service),
-                SprintStartWebhookHandler(self.sprint_database_service, self.sync_log_repository,
-                                          self.jira_sprint_api_service),
-                SprintCloseWebhookHandler(self.sprint_database_service, self.sync_log_repository,
-                                          self.jira_sprint_api_service, self.jira_issue_repository),
-                SprintDeleteWebhookHandler(self.sprint_database_service, self.sync_log_repository,
-                                           self.jira_sprint_api_service)
-            ]
+    #     # Sprint handlers - only add if sprint_database_service is provided
+    #     sprint_handlers = []
+    #     if self.sprint_database_service:
+    #         sprint_handlers = [
+    #             SprintCreateWebhookHandler(self.sprint_database_service, self.sync_log_repository,
+    #                                        self.jira_sprint_api_service),
+    #             SprintUpdateWebhookHandler(self.sprint_database_service, self.sync_log_repository,
+    #                                        self.jira_sprint_api_service),
+    #             SprintStartWebhookHandler(self.sprint_database_service, self.sync_log_repository,
+    #                                       self.jira_sprint_api_service),
+    #             SprintCloseWebhookHandler(self.sprint_database_service, self.sync_log_repository,
+    #                                       self.jira_sprint_api_service, self.jira_issue_repository),
+    #             SprintDeleteWebhookHandler(self.sprint_database_service, self.sync_log_repository,
+    #                                        self.jira_sprint_api_service)
+    #         ]
 
-        # Combine all handlers
-        self.handlers = issue_handlers + sprint_handlers
+    #     # Combine all handlers
+    #     self.handlers = issue_handlers + sprint_handlers
 
     async def handle_webhook(self, webhook_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Handle a webhook by delegating to appropriate handler"""

@@ -378,7 +378,7 @@ class JiraWebhookQueueService:
                 jira_project_repository=services['project_repo'],
                 redis_service=services['redis_service'],
                 jira_sprint_repository=services['sprint_repo'],
-                nats_application_service=services['nats_service'],
+                nats_application_service=services['nats_application_service'],
                 handlers=handlers
             )
 
