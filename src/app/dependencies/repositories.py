@@ -1,16 +1,6 @@
 from fastapi import Depends
 
-from src.configs.database import get_db
-from src.domain.repositories.jira_issue_history_repository import IJiraIssueHistoryRepository
-from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
-from src.domain.repositories.jira_project_repository import IJiraProjectRepository
-from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
-from src.domain.repositories.jira_user_repository import IJiraUserRepository
-from src.domain.repositories.media_repository import IMediaRepository
-from src.domain.repositories.refresh_token_repository import IRefreshTokenRepository
-from src.domain.repositories.sync_log_repository import ISyncLogRepository
-from src.domain.repositories.system_config_repository import ISystemConfigRepository
-from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
+from src.app.dependencies.container import DependencyContainer
 from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
 from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import (
     SQLAlchemyJiraIssueHistoryRepository,
@@ -22,61 +12,92 @@ from src.infrastructure.repositories.sqlalchemy_jira_user_repository import SQLA
 from src.infrastructure.repositories.sqlalchemy_media_repository import SQLAlchemyMediaRepository
 from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
-from src.infrastructure.repositories.sqlalchemy_system_config_repository import SqlAlchemySystemConfigRepository
+from src.infrastructure.repositories.sqlalchemy_system_config_repository import SQLAlchemySystemConfigRepository
 from src.infrastructure.repositories.sqlalchemy_workflow_mapping_repository import SQLAlchemyWorkflowMappingRepository
-from src.infrastructure.unit_of_works.sqlalchemy_jira_sync_session import SQLAlchemyJiraSyncSession
+
+# Repositories dependencies
 
 
-async def get_jira_project_repository(session=Depends(get_db)) -> IJiraProjectRepository:
-    """Get a project repository instance."""
-    return SQLAlchemyJiraProjectRepository(session)
+def get_jira_user_repository() -> SQLAlchemyJiraUserRepository:
+    """Get Jira User repository from container"""
+    container = DependencyContainer.get_instance()
+    return container.jira_user_repository
 
 
-async def get_jira_issue_repository(session=Depends(get_db)) -> IJiraIssueRepository:
-    """Get issue repository"""
-    return SQLAlchemyJiraIssueRepository(session)
+def get_refresh_token_repository() -> SQLAlchemyRefreshTokenRepository:
+    """Get Refresh Token repository from container"""
+    container = DependencyContainer.get_instance()
+    return container.refresh_token_repository
 
 
-async def get_jira_sprint_repository(session=Depends(get_db)) -> IJiraSprintRepository:
-    """Get Jira sprint repository"""
-    return SQLAlchemyJiraSprintRepository(session)
+def get_jira_project_repository() -> SQLAlchemyJiraProjectRepository:
+    """Get Jira Project repository from container"""
+    container = DependencyContainer.get_instance()
+    return container.project_repository
 
 
-async def get_jira_issue_history_repository(session=Depends(get_db)) -> IJiraIssueHistoryRepository:
-    """Get a issue history repository instance."""
-    return SQLAlchemyJiraIssueHistoryRepository(session)
+def get_sync_log_repository() -> SQLAlchemySyncLogRepository:
+    """Get Sync Log repository from container"""
+    container = DependencyContainer.get_instance()
+    return container.sync_log_repository
 
 
-async def get_jira_user_repository(session=Depends(get_db)) -> IJiraUserRepository:
-    """Get the user repository."""
-    return SQLAlchemyJiraUserRepository(session=session)
+def get_jira_issue_repository() -> SQLAlchemyJiraIssueRepository:
+    """Get Jira Issue repository from container"""
+    container = DependencyContainer.get_instance()
+    return container.jira_issue_repository
 
 
-async def get_refresh_token_repository(session=Depends(get_db)) -> IRefreshTokenRepository:
-    """Get the refresh token repository."""
-    return SQLAlchemyRefreshTokenRepository(session=session)
+def get_jira_sprint_repository() -> SQLAlchemyJiraSprintRepository:
+    """Get Jira Sprint repository from container"""
+    container = DependencyContainer.get_instance()
+    return container.jira_sprint_repository
 
 
-async def get_media_repository(session=Depends(get_db)) -> IMediaRepository:
-    """Get the media repository"""
-    return SQLAlchemyMediaRepository(session)
+def get_jira_issue_history_repository() -> SQLAlchemyJiraIssueHistoryRepository:
+    """Get Jira Issue History repository from container"""
+    container = DependencyContainer.get_instance()
+    return container.issue_history_repository
 
 
-async def get_sync_log_repository(session=Depends(get_db)) -> ISyncLogRepository:
-    """Get the sync log repository."""
-    return SQLAlchemySyncLogRepository(session)
+def get_workflow_mapping_repository() -> SQLAlchemyWorkflowMappingRepository:
+    """Get Workflow Mapping repository from container"""
+    container = DependencyContainer.get_instance()
+    return container.workflow_mapping_repository
 
 
-async def get_workflow_mapping_repository(session=Depends(get_db)) -> IWorkflowMappingRepository:
-    """Get the workflow mapping repository"""
-    return SQLAlchemyWorkflowMappingRepository(session)
+def get_media_repository() -> SQLAlchemyMediaRepository:
+    """Get Media repository from container"""
+    container = DependencyContainer.get_instance()
+    return container.media_repository
 
 
-async def get_sqlalchemy_jira_sync_session(session=Depends(get_db)) -> IJiraSyncSession:
-    """Get Jira sync session instance."""
-    return SQLAlchemyJiraSyncSession(session_maker=session)
+def get_system_config_repository() -> SQLAlchemySystemConfigRepository:
+    """Get System Config repository from container"""
+    container = DependencyContainer.get_instance()
+    return container.system_config_repository
 
 
-async def get_system_config_repository(session=Depends(get_db)) -> ISystemConfigRepository:
-    """Get system config repository"""
-    return SqlAlchemySystemConfigRepository(session=session)
+def get_sqlalchemy_jira_sync_session() -> IJiraSyncSession:
+    """Get SQLAlchemy Jira Sync Session from container"""
+    container = DependencyContainer.get_instance()
+    return container.sync_session
+
+# Grouped dependencies
+
+
+def get_jira_repositories(
+    user_repository: SQLAlchemyJiraUserRepository = Depends(get_jira_user_repository),
+    project_repository: SQLAlchemyJiraProjectRepository = Depends(get_jira_project_repository),
+    issue_repository: SQLAlchemyJiraIssueRepository = Depends(get_jira_issue_repository),
+    sprint_repository: SQLAlchemyJiraSprintRepository = Depends(get_jira_sprint_repository),
+    issue_history_repository: SQLAlchemyJiraIssueHistoryRepository = Depends(get_jira_issue_history_repository),
+):
+    """Get all Jira repositories"""
+    return {
+        "user_repository": user_repository,
+        "project_repository": project_repository,
+        "issue_repository": issue_repository,
+        "sprint_repository": sprint_repository,
+        "issue_history_repository": issue_history_repository,
+    }

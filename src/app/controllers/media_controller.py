@@ -6,12 +6,12 @@ from fastapi.responses import StreamingResponse
 
 from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.media import MediaResponse
-from src.app.services.media_service import MediaService
+from src.app.services.media_service import MediaApplicationService
 from src.configs.logger import log
 
 
 class MediaController:
-    def __init__(self, media_service: MediaService):
+    def __init__(self, media_service: MediaApplicationService):
         self.media_service = media_service
 
     async def upload_media(self, file: UploadFile, user_id: int) -> StandardResponse[MediaResponse]:

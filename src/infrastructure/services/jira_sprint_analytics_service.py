@@ -158,7 +158,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         to_do_percentage = (len(to_do_issues) / total_issues * 100) if total_issues > 0 else 0
 
         # Tính toán added points (tổng điểm của các issues được thêm vào sau khi sprint bắt đầu)
-        added_points = 0
+        added_points: float = 0
         if sprint.start_date:
             for issue in issues:
                 if issue.created_at and issue.created_at > sprint.start_date:
@@ -588,7 +588,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         1. Issue have points change history before sprint start date, then use latest point change history before sprint start date
         2. Issue created before sprint start date with points and no points change history before sprint start date, then use points of issue
         """
-        total_initial_points = 0
+        total_initial_points: float = 0
         for issue in initial_issues:
             point_change_histories: List[JiraIssueHistoryModel] = initial_points_histories.get(issue.jira_issue_id, [])
 

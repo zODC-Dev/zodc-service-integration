@@ -126,3 +126,7 @@ class SystemConfigUpdateRequest(BaseModel):
     bool_value: Optional[bool] = None
     time_value: Optional[str] = None  # Format HH:MM:SS or HH:MM
     description: Optional[str] = None
+
+    class Config:
+        populate_by_name = True
+        alias_generator = to_camel

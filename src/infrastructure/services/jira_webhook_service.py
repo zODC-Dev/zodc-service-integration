@@ -39,11 +39,11 @@ class JiraWebhookService:
         sprint_database_service: IJiraSprintDatabaseService,
         issue_history_sync_service: JiraIssueHistoryApplicationService,
         jira_project_repository: IJiraProjectRepository,
-        jira_sprint_repository: IJiraSprintRepository,
         redis_service: IRedisService,
-        nats_application_service: NATSApplicationService = None
+        jira_sprint_repository: IJiraSprintRepository,
+        nats_application_service: NATSApplicationService = None,
+        handlers: List[JiraWebhookHandler] = None
     ):
-        self.handlers: List[JiraWebhookHandler] = []
         self.jira_issue_repository = jira_issue_repository
         self.sync_log_repository = sync_log_repository
         self.jira_issue_api_service = jira_issue_api_service
@@ -54,7 +54,11 @@ class JiraWebhookService:
         self.redis_service = redis_service
         self.nats_application_service = nats_application_service
         self.jira_sprint_repository = jira_sprint_repository
-        self._init_handlers()
+
+        # Sử dụng handlers được cung cấp hoặc tạo mới
+        self.handlers = handlers or []
+        if not self.handlers:
+            self._init_handlers()
 
     def _init_handlers(self) -> None:
         """Initialize webhook handlers"""
