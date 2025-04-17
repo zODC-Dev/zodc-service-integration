@@ -115,15 +115,9 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
 
                 log.info(f"Removing link between {source_key} and {target_key}")
 
-                # Lấy tất cả issuelinks của source issue
-                issue_data = await self.jira_issue_service.jira_issue_api_service.get_issue_with_admin_auth(source_key)
+                # Sử dụng hàm get_issue_links_with_admin_auth mới để lấy tất cả issue links
+                issue_links = await self.jira_issue_service.jira_issue_api_service.get_issue_links_with_admin_auth(source_key)
 
-                if not issue_data:
-                    log.error(f"Source issue {source_key} not found")
-                    continue
-
-                # Kiểm tra nếu có issue links
-                issue_links = issue_data.issue_links
                 if not issue_links:
                     log.info(f"No links found for issue {source_key}")
                     continue
@@ -131,9 +125,10 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                 # Tìm link với target issue
                 link_id = None
                 for link in issue_links:
-                    if (link.inward_issue and link.inward_issue.key == target_key) or \
-                       (link.outward_issue and link.outward_issue.key == target_key):
+                    if link.linked_issue.key == target_key:
                         link_id = link.id
+                        log.info(
+                            f"Found link {link_id} between {source_key} and {target_key} with relationship: {link.relationship_description}")
                         break
 
                 if not link_id:
@@ -141,7 +136,7 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                     continue
 
                 # Xóa link bằng id
-                success = await self.jira_issue_service.jira_issue_api_service.delete_issue_link_with_admin_auth(link_id)
+                success = await self.jira_issue_service.remove_issue_link(link_id)
 
                 if success:
                     removed_count += 1

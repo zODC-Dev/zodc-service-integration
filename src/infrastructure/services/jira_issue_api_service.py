@@ -5,6 +5,7 @@ from src.configs.logger import log
 from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JiraIssueStatus, JiraIssueType
 from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.jira.apis.mappers.jira_issue import JiraIssueMapper
+from src.domain.models.jira.apis.mappers.jira_issue_link import JiraIssueLinkMapper
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
 from src.domain.models.jira.apis.responses.jira_changelog import (
     JiraIssueChangelogAPIGetResponseDTO,
@@ -14,7 +15,9 @@ from src.domain.models.jira.apis.responses.jira_issue import (
     JiraIssueAPIGetResponseDTO,
     JiraIssueBulkFetchAPIGetResponseDTO,
 )
+from src.domain.models.jira.apis.responses.jira_issue_link import JiraIssueLinksResponseDTO
 from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_issue_link import JiraIssueLinkModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.infrastructure.services.jira_service import JiraAPIClient
@@ -950,3 +953,71 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         issues = JiraIssueBulkFetchAPIGetResponseDTO.model_validate(response_data)
         return [JiraIssueMapper.to_domain(issue) for issue in issues.issues]
+
+    async def update_issue_assignee_with_admin_auth(self, issue_key: str, assignee_account_id: str, user_id: int) -> bool:
+        """
+        Update the assignee of a Jira issue
+
+        Args:
+            issue_key: The Jira issue key
+            assignee_account_id: The Jira account ID of the new assignee
+            user_id: The user ID making the request
+
+        Returns:
+            bool: Whether the update was successful
+        """
+        try:
+            url = f"/rest/api/3/issue/{issue_key}/assignee"
+
+            payload = {
+                "accountId": assignee_account_id
+            }
+
+            await self.client.put(
+                endpoint=url,
+                data=payload,
+                error_msg=f"Error updating issue assignee {issue_key}"
+            )
+            return True
+        except Exception as e:
+            log.error(f"Error updating issue assignee: {str(e)}")
+            raise JiraRequestError(500, f"Failed to update issue assignee: {str(e)}")
+
+    async def get_issue_links_with_admin_auth(self, issue_key: str) -> List[JiraIssueLinkModel]:
+        """Get links for an issue using admin auth
+
+        Args:
+            issue_key: The key of the issue to get links for
+
+        Returns:
+            List of issue link models
+        """
+        client = self.admin_client or self.client
+
+        url = f"/rest/api/3/issue/{issue_key}"
+        params = {
+            "fields": "issuelinks"
+        }
+
+        try:
+            response_data = await client.get(
+                url,
+                None,  # Không cần user_id khi sử dụng admin client
+                params=params,
+                error_msg=f"Error when getting links for issue {issue_key}"
+            )
+
+            # Extract the part we care about
+            fields_data = response_data.get("fields", {})
+
+            # Create a response DTO with the issuelinks field
+            response_dto = JiraIssueLinksResponseDTO(issuelinks=fields_data.get("issuelinks", []))
+
+            # Convert to domain models
+            issue_links = JiraIssueLinkMapper.response_to_domain_list(response_dto)
+
+            return issue_links
+
+        except Exception as e:
+            log.error(f"Error getting issue links for {issue_key}: {str(e)}")
+            return []
