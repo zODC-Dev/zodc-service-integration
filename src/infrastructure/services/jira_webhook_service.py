@@ -78,7 +78,7 @@ class JiraWebhookService:
                 SprintStartWebhookHandler(self.sprint_database_service, self.sync_log_repository,
                                           self.jira_sprint_api_service),
                 SprintCloseWebhookHandler(self.sprint_database_service, self.sync_log_repository,
-                                          self.jira_sprint_api_service),
+                                          self.jira_sprint_api_service, self.jira_issue_repository),
                 SprintDeleteWebhookHandler(self.sprint_database_service, self.sync_log_repository,
                                            self.jira_sprint_api_service)
             ]

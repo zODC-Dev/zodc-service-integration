@@ -1,10 +1,8 @@
 from datetime import time
 from typing import List, Optional, Union
 
-from pydantic import BaseModel
-
-from src.app.schemas.responses.base import BaseResponse
 from src.app.schemas.requests.system_config import ConfigScopeEnum, ConfigTypeEnum
+from src.app.schemas.responses.base import BaseResponse
 
 
 class SystemConfigResponse(BaseResponse):
