@@ -653,7 +653,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
                     issue, sprint.jira_sprint_id, day, sprint_history_by_issue.get(issue.jira_issue_id, []))]
 
                 # Tính completed_points - những issues đã Done tính đến ngày day
-                completed_points = 0
+                completed_points: float = 0
                 for issue in sprint_issues:
                     is_completed = self._is_issue_completed_at_date(
                         issue,

@@ -101,7 +101,7 @@ class JiraSprintAnalyticsApplicationService:
             current_date = datetime.now().date()
 
             # Process actual burnup - set values to None for future dates
-            actual_burnup = []
+            actual_burnup: List[float | None] = []
             dates = burnup_data.get_dates_list()
             raw_actual_burnup = burnup_data.get_actual_burnup()
 

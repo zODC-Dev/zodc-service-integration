@@ -366,3 +366,57 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         except Exception as e:
             log.error(f"[REPO] Error getting issues by keys: {str(e)}", exc_info=True)
             raise
+
+    async def reset_system_linked_for_sprint(self, sprint_id: int) -> int:
+        """Reset is_system_linked flag to False for all issues in a sprint"""
+        try:
+            log.info(f"[REPO] Resetting is_system_linked flag for issues in sprint {sprint_id}")
+
+            # Get the sprint entity first
+            sprint_result = await self.session.exec(
+                select(JiraSprintEntity).where(col(JiraSprintEntity.id) == sprint_id)
+            )
+            sprint_entity = sprint_result.first()
+
+            if not sprint_entity:
+                log.warning(f"[REPO] Sprint with ID {sprint_id} not found")
+                return 0
+
+            # Find all issues in this sprint
+            query = (
+                select(JiraIssueEntity)
+                .join(
+                    JiraIssueSprintEntity,
+                    col(JiraIssueEntity.jira_issue_id) == col(JiraIssueSprintEntity.jira_issue_id)
+                )
+                .where(
+                    and_(
+                        col(JiraIssueSprintEntity.jira_sprint_id) == sprint_entity.jira_sprint_id,
+                        col(JiraIssueEntity.is_system_linked).is_(True),
+                        col(JiraIssueEntity.is_deleted).is_(False)
+                    )
+                )
+            )
+
+            result = await self.session.exec(query)
+            issues = result.all()
+
+            if not issues:
+                log.info(f"[REPO] No system-linked issues found in sprint {sprint_id}")
+                return 0
+
+            # Update all issues in this sprint to reset is_system_linked flag
+            count = 0
+            for issue in issues:
+                issue.is_system_linked = False
+                issue.updated_at = datetime.now(timezone.utc)
+                count += 1
+
+            await self.session.commit()
+            log.info(f"[REPO] Reset is_system_linked flag for {count} issues in sprint {sprint_id}")
+            return count
+
+        except Exception as e:
+            await self.session.rollback()
+            log.error(f"[REPO] Error resetting is_system_linked for sprint {sprint_id}: {str(e)}", exc_info=True)
+            raise

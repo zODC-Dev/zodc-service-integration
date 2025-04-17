@@ -10,6 +10,7 @@ from src.app.services.jira_webhook_handlers.sprint_create_webhook_handler import
 from src.app.services.jira_webhook_handlers.sprint_delete_webhook_handler import SprintDeleteWebhookHandler
 from src.app.services.jira_webhook_handlers.sprint_start_webhook_handler import SprintStartWebhookHandler
 from src.app.services.jira_webhook_handlers.sprint_update_webhook_handler import SprintUpdateWebhookHandler
+from src.app.services.nats_application_service import NATSApplicationService
 from src.configs.logger import log
 from src.domain.models.jira.webhooks.jira_webhook import (
     BaseJiraWebhookDTO,
@@ -18,6 +19,7 @@ from src.domain.models.jira.webhooks.jira_webhook import (
 )
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
+from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
@@ -37,7 +39,9 @@ class JiraWebhookService:
         sprint_database_service: IJiraSprintDatabaseService,
         issue_history_sync_service: JiraIssueHistoryApplicationService,
         jira_project_repository: IJiraProjectRepository,
-        redis_service: IRedisService
+        jira_sprint_repository: IJiraSprintRepository,
+        redis_service: IRedisService,
+        nats_application_service: NATSApplicationService = None
     ):
         self.handlers: List[JiraWebhookHandler] = []
         self.jira_issue_repository = jira_issue_repository
@@ -48,6 +52,8 @@ class JiraWebhookService:
         self.issue_history_sync_service = issue_history_sync_service
         self.jira_project_repository = jira_project_repository
         self.redis_service = redis_service
+        self.nats_application_service = nats_application_service
+        self.jira_sprint_repository = jira_sprint_repository
         self._init_handlers()
 
     def _init_handlers(self) -> None:
@@ -57,7 +63,7 @@ class JiraWebhookService:
             IssueCreateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
                                       self.jira_issue_api_service, self.jira_project_repository, self.redis_service),
             IssueUpdateWebhookHandler(self.jira_issue_repository, self.sync_log_repository,
-                                      self.jira_issue_api_service, self.issue_history_sync_service),
+                                      self.jira_issue_api_service, self.issue_history_sync_service, self.nats_application_service, self.jira_sprint_repository),
             IssueDeleteWebhookHandler(self.jira_issue_repository, self.sync_log_repository)
         ]
 
@@ -72,7 +78,7 @@ class JiraWebhookService:
                 SprintStartWebhookHandler(self.sprint_database_service, self.sync_log_repository,
                                           self.jira_sprint_api_service),
                 SprintCloseWebhookHandler(self.sprint_database_service, self.sync_log_repository,
-                                          self.jira_sprint_api_service),
+                                          self.jira_sprint_api_service, self.jira_issue_repository),
                 SprintDeleteWebhookHandler(self.sprint_database_service, self.sync_log_repository,
                                            self.jira_sprint_api_service)
             ]

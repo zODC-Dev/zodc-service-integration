@@ -395,7 +395,7 @@ class JiraWebhookQueueService:
             redis_service = RedisService(redis_client)
             # Tạo webhook service
             webhook_service = JiraWebhookService(
-                issue_repo, sync_log_repo, self.jira_issue_api_service, self.jira_sprint_api_service, sprint_database_service, issue_history_sync_service, jira_project_repository, redis_service)
+                jira_issue_repository=issue_repo, sync_log_repository=sync_log_repo, jira_issue_api_service=self.jira_issue_api_service, jira_sprint_api_service=self.jira_sprint_api_service, sprint_database_service=sprint_database_service, issue_history_sync_service=issue_history_sync_service, jira_project_repository=jira_project_repository, redis_service=redis_service, jira_sprint_repository=sprint_repo)
 
             try:
                 yield webhook_service

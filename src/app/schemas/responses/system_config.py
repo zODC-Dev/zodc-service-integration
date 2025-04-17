@@ -1,12 +1,11 @@
 from datetime import time
 from typing import List, Optional, Union
 
-from pydantic import BaseModel
-
 from src.app.schemas.requests.system_config import ConfigScopeEnum, ConfigTypeEnum
+from src.app.schemas.responses.base import BaseResponse
 
 
-class SystemConfigResponse(BaseModel):
+class SystemConfigResponse(BaseResponse):
     id: int
     key: str
     scope: ConfigScopeEnum
@@ -18,7 +17,7 @@ class SystemConfigResponse(BaseModel):
     updated_at: Optional[str] = None
 
 
-class SystemConfigListResponse(BaseModel):
+class SystemConfigListResponse(BaseResponse):
     items: List[SystemConfigResponse]
     total: int
     offset: int

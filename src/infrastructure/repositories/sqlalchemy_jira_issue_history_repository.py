@@ -127,8 +127,8 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                         )
                     )
 
-                    result = await self.session.exec(history_stmt)
-                    existing_item = result.one_or_none()
+                    history_result = await self.session.exec(history_stmt)
+                    existing_item = history_result.one_or_none()
                 except Exception as e:
                     log.error(f"Error checking for existing history item: {str(e)}")
                     # Nếu lỗi khi kiểm tra, giả định không có trùng lặp

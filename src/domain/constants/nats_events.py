@@ -29,3 +29,4 @@ class NATSPublishTopic(str, Enum):
     JIRA_ISSUE_SYNC_CONFLICT = "jira.issues.sync.conflict"
     JIRA_ISSUE_UPDATE_ERROR = "jira.issue.update.error"
     JIRA_PROJECT_SYNC_RESULT = "jira.project.sync.result"
+    JIRA_ISSUE_UPDATE = "jira.issue.update"

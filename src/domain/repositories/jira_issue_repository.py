@@ -51,3 +51,15 @@ class IJiraIssueRepository(ABC):
         - List of Jira issues matching the provided keys
         """
         pass
+
+    @abstractmethod
+    async def reset_system_linked_for_sprint(self, sprint_id: int) -> int:
+        """Reset is_system_linked flag to False for all issues in a sprint
+
+        Parameters:
+        - sprint_id: The system ID of the sprint
+
+        Returns:
+        - The number of issues that were updated
+        """
+        pass
