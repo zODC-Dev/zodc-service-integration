@@ -1,7 +1,7 @@
-
 from fastapi import HTTPException
 
 from src.app.schemas.responses.base import StandardResponse
+from src.app.schemas.responses.jira_issue import JiraIssueDescriptionDTO
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.domain.exceptions.jira_exceptions import JiraIssueNotFoundError
@@ -30,6 +30,26 @@ class JiraIssueController:
             result = await self.jira_issue_history_service.get_issue_changelogs(issue_key)
             return StandardResponse(
                 message="Successfully fetched changelogs",
+                data=result
+            )
+        except JiraIssueNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+    async def get_issue_description(self, issue_key: str) -> StandardResponse[JiraIssueDescriptionDTO]:
+        """Lấy description (HTML) của một Jira Issue
+
+        Args:
+            issue_key: Key của Jira Issue
+
+        Returns:
+            HTML description của issue
+        """
+        try:
+            result = await self.jira_issue_service.get_issue_description_html(issue_key)
+            return StandardResponse(
+                message="Successfully fetched issue description",
                 data=result
             )
         except JiraIssueNotFoundError as e:

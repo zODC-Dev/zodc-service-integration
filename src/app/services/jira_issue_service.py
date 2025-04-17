@@ -1,8 +1,12 @@
 from datetime import datetime
 from typing import List
 
+from src.app.schemas.responses.jira_issue import JiraIssueDescriptionDTO
 from src.configs.logger import log
 from src.domain.constants.jira import JiraActionType, JiraIssueStatus, JiraIssueType
+from src.domain.constants.sync import EntityType, OperationType, SourceType
+from src.domain.exceptions.jira_exceptions import JiraIssueNotFoundError
+from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
 from src.domain.models.nats.replies.jira_issue import JiraIssueSyncNATSReplyDTO
 from src.domain.models.nats.requests.jira_issue import (
@@ -16,8 +20,6 @@ from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.nats_service import INATSService
-from src.domain.constants.sync import EntityType, OperationType, SourceType
-from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 
 
 class JiraIssueApplicationService:
@@ -199,8 +201,7 @@ class JiraIssueApplicationService:
         return results
 
     async def update_issue_assignee(self, user_id: int, issue_key: str, assignee_account_id: str) -> bool:
-        """
-        Update the assignee of a Jira issue
+        """Update the assignee of a Jira issue
 
         Args:
             user_id: ID of the user performing the action
@@ -263,13 +264,10 @@ class JiraIssueApplicationService:
             raise
 
     async def remove_issue_link(self, link_id: str) -> bool:
-        """
-        Remove a link between two issues
+        """Remove a link between two issues
 
         Args:
-            user_id: ID of the user performing the action
-            issue_key: The Jira issue key
-            link_type: The type of link to remove
+            link_id: ID of the link to remove
 
         Returns:
             bool: Whether the link was removed successfully
@@ -283,3 +281,27 @@ class JiraIssueApplicationService:
         except Exception as e:
             log.error(f"Error removing link for issue {link_id}: {str(e)}")
             return False
+
+    async def get_issue_description_html(self, issue_key: str) -> JiraIssueDescriptionDTO:
+        """Lấy description dưới dạng HTML của một Jira issue
+
+        Args:
+            issue_key: Key của Jira issue
+
+        Returns:
+            DTO chứa key và HTML description
+        """
+        # Lấy issue từ database
+        issue = await self.jira_issue_repository.get_by_jira_issue_key(issue_key)
+
+        if not issue:
+            raise JiraIssueNotFoundError(f"Issue with key {issue_key} not found")
+
+        # Lấy raw ADF data từ Jira API nếu có thể
+
+        description_html = f"{issue.description}" if issue.description else None
+
+        return JiraIssueDescriptionDTO(
+            key=issue_key,
+            description=description_html
+        )

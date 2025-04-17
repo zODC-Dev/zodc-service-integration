@@ -88,6 +88,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                     f"/rest/api/3/issue/{issue_id}",
                     user_id,
                     params={
+                        "expand": "renderedFields",
                         "fields": [
                             "summary",
                             "description",
@@ -955,8 +956,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         return [JiraIssueMapper.to_domain(issue) for issue in issues.issues]
 
     async def update_issue_assignee_with_admin_auth(self, issue_key: str, assignee_account_id: str, user_id: int) -> bool:
-        """
-        Update the assignee of a Jira issue
+        """Update the assignee of a Jira issue
 
         Args:
             issue_key: The Jira issue key
@@ -981,7 +981,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             return True
         except Exception as e:
             log.error(f"Error updating issue assignee: {str(e)}")
-            raise JiraRequestError(500, f"Failed to update issue assignee: {str(e)}")
+            raise JiraRequestError(500, f"Failed to update issue assignee: {str(e)}") from e
 
     async def get_issue_links_with_admin_auth(self, issue_key: str) -> List[JiraIssueLinkModel]:
         """Get links for an issue using admin auth

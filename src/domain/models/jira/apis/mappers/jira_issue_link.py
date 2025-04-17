@@ -1,12 +1,7 @@
 from typing import List
 
 from src.domain.models.jira.apis.responses.jira_issue_link import JiraIssueLinkDTO, JiraIssueLinksResponseDTO
-from src.domain.models.jira_issue_link import (
-    JiraIssueLinkModel,
-    JiraIssueLinkDirection,
-    IssueLinkType,
-    LinkedIssue
-)
+from src.domain.models.jira_issue_link import IssueLinkType, JiraIssueLinkDirection, JiraIssueLinkModel, LinkedIssue
 
 
 class JiraIssueLinkMapper:
