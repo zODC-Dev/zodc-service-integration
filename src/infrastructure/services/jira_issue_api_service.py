@@ -2,7 +2,7 @@ import asyncio
 from typing import Any, Dict, List, Optional, Union
 
 from src.configs.logger import log
-from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JiraIssueStatus, JiraIssueType
+from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.jira.apis.mappers.jira_issue import JiraIssueMapper
 from src.domain.models.jira.apis.mappers.jira_issue_link import JiraIssueLinkMapper
@@ -202,23 +202,24 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
     def _get_issue_type_payload(self, issue_type: Union[JiraIssueType, str, None]) -> Dict[str, Any]:
         """Get issue type payload for Jira API"""
+        converted_issue_type: JiraIssueType = JiraIssueType.TASK
         if issue_type is None:
-            issue_type = JiraIssueType.TASK
+            converted_issue_type = JiraIssueType.TASK
 
         if isinstance(issue_type, str):
             try:
-                issue_type = JiraIssueType(issue_type)
+                converted_issue_type = JiraIssueType(issue_type)
             except ValueError:
                 log.warning(f"Invalid issue type: {issue_type}, using TASK")
-                issue_type = JiraIssueType.TASK
+                converted_issue_type = JiraIssueType.TASK
 
-        # Tìm ID từ mapping
-        for type_id, mapped_type in JIRA_ISSUE_TYPE_ID_MAPPING.items():
-            if mapped_type == issue_type:
-                return {"id": type_id}
+        # # Tìm ID từ mapping
+        # for type_id, mapped_type in JIRA_ISSUE_TYPE_ID_MAPPING.items():
+        #     if mapped_type == issue_type:
+        #         return {"id": type_id}
 
-        # Fallback to using name if no ID mapping found
-        return {"name": issue_type.value}
+        # Using name
+        return {"name": converted_issue_type.value}
 
     async def update_issue(self, user_id: int, issue_id: str, update: JiraIssueAPIUpdateRequestDTO) -> JiraIssueModel:
         """Update issue in Jira"""
