@@ -210,11 +210,12 @@ class JiraWebhookQueueService:
             try:
                 # Xử lý với session mới
                 async with AsyncSessionLocal() as session:
-                    async with session.begin():
-                        result = await handler.process(last_webhook)
-                        if result and "error" in result:
-                            log.warning(f"Error processing webhook: {result['error']}")
-                            await self._handle_retry(webhooks, highest_priority)
+                    # Remove the explicit transaction begin/commit - let the handler manage its own transactions
+                    # async with session.begin():
+                    result = await handler.process(last_webhook)
+                    if result and "error" in result:
+                        log.warning(f"Error processing webhook: {result['error']}")
+                        await self._handle_retry(webhooks, highest_priority)
             except Exception as e:
                 log.error(f"Error processing webhooks: {str(e)}")
                 await self._handle_retry(webhooks, highest_priority)

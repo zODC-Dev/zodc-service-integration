@@ -17,7 +17,7 @@ class ProjectConfigModel(BaseModel):
 class GanttChartJiraIssueModel(BaseModel):
     """Model for a Jira issue in calculation input"""
     node_id: str
-    jira_key: Optional[str] = None
+    jira_key: str
     type: str  # TASK, BUG, STORY
     title: Optional[str] = None  # Will be populated from DB if available
     estimate_points: float = 0   # Will be populated from DB if available

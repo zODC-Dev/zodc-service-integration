@@ -26,7 +26,11 @@ class SQLAlchemySyncLogRepository(ISyncLogRepository):
             error_message=sync_log.error_message,
         )
         self.session.add(sync_log_entity)
-        await self.session.commit()
+        # Remove the commit from here - let the calling service manage the transaction
+        # await self.session.commit()
+
+        # Still need to flush to ensure the entity has an ID
+        await self.session.flush()
         return SyncLogModel.from_entity(sync_log_entity)
 
     async def update_sync_log(self, sync_log_id: int, **kwargs) -> None:

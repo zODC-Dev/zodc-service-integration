@@ -270,7 +270,8 @@ class DependencyContainer:
                 instance.jira_user_repository,
                 instance.jira_sprint_repository,
                 instance.workflow_mapping_repository,
-                instance.redis_service
+                instance.redis_service,
+                instance.jira_issue_repository
             ),
             NATSSubscribeTopic.GANTT_CHART_CALCULATION.value: GanttChartRequestHandler(
                 instance.gantt_chart_service
@@ -283,7 +284,8 @@ class DependencyContainer:
                 instance.jira_user_repository,
                 instance.jira_sprint_repository,
                 instance.workflow_mapping_repository,
-                instance.redis_service
+                instance.redis_service,
+                instance.jira_issue_repository
             ),
             NATSSubscribeTopic.JIRA_ISSUE_REASSIGN.value: JiraIssueReassignRequestHandler(
                 instance.jira_issue_application_service,
