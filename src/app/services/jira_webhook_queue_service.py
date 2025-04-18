@@ -114,7 +114,7 @@ class JiraWebhookQueueService:
                 entity_id = parsed_webhook.user.account_id
                 entity_type = 'user'
             else:
-                log.error(f"Cannot determine entity ID from webhook event {parsed_webhook.webhook_event}")
+                log.warning(f"Cannot determine entity ID from webhook event {parsed_webhook.webhook_event}")
                 return False
 
             log.info(f"Determined entity type: {entity_type}, entity ID: {entity_id}")
