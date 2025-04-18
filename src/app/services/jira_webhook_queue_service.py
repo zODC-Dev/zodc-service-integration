@@ -114,7 +114,7 @@ class JiraWebhookQueueService:
                 entity_id = parsed_webhook.user.account_id
                 entity_type = 'user'
             else:
-                log.error(f"Cannot determine entity ID from webhook event {parsed_webhook.webhook_event}")
+                log.warning(f"Cannot determine entity ID from webhook event {parsed_webhook.webhook_event}")
                 return False
 
             log.info(f"Determined entity type: {entity_type}, entity ID: {entity_id}")
@@ -209,12 +209,13 @@ class JiraWebhookQueueService:
 
             try:
                 # Xử lý với session mới
-                async with AsyncSessionLocal() as session:
-                    async with session.begin():
-                        result = await handler.process(last_webhook)
-                        if result and "error" in result:
-                            log.warning(f"Error processing webhook: {result['error']}")
-                            await self._handle_retry(webhooks, highest_priority)
+                # async with AsyncSessionLocal() as session:
+                # Remove the explicit transaction begin/commit - let the handler manage its own transactions
+                # async with session.begin():
+                result = await handler.process(last_webhook)
+                if result and "error" in result:
+                    log.warning(f"Error processing webhook: {result['error']}")
+                    await self._handle_retry(webhooks, highest_priority)
             except Exception as e:
                 log.error(f"Error processing webhooks: {str(e)}")
                 await self._handle_retry(webhooks, highest_priority)

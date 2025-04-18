@@ -1,12 +1,10 @@
-import json
-from typing import Dict, Any
+from typing import Any, Dict
 
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.configs.logger import log
-from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.exceptions.jira_exceptions import JiraRequestError
-from src.domain.models.nats.requests.jira_issue_reassign import JiraIssueReassignNATSRequestDTO
 from src.domain.models.nats.replies.jira_issue_reassign import JiraIssueReassignNATSReplyDTO
+from src.domain.models.nats.requests.jira_issue_reassign import JiraIssueReassignNATSRequestDTO
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.infrastructure.services.nats_service import NATSService
 
@@ -21,8 +19,7 @@ class JiraIssueReassignRequestHandler:
         self.jira_user_repository = jira_user_repository
 
     async def handle(self, data: Dict[str, Any], nats_service: NATSService) -> Dict[str, Any]:
-        """
-        Handle Jira issue reassign request
+        """Handle Jira issue reassign request
 
         Args:
             data: Request data from NATS

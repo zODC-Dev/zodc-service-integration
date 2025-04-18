@@ -1,5 +1,4 @@
 from typing import Any, Dict, List, Optional
-import uuid
 
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.configs.logger import log
@@ -9,7 +8,7 @@ from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRe
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.nats.replies.workflow_sync import WorkflowSyncReply, WorkflowSyncReplyIssue
 from src.domain.models.nats.requests.workflow_sync import WorkflowSyncConnection, WorkflowSyncIssue, WorkflowSyncRequest
-from src.domain.models.workflow_mapping import WorkflowMappingModel
+from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
@@ -24,13 +23,15 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
         user_repository: IJiraUserRepository,
         jira_sprint_repository: IJiraSprintRepository,
         workflow_mapping_repository: IWorkflowMappingRepository,
-        redis_service: IRedisService
+        redis_service: IRedisService,
+        jira_issue_repository: IJiraIssueRepository
     ):
         self.jira_issue_service = jira_issue_service
         self.user_repository = user_repository
         self.jira_sprint_repository = jira_sprint_repository
         self.workflow_mapping_repository = workflow_mapping_repository
         self.redis_service = redis_service
+        self.jira_issue_repository = jira_issue_repository
 
     async def handle(self, subject: str, message: Dict[str, Any]) -> Dict[str, Any]:
         """Handle workflow sync requests"""
@@ -40,17 +41,17 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             request = WorkflowSyncRequest.model_validate(message)
 
             # Lưu workflow mapping
-            workflow_id = str(uuid.uuid4())  # Generate UUID cho workflow mới
-            workflow_mapping = WorkflowMappingModel(
-                workflow_id=workflow_id,
-                transaction_id=request.transaction_id,
-                project_key=request.project_key,
-                sprint_id=request.sprint_id,
-                status="active"
-            )
+            # workflow_id = str(uuid.uuid4())  # Generate UUID cho workflow mới
+            # workflow_mapping = WorkflowMappingModel(
+            #     workflow_id=workflow_id,
+            #     transaction_id=request.transaction_id,
+            #     project_key=request.project_key,
+            #     sprint_id=request.sprint_id,
+            #     status="active"
+            # )
 
-            await self.workflow_mapping_repository.create(workflow_mapping)
-            log.info(f"Created workflow mapping with ID: {workflow_id}")
+            # await self.workflow_mapping_repository.create(workflow_mapping)
+            # log.info(f"Created workflow mapping with ID: {workflow_id}")
 
             # Tạo mapping ban đầu từ các issue đã có Jira key
             node_to_jira_key_map = {}
@@ -143,18 +144,9 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
         issue_type = self._map_issue_type(issue.type)
 
         # Tìm Jira sprint ID tương ứng từ sprint ID của DB nếu có
-        jira_sprint_id = None
-        if sprint_id:
-            try:
-                # Lấy sprint từ repository
-                sprint = await self.jira_sprint_repository.get_sprint_by_id(sprint_id)
-                if sprint and sprint.jira_sprint_id:
-                    jira_sprint_id = sprint.jira_sprint_id
-                    log.info(f"Mapped sprint ID {sprint_id} to Jira sprint ID {jira_sprint_id}")
-                else:
-                    log.warning(f"Could not find Jira sprint ID for sprint ID {sprint_id}")
-            except Exception as e:
-                raise Exception(f"Error mapping sprint ID {sprint_id} to Jira sprint ID: {str(e)}") from e
+        jira_sprint_id = await self._get_jira_sprint_id(project_key, sprint_id)
+        if not jira_sprint_id:
+            raise Exception(f"Jira sprint ID not found for sprint ID {sprint_id}")
 
         # Create issue data
         create_dto = JiraIssueAPICreateRequestDTO(
@@ -174,32 +166,6 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
         jira_issue = await self.jira_issue_service.jira_issue_api_service.create_issue_with_admin_auth(
             issue_data=create_dto
         )
-
-        # Đảm bảo issue được lưu vào DB với is_system_linked=True
-        # Sau khi tạo issue trên Jira, cần cập nhật lại DB (nếu cần)
-        if jira_issue and jira_issue.jira_issue_id:
-            try:
-                # Kiểm tra xem issue đã tồn tại trong DB chưa
-                existing_issue = await self.jira_issue_service.jira_issue_repository.get_by_jira_issue_id(
-                    jira_issue.jira_issue_id
-                )
-
-                # Nếu chưa có trong DB hoặc chưa được đánh dấu là system linked
-                if not existing_issue or not existing_issue.is_system_linked:
-                    # Cập nhật hoặc tạo mới với is_system_linked=True
-                    from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
-
-                    update_dto = JiraIssueDBUpdateDTO(
-                        is_system_linked=True
-                    )
-
-                    await self.jira_issue_service.jira_issue_repository.update(
-                        jira_issue.jira_issue_id, update_dto
-                    )
-                    log.info(f"Marked issue {jira_issue.key} as system linked in database")
-            except Exception as e:
-                log.error(f"Error updating system_linked flag for issue {jira_issue.key}: {str(e)}")
-                # Không raise exception ở đây để không ảnh hưởng đến luồng chính
 
         return jira_issue
 
@@ -223,27 +189,26 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             update=update_dto
         )
         # Sau khi update, đảm bảo issue được đánh dấu là system linked trong DB
-        if jira_issue and jira_issue.jira_issue_id:
-            try:
-                # Kiểm tra xem issue đã được đánh dấu là system linked chưa
-                existing_issue = await self.jira_issue_service.jira_issue_repository.get_by_jira_issue_id(
-                    jira_issue.jira_issue_id
+        try:
+            # Kiểm tra xem issue đã được đánh dấu là system linked chưa
+            existing_issue = await self.jira_issue_repository.get_by_jira_issue_id(
+                jira_issue.jira_issue_id
+            )
+
+            # Nếu chưa được đánh dấu là system linked
+            if existing_issue and not existing_issue.is_system_linked:
+                # Cập nhật flag is_system_linked
+                update_db_dto = JiraIssueDBUpdateDTO(
+                    is_system_linked=True
                 )
 
-                # Nếu chưa được đánh dấu là system linked
-                if existing_issue and not existing_issue.is_system_linked:
-                    # Cập nhật flag is_system_linked
-                    update_db_dto = JiraIssueDBUpdateDTO(
-                        is_system_linked=True
-                    )
-
-                    await self.jira_issue_service.jira_issue_repository.update(
-                        jira_issue.jira_issue_id, update_db_dto
-                    )
-                    log.info(f"Marked updated issue {jira_issue.key} as system linked in database")
-            except Exception as e:
-                log.error(f"Error updating system_linked flag for issue {jira_issue.key}: {str(e)}")
-                # Không raise exception ở đây để không ảnh hưởng đến luồng chính
+                await self.jira_issue_repository.update(
+                    jira_issue.jira_issue_id, update_db_dto
+                )
+                log.debug(f"Marked updated issue {jira_issue.key} as system linked in database")
+        except Exception as e:
+            log.error(f"Error updating system_linked flag for issue {jira_issue.key}: {str(e)}")
+            # Không raise exception ở đây để không ảnh hưởng đến luồng chính
         return jira_issue
 
     async def _process_connections(
@@ -255,7 +220,7 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
         connection_results = []
 
         # Log mapping để dễ debug
-        log.info(f"Node to Jira key mapping: {node_to_jira_key_map}")
+        log.debug(f"Node to Jira key mapping: {node_to_jira_key_map}")
 
         for connection in connections:
             try:
@@ -327,3 +292,16 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             log.info(f"Marked issue {jira_key} for system linking in Redis")
         except Exception as e:
             log.error(f"Error marking issue {jira_key} for system linking: {str(e)}")
+
+    async def _get_jira_sprint_id(self, project_key: str, sprint_id: Optional[int]) -> Optional[int]:
+        """Lấy Jira sprint ID từ sprint ID của DB"""
+        try:
+            if sprint_id is None:
+                # Get current sprint
+                current_sprint = await self.jira_sprint_repository.get_current_sprint(project_key)
+                return current_sprint.jira_sprint_id if current_sprint else None
+
+            sprint = await self.jira_sprint_repository.get_sprint_by_id(sprint_id)
+            return sprint.jira_sprint_id if sprint else None
+        except Exception as e:
+            raise Exception(f"Error getting Jira sprint ID for sprint ID {sprint_id}: {str(e)}") from e

@@ -9,6 +9,7 @@ class WorkflowEditIssue(BaseModel):
     title: str
     assignee_id: Optional[int] = None
     jira_key: Optional[str] = None
+    estimate_point: Optional[float] = None
     action: str  # "create" hoặc "update"
 
 
@@ -26,7 +27,7 @@ class NodeJiraMapping(BaseModel):
 class WorkflowEditRequest(BaseModel):
     transaction_id: str
     project_key: str
-    sprint_id: Optional[int] = None
+    sprint_id: Optional[int] = None  # system sprint id
     issues: List[WorkflowEditIssue]  # Các issue mới/cập nhật
     connections: List[WorkflowEditConnection]  # Các connections mới
     connections_to_remove: List[WorkflowEditConnection]  # Các connections cần xóa

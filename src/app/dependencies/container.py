@@ -5,15 +5,16 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from redis.asyncio import Redis
 
-from src.app.services.nats_application_service import NATSApplicationService
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.app.services.media_service import MediaApplicationService
+from src.app.services.nats_application_service import NATSApplicationService
 from src.app.services.nats_event_service import NATSEventService
 from src.app.services.nats_handlers.gantt_chart_handler import GanttChartRequestHandler
 from src.app.services.nats_handlers.jira_issue_link_handler import JiraIssueLinkRequestHandler
+from src.app.services.nats_handlers.jira_issue_reassign_handler import JiraIssueReassignRequestHandler
 from src.app.services.nats_handlers.jira_issue_sync_handler import JiraIssueSyncRequestHandler
 from src.app.services.nats_handlers.jira_login_message_handler import JiraLoginMessageHandler
 from src.app.services.nats_handlers.jira_project_sync_handler import JiraProjectSyncRequestHandler
@@ -54,7 +55,6 @@ from src.infrastructure.services.redis_service import RedisService
 from src.infrastructure.services.token_refresh_service import TokenRefreshService
 from src.infrastructure.services.token_scheduler_service import TokenSchedulerService
 from src.infrastructure.unit_of_works.sqlalchemy_jira_sync_session import SQLAlchemyJiraSyncSession
-from src.app.services.nats_handlers.jira_issue_reassign_handler import JiraIssueReassignRequestHandler
 
 
 class DependencyContainer:
@@ -270,7 +270,8 @@ class DependencyContainer:
                 instance.jira_user_repository,
                 instance.jira_sprint_repository,
                 instance.workflow_mapping_repository,
-                instance.redis_service
+                instance.redis_service,
+                instance.jira_issue_repository
             ),
             NATSSubscribeTopic.GANTT_CHART_CALCULATION.value: GanttChartRequestHandler(
                 instance.gantt_chart_service
@@ -283,7 +284,8 @@ class DependencyContainer:
                 instance.jira_user_repository,
                 instance.jira_sprint_repository,
                 instance.workflow_mapping_repository,
-                instance.redis_service
+                instance.redis_service,
+                instance.jira_issue_repository
             ),
             NATSSubscribeTopic.JIRA_ISSUE_REASSIGN.value: JiraIssueReassignRequestHandler(
                 instance.jira_issue_application_service,
@@ -366,7 +368,6 @@ class DependencyContainer:
         from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
         from src.infrastructure.services.jira_user_database_service import JiraUserDatabaseService
         from src.infrastructure.services.redis_service import RedisService
-        from src.app.services.nats_application_service import NATSApplicationService
 
         # Tạo các repositories cần thiết
         issue_repo = SQLAlchemyJiraIssueRepository(session)

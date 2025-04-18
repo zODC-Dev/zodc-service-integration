@@ -1,15 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
-from src.app.services.jira_webhook_handlers.issue_create_webhook_handler import IssueCreateWebhookHandler
-from src.app.services.jira_webhook_handlers.issue_delete_webhook_handler import IssueDeleteWebhookHandler
-from src.app.services.jira_webhook_handlers.issue_update_webhook_handler import IssueUpdateWebhookHandler
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
-from src.app.services.jira_webhook_handlers.sprint_close_webhook_handler import SprintCloseWebhookHandler
-from src.app.services.jira_webhook_handlers.sprint_create_webhook_handler import SprintCreateWebhookHandler
-from src.app.services.jira_webhook_handlers.sprint_delete_webhook_handler import SprintDeleteWebhookHandler
-from src.app.services.jira_webhook_handlers.sprint_start_webhook_handler import SprintStartWebhookHandler
-from src.app.services.jira_webhook_handlers.sprint_update_webhook_handler import SprintUpdateWebhookHandler
 from src.app.services.nats_application_service import NATSApplicationService
 from src.configs.logger import log
 from src.domain.models.jira.webhooks.jira_webhook import (

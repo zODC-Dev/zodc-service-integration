@@ -8,6 +8,7 @@ from src.domain.models.gantt_chart import (
     ProjectConfigModel,
     TaskScheduleModel,
 )
+from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
@@ -43,7 +44,7 @@ class GanttChartApplicationService:
     ) -> GanttChartModel:
         """Get Gantt chart for a sprint"""
         try:
-            log.info(f"[GANTT] Starting Gantt chart calculation for sprint: {sprint_id}, project: {project_key}")
+            log.debug(f"[GANTT] Starting Gantt chart calculation for sprint: {sprint_id}, project: {project_key}")
             log.debug(f"[GANTT] Input issues count: {len(issues) if issues else 0}")
             log.debug(f"[GANTT] Input connections count: {len(connections) if connections else 0}")
             log.debug(f"[GANTT] Configuration: {config.model_dump() if config else 'default'}")
@@ -61,32 +62,32 @@ class GanttChartApplicationService:
                 raise ValueError(f"Sprint with ID {sprint_id} not found")
 
             assert sprint.end_date is not None, "Sprint end date is None"
-            log.info(f"[GANTT] Sprint period: {sprint.start_date} to {sprint.end_date}")
+            log.debug(f"[GANTT] Sprint period: {sprint.start_date} to {sprint.end_date}")
 
             # Process issues from request
-            issues_list: List[GanttChartJiraIssueModel] = []
+            gantt_chart_issues_list: List[GanttChartJiraIssueModel] = []
             if issues:
                 # Create mapping of jira_key to issues for quicker lookup
                 jira_keys = [issue.jira_key for issue in issues if issue.jira_key]
                 log.debug(f"[GANTT] Jira keys to fetch from DB: {jira_keys}")
 
                 # Fetch actual estimate points and other details from database
-                db_issues_map = {}
-                if jira_keys:
-                    log.debug(f"[GANTT] Fetching {len(jira_keys)} issues from database")
-                    db_issues = await self.issue_repository.get_issues_by_keys(jira_keys)
-                    log.debug(f"[GANTT] Found {len(db_issues)} issues in database")
-                    db_issues_map = {issue.key: issue for issue in db_issues}
+                db_issues_map: Dict[str, JiraIssueModel] = {}
+
+                log.debug(f"[GANTT] Fetching {len(jira_keys)} issues from database")
+                db_issues = await self.issue_repository.get_issues_by_keys(jira_keys)
+                log.debug(f"[GANTT] Found {len(db_issues)} issues in database")
+                db_issues_map = {issue.key: issue for issue in db_issues}
 
                 # Process each issue from request
                 for req_issue in issues:
                     # Create a copy of the request issue
-                    issue_model = GanttChartJiraIssueModel(
+                    gantt_chart_issue_model = GanttChartJiraIssueModel(
                         node_id=req_issue.node_id,
                         jira_key=req_issue.jira_key,
                         type=req_issue.type,
                         # Use defaults initially
-                        title="Untitled Issue",
+                        title="",
                         estimate_points=0,
                         assignee_id=None
                     )
@@ -94,20 +95,20 @@ class GanttChartApplicationService:
                     # If we have this issue in database, update with DB data
                     if req_issue.jira_key and req_issue.jira_key in db_issues_map:
                         db_issue = db_issues_map[req_issue.jira_key]
-                        issue_model.title = db_issue.summary
-                        issue_model.estimate_points = db_issue.estimate_point
-                        issue_model.assignee_id = db_issue.assignee_id
+                        gantt_chart_issue_model.title = db_issue.summary
+                        gantt_chart_issue_model.estimate_points = db_issue.estimate_point
+                        gantt_chart_issue_model.assignee_id = db_issue.assignee_id
                         log.debug(
                             f"[GANTT] Issue {req_issue.jira_key} found in DB: points={db_issue.estimate_point}, title={db_issue.summary}")
                     else:
                         # For issues not in DB, use node_id as title if none provided
-                        issue_model.title = f"Issue {req_issue.jira_key or req_issue.node_id}"
+                        gantt_chart_issue_model.title = f"Issue {req_issue.jira_key or req_issue.node_id}"
                         log.debug(
                             f"[GANTT] Issue {req_issue.jira_key or req_issue.node_id} not found in DB or has no key")
 
-                    issues_list.append(issue_model)
+                    gantt_chart_issues_list.append(gantt_chart_issue_model)
 
-                log.info(f"[GANTT] Processed {len(issues_list)} issues for calculation")
+                log.debug(f"[GANTT] Processed {len(gantt_chart_issues_list)} issues for calculation")
             else:
                 log.warning("[GANTT] No issues provided in request")
                 # Return empty Gantt chart
@@ -140,24 +141,24 @@ class GanttChartApplicationService:
                 log.debug(f"[GANTT] Flattened connection: {conn.from_node_id} -> {conn.to_node_id} ({conn.type})")
 
             # Calculate schedule
-            log.info(
-                f"[GANTT] Calculating schedule for {len(issues_list)} issues with {len(flattened_connections)} connections")
+            log.debug(
+                f"[GANTT] Calculating schedule for {len(gantt_chart_issues_list)} issues with {len(flattened_connections)} connections")
             tasks = await self.gantt_calculator_service.calculate_schedule(
                 sprint_start_date=sprint.start_date,
                 sprint_end_date=sprint.end_date,
-                issues=issues_list,
+                issues=gantt_chart_issues_list,
                 connections=flattened_connections,
                 hierarchy_map=hierarchy_map,
                 config=config
             )
-            log.info(f"[GANTT] Schedule calculation completed: {len(tasks)} tasks scheduled")
+            log.debug(f"[GANTT] Schedule calculation completed: {len(tasks)} tasks scheduled")
 
             # Check if schedule is feasible
             is_feasible = self.gantt_calculator_service.is_schedule_feasible(
                 tasks=tasks,
                 sprint_end_date=sprint.end_date
             )
-            log.info(f"[GANTT] Schedule feasibility: {is_feasible}")
+            log.debug(f"[GANTT] Schedule feasibility: {is_feasible}")
             if not is_feasible:
                 log.warning("[GANTT] Some tasks are scheduled to finish after sprint end date")
                 # Log tasks that finish after sprint end

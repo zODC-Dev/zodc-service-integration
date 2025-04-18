@@ -100,3 +100,9 @@ class JiraCreateIssueResponse(BaseResponse):
     id: str
     key: str
     self: str  # API URL of the created issue
+
+
+class JiraIssueDescriptionDTO(BaseModel):
+    """Response model for Jira issue description"""
+    key: str
+    description: Optional[str] = None
