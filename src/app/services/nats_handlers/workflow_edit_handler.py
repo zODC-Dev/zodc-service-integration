@@ -1,14 +1,14 @@
 from typing import Any, Dict, List, Optional
 
-from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
-from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.configs.logger import log
 from src.domain.constants.jira import JiraActionType, JiraIssueType
+from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.nats.replies.workflow_edit import WorkflowEditReply, WorkflowEditReplyIssue
 from src.domain.models.nats.requests.workflow_edit import WorkflowEditConnection, WorkflowEditIssue, WorkflowEditRequest
+from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository

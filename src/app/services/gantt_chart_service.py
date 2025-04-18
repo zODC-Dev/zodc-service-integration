@@ -1,6 +1,5 @@
 from typing import Dict, List, Optional
 
-from src.domain.models.jira_issue import JiraIssueModel
 from src.configs.logger import log
 from src.domain.models.gantt_chart import (
     GanttChartConnectionModel,
@@ -9,6 +8,7 @@ from src.domain.models.gantt_chart import (
     ProjectConfigModel,
     TaskScheduleModel,
 )
+from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
