@@ -1,9 +1,9 @@
-from datetime import datetime
-from typing import Any, List
+# from datetime import datetime
+# from typing import Any, List
 
-from src.configs.logger import log
-from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JIRA_STATUS_ID_MAPPING, JiraIssueStatus, JiraIssueType
-from src.domain.models.jira_sprint import JiraSprintModel
+# from src.configs.logger import log
+# from src.domain.constants.jira import JIRA_ISSUE_TYPE_ID_MAPPING, JIRA_STATUS_ID_MAPPING, JiraIssueStatus, JiraIssueType
+# from src.domain.models.jira_sprint import JiraSprintModel
 
 
 class JiraWebhookMapper:
@@ -179,97 +179,97 @@ class JiraWebhookMapper:
     #         log.error(f"Error mapping webhook data to update dict: {str(e)}")
     #         raise
 
-    @classmethod
-    def _transform_field_value(cls, field_id_or_name: str, value: Any) -> Any:
-        """Transform field value based on field type"""
-        if value is None:
-            return None
+    # @classmethod
+    # def _transform_field_value(cls, field_id_or_name: str, value: Any) -> Any:
+    #     """Transform field value based on field type"""
+    #     if value is None:
+    #         return None
 
-        try:
-            # Xử lý các trường hợp dựa vào field_id hoặc field_name
-            if field_id_or_name == "status":
-                return cls._map_status(value)
+    #     try:
+    #         # Xử lý các trường hợp dựa vào field_id hoặc field_name
+    #         if field_id_or_name == "status":
+    #             return cls._map_status(value)
 
-            elif field_id_or_name == "issuetype":
-                return cls._map_issue_type(value)
+    #         elif field_id_or_name == "issuetype":
+    #             return cls._map_issue_type(value)
 
-            elif field_id_or_name == "assignee":
-                return value  # Assuming value is account_id
+    #         elif field_id_or_name == "assignee":
+    #             return value  # Assuming value is account_id
 
-            elif field_id_or_name == "customfield_10016" or field_id_or_name == "Story point estimate":
-                # Chuyển đổi story points sang float
-                try:
-                    return float(value) if value else 0
-                except (ValueError, TypeError):
-                    log.warning(f"Could not convert story point value '{value}' to float")
-                    return 0
+    #         elif field_id_or_name == "customfield_10016" or field_id_or_name == "Story point estimate":
+    #             # Chuyển đổi story points sang float
+    #             try:
+    #                 return float(value) if value else 0
+    #             except (ValueError, TypeError):
+    #                 log.warning(f"Could not convert story point value '{value}' to float")
+    #                 return 0
 
-            elif field_id_or_name == "customfield_10017" or field_id_or_name == "Actual point":
-                # Chuyển đổi actual points sang float
-                try:
-                    return float(value) if value else 0
-                except (ValueError, TypeError):
-                    log.warning(f"Could not convert actual point value '{value}' to float")
-                    return 0
+    #         elif field_id_or_name == "customfield_10017" or field_id_or_name == "Actual point":
+    #             # Chuyển đổi actual points sang float
+    #             try:
+    #                 return float(value) if value else 0
+    #             except (ValueError, TypeError):
+    #                 log.warning(f"Could not convert actual point value '{value}' to float")
+    #                 return 0
 
-            elif field_id_or_name == "customfield_10020" or field_id_or_name == "Sprint":
-                if not value:
-                    return []
+    #         elif field_id_or_name == "customfield_10020" or field_id_or_name == "Sprint":
+    #             if not value:
+    #                 return []
 
-                return cls._map_sprints(value)
+    #             return cls._map_sprints(value)
 
-            # Nếu không thuộc các trường hợp đặc biệt, trả về giá trị nguyên gốc
-            return value
+    #         # Nếu không thuộc các trường hợp đặc biệt, trả về giá trị nguyên gốc
+    #         return value
 
-        except Exception as e:
-            log.warning(f"Error transforming field {field_id_or_name}: {str(e)}")
-            return None
+    #     except Exception as e:
+    #         log.warning(f"Error transforming field {field_id_or_name}: {str(e)}")
+    #         return None
 
-    @staticmethod
-    def _parse_datetime(dt_str: str) -> datetime:
-        """Parse datetime string from Jira"""
-        if dt_str.endswith('Z'):
-            dt_str = dt_str.replace('Z', '+00:00')
-        return datetime.fromisoformat(dt_str)
+    # @staticmethod
+    # def _parse_datetime(dt_str: str) -> datetime:
+    #     """Parse datetime string from Jira"""
+    #     if dt_str.endswith('Z'):
+    #         dt_str = dt_str.replace('Z', '+00:00')
+    #     return datetime.fromisoformat(dt_str)
 
-    @staticmethod
-    def _map_issue_type(value: Any) -> str:
-        """Map issue type to string"""
-        if isinstance(value, (str, int)) and str(value) in JIRA_ISSUE_TYPE_ID_MAPPING:
-            issue_type = JIRA_ISSUE_TYPE_ID_MAPPING[str(value)]
-            log.info(f"Mapped issue type ID {value} to {issue_type.value}")
-            return issue_type.value
-        else:
-            # Nếu không có trong ID mapping, thử dùng tên
-            try:
-                return JiraIssueType(value).value
-            except ValueError:
-                log.warning(f"Invalid issue type value: {value}, defaulting to TASK")
-                return JiraIssueType.TASK.value
+    # @staticmethod
+    # def _map_issue_type(value: Any) -> str:
+    #     """Map issue type to string"""
+    #     if isinstance(value, (str, int)) and str(value) in JIRA_ISSUE_TYPE_ID_MAPPING:
+    #         issue_type = JIRA_ISSUE_TYPE_ID_MAPPING[str(value)]
+    #         log.info(f"Mapped issue type ID {value} to {issue_type.value}")
+    #         return issue_type.value
+    #     else:
+    #         # Nếu không có trong ID mapping, thử dùng tên
+    #         try:
+    #             return JiraIssueType(value).value
+    #         except ValueError:
+    #             log.warning(f"Invalid issue type value: {value}, defaulting to TASK")
+    #             return JiraIssueType.TASK.value
 
-    @staticmethod
-    def _map_status(value: Any) -> str:
-        """Map status to string"""
-        if isinstance(value, (str, int)) and str(value) in JIRA_STATUS_ID_MAPPING:
-            status = JIRA_STATUS_ID_MAPPING[str(value)]
-            log.info(f"Mapped status ID {value} to {status.value}")
-            return status.value
+    # @staticmethod
+    # def _map_status(value: Any) -> str:
+    #     """Map status to string"""
+    #     if isinstance(value, (str, int)) and str(value) in JIRA_STATUS_ID_MAPPING:
+    #         status = JIRA_STATUS_ID_MAPPING[str(value)]
+    #         log.info(f"Mapped status ID {value} to {status.value}")
+    #         return status.value
 
-        # Nếu không có trong ID mapping, thử dùng tên
-        try:
-            return JiraIssueStatus(value).value
-        except ValueError:
-            # Fallback: dùng from_str để tìm kiếm theo cách không phân biệt hoa thường
-            try:
-                log.info(f"Trying to map status name {value} using from_str")
-                return JiraIssueStatus.from_str(value).value
-            except ValueError:
-                log.warning(f"Invalid status value: {value}, defaulting to TO_DO")
-                return JiraIssueStatus.TO_DO.value
+    #     # Nếu không có trong ID mapping, thử dùng tên
+    #     try:
+    #         return JiraIssueStatus(value).value
+    #     except ValueError:
+    #         # Fallback: dùng from_str để tìm kiếm theo cách không phân biệt hoa thường
+    #         try:
+    #             log.info(f"Trying to map status name {value} using from_str")
+    #             return JiraIssueStatus.from_str(value).value
+    #         except ValueError:
+    #             log.warning(f"Invalid status value: {value}, defaulting to TO_DO")
+    #             return JiraIssueStatus.TO_DO.value
 
-    @staticmethod
-    def _map_sprints(value: Any) -> List[JiraSprintModel]:
-        """Value will be sprint_id (str), need to get sprint from database"""
-        if not value:
-            return []
-        return [JiraSprintModel(jira_sprint_id=sprint.id, name=sprint.name, state=sprint.state) for sprint in value]
+    # @staticmethod
+    # def _map_sprints(value: Any) -> List[JiraSprintModel]:
+    #     """Value will be sprint_id (str), need to get sprint from database"""
+    #     if not value:
+    #         return []
+    #     return [JiraSprintModel(jira_sprint_id=sprint.id, name=sprint.name, state=sprint.state) for sprint in value]
