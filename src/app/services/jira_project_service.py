@@ -476,6 +476,9 @@ class JiraProjectApplicationService:
     async def _sync_project_changelog(self, issue_ids: List[str], session: IJiraSyncSession) -> None:
         """Sync issues changelog from Jira API to database"""
         try:
+            if len(issue_ids) == 0:
+                return
+
             changelog_response = await self.jira_issue_api_service.bulk_get_issue_changelog_with_admin_auth(issue_ids)
 
             # Xử lý và lưu từng changelog

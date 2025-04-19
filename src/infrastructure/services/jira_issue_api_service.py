@@ -212,11 +212,11 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             except ValueError:
                 log.warning(f"Invalid issue type: {issue_type}, using TASK")
                 converted_issue_type = JiraIssueType.TASK
-
-        # # Tìm ID từ mapping
-        # for type_id, mapped_type in JIRA_ISSUE_TYPE_ID_MAPPING.items():
-        #     if mapped_type == issue_type:
-        #         return {"id": type_id}
+        elif isinstance(issue_type, JiraIssueType):
+            converted_issue_type = issue_type
+        else:
+            log.warning(f"Invalid issue type: {issue_type}, using TASK")
+            converted_issue_type = JiraIssueType.TASK
 
         # Using name
         return {"name": converted_issue_type.value}
