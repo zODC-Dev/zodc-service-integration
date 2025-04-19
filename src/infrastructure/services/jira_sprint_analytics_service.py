@@ -1,4 +1,3 @@
-
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
@@ -56,10 +55,10 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
             log.error(f"Sprint {sprint_id} not found")
             raise ValueError(f"Sprint {sprint_id} not found")
 
-        # Check if sprint status is active
-        if sprint.state != JiraSprintState.ACTIVE.value:
-            log.error(f"Sprint {sprint_id} is not active")
-            raise ValueError(f"Sprint {sprint.name} is not active")
+        # # Check if sprint status is active
+        # if sprint.state != JiraSprintState.ACTIVE.value:
+        #     log.error(f"Sprint {sprint_id} is not active")
+        #     raise ValueError(f"Sprint {sprint.name} is not active")
 
         # Lấy danh sách issues trong sprint
         issues = await self._get_sprint_issues(user_id, project_key, sprint_id)
@@ -371,9 +370,8 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
         # Tìm thời điểm issue được thêm vào sprint
         for history in sprint_histories:
-            # Đảm bảo created_at có timezone
-            jira_sprint_id = int(history.new_value or 0)
-            if jira_sprint_id == jira_sprint_id and history.created_at <= date:
+            # Handle the case where new_value contains comma-separated sprint IDs
+            if history.created_at <= date and self._is_sprint_id_in_value(jira_sprint_id, history.new_value):
                 return True
 
         return False
@@ -415,8 +413,9 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
             for change in sprint_changes:
                 try:
                     # Chỉ xét các thay đổi khi issue được thêm vào sprint
-                    new_value = change.new_value_parsed
-                    if new_value and str(sprint_id) in str(new_value):
+                    new_value = change.new_value
+                    # Handle the case where new_value contains comma-separated sprint IDs
+                    if self._is_sprint_id_in_value(sprint_id, new_value):
                         # Tìm issue tương ứng
                         issue = next((i for i in issues if i.jira_issue_id == change.jira_issue_id), None)
                         if not issue:
@@ -694,3 +693,16 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
                 raise
 
         return daily_data
+
+    def _is_sprint_id_in_value(self, sprint_id: int, value: Optional[str]) -> bool:
+        """Kiểm tra xem một sprint ID có nằm trong giá trị không (có thể là chuỗi chứa nhiều ID ngăn cách bởi dấu phẩy)"""
+        if not value:
+            return False
+
+        if ',' in value:
+            # Split by comma and check if our sprint ID is in the list
+            sprint_ids = [id.strip() for id in value.split(',')]
+            return str(sprint_id) in sprint_ids
+        else:
+            # Single ID
+            return value.isdigit() and int(value) == sprint_id
