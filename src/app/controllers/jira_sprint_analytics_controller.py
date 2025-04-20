@@ -1,4 +1,5 @@
 from datetime import time
+from typing import List
 
 from fastapi import HTTPException
 
@@ -10,6 +11,7 @@ from src.app.schemas.responses.jira_sprint_analytics import (
     SprintBurndownResponse,
     SprintBurnupResponse,
     SprintGoalResponse,
+    WorkloadResponse,
 )
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_sprint_analytics_service import JiraSprintAnalyticsApplicationService
@@ -231,3 +233,27 @@ class JiraSprintAnalyticsController:
         except Exception as e:
             log.error(f"Error checking sprint feasibility: {str(e)}")
             raise
+
+    async def get_team_workload(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: int
+    ) -> StandardResponse[List[WorkloadResponse]]:
+        """Get workload data for team members in a sprint"""
+        try:
+            result = await self.sprint_analytics_service.get_team_workload(
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
+            )
+            return StandardResponse(
+                data=result,
+                message="Team workload data retrieved successfully"
+            )
+        except ValueError as e:
+            log.error(f"Error getting team workload: {str(e)}")
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        except Exception as e:
+            log.error(f"Error getting team workload: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e)) from e

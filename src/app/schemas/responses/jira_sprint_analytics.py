@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 from pydantic.alias_generators import to_camel
@@ -122,6 +122,16 @@ class BugReportDataResponse(BaseResponse):
     """Response schema for bug report data"""
     bugs: List[BugTaskResponse]
     bugs_chart: List[BugChartResponse] = Field(..., alias="bugsChart")
+
+    class Config:
+        populate_by_name = True
+
+
+class WorkloadResponse(BaseModel):
+    """DTO for team member workload data in API response"""
+    user_name: str = Field(alias="userName")
+    completed_points: float = Field(alias="completedPoints")
+    remaining_points: float = Field(alias="remainingPoints")
 
     class Config:
         populate_by_name = True

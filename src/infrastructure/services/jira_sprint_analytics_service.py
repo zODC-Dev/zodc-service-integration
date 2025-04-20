@@ -19,6 +19,7 @@ from src.domain.models.jira_sprint_analytics import (
     SprintGoalModel,
     SprintScopeChange,
     TaskReportModel,
+    WorkloadModel,
 )
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
@@ -706,3 +707,64 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         else:
             # Single ID
             return value.isdigit() and int(value) == sprint_id
+
+    async def get_team_workload_data(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: int
+    ) -> List[WorkloadModel]:
+        """Lấy dữ liệu workload của các thành viên trong sprint"""
+        # Lấy thông tin sprint
+        sprint = await self._get_sprint_details(sprint_id)
+        if not sprint:
+            log.error(f"Sprint {sprint_id} not found")
+            raise ValueError(f"Sprint {sprint_id} not found")
+
+        # Lấy danh sách issues trong sprint
+        issues = await self._get_sprint_issues(user_id, project_key, sprint_id)
+
+        # Lưu trữ workload theo thành viên
+        workload_by_member: Dict[str, Dict[str, float]] = {}
+
+        # Duyệt qua từng issue để tính toán workload
+        for issue in issues:
+            # Bỏ qua issue không có assignee
+            if not issue.assignee:
+                continue
+
+            user_name = issue.assignee.name
+
+            # Khởi tạo dữ liệu workload cho thành viên nếu chưa có
+            if user_name not in workload_by_member:
+                workload_by_member[user_name] = {
+                    "completed_points": 0,
+                    "remaining_points": 0
+                }
+
+            # Tính toán điểm dựa vào trạng thái issue
+            points = issue.estimate_point or 0
+
+            if issue.status == JiraIssueStatus.DONE:
+                workload_by_member[user_name]["completed_points"] += points
+            else:
+                workload_by_member[user_name]["remaining_points"] += points
+
+        # Chuyển đổi dữ liệu sang model
+        result: List[WorkloadModel] = []
+        for user_name, points in workload_by_member.items():
+            result.append(
+                WorkloadModel(
+                    user_name=user_name,
+                    completed_points=round(points["completed_points"], 2),
+                    remaining_points=round(points["remaining_points"], 2)
+                )
+            )
+
+        # Sắp xếp kết quả theo tổng số điểm (giảm dần)
+        result.sort(
+            key=lambda x: (x.completed_points + x.remaining_points),
+            reverse=True
+        )
+
+        return result
