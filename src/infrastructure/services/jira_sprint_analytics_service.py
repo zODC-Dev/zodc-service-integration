@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from src.configs.logger import log
-from src.domain.constants.jira import JiraIssueStatus, JiraIssueType, JiraSprintState
+from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.models.apis.jira_user import JiraAssigneeResponse
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.jira_issue_history import JiraIssueHistoryModel
