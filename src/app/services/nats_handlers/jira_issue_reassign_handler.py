@@ -55,6 +55,8 @@ class JiraIssueReassignRequestHandler:
             # Using the old_user as the authenticated user if available, otherwise use new_user
             user_id = old_user.id if old_user else new_user.id
 
+            assert user_id is not None, "user_id is not None"
+
             # Update assignee in Jira
             success = await self.jira_issue_service.update_issue_assignee(
                 user_id=user_id,

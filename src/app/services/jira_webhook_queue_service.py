@@ -199,27 +199,18 @@ class JiraWebhookQueueService:
             # Get the last webhook
             last_webhook = webhooks[-1]
 
-            # Tìm handler phù hợp
-            handler = await self._get_handler(last_webhook.normalized_event)
+            # Process with a new session to avoid session conflicts
+            success = await self._process_webhook_with_new_session(last_webhook)
 
-            if not handler:
-                log.error(f"No handler found for event {last_webhook.webhook_event}")
-                await self._handle_retry(webhooks, highest_priority)
-                return
-
-            try:
-                # Xử lý với session mới
-                # async with AsyncSessionLocal() as session:
-                # Remove the explicit transaction begin/commit - let the handler manage its own transactions
-                # async with session.begin():
-                result = await handler.process(last_webhook)
-                if result and "error" in result:
-                    log.warning(f"Error processing webhook: {result['error']}")
-                    await self._handle_retry(webhooks, highest_priority)
-            except Exception as e:
-                log.error(f"Error processing webhooks: {str(e)}")
+            if not success:
+                log.warning(f"Failed to process webhook for entity {entity_id}")
                 await self._handle_retry(webhooks, highest_priority)
 
+        except Exception as e:
+            log.error(f"Error processing entity queue {entity_id}: {str(e)}")
+            # If we have webhooks, try to retry them
+            if 'webhooks' in locals() and webhooks and 'highest_priority' in locals():
+                await self._handle_retry(webhooks, highest_priority)
         finally:
             self.processing.remove(entity_id)
             if entity_id in self.queues and self.queues[entity_id].empty():
@@ -261,26 +252,22 @@ class JiraWebhookQueueService:
 
                     if retry_count < self.max_retries:
                         try:
-                            # Find appropriate handler
-                            handler = await self._get_handler(webhook.normalized_event)
-                            if handler:
-                                result = await handler.process(webhook)
-                                if result and "error" not in result:
-                                    # Success - clear retry count
-                                    self.retry_counts.pop(webhook_key, None)
-                                    log.info(
-                                        f"Successfully processed webhook {webhook_key} on retry #{retry_count + 1}")
-                                else:
-                                    # Failed - schedule next retry
-                                    self.retry_counts[webhook_key] = retry_count + 1
-                                    delay = self.RETRY_DELAYS[min(retry_count, len(self.RETRY_DELAYS) - 1)]
-                                    await asyncio.sleep(delay)
-                                    await self.retry_queue.put((priority + 1, time.time(), webhook))
-                                    log.warning(
-                                        f"Retry #{retry_count + 1} failed for {webhook_key}, scheduling next retry in {delay}s")
+                            # Process with new session
+                            success = await self._process_webhook_with_new_session(webhook)
+
+                            if success:
+                                # Success - clear retry count
+                                self.retry_counts.pop(webhook_key, None)
+                                log.info(f"Successfully processed webhook {webhook_key} on retry #{retry_count + 1}")
                             else:
-                                log.error(f"No handler found for webhook {webhook_key}")
+                                # Failed - schedule next retry
                                 self.retry_counts[webhook_key] = retry_count + 1
+                                delay = self.RETRY_DELAYS[min(retry_count, len(self.RETRY_DELAYS) - 1)]
+                                await asyncio.sleep(delay)
+                                await self.retry_queue.put((priority + 1, time.time(), webhook))
+                                log.warning(
+                                    f"Retry #{retry_count + 1} failed for {webhook_key}, scheduling next retry in {delay}s")
+
                         except Exception as e:
                             log.error(f"Error processing webhook {webhook_key}: {str(e)}")
                             # Schedule next retry
@@ -364,7 +351,8 @@ class JiraWebhookQueueService:
     @asynccontextmanager
     async def _get_webhook_service(self):
         """Tạo webhook service mới với session database mới"""
-        async with AsyncSessionLocal() as session:
+        session = AsyncSessionLocal()
+        try:
             # Sử dụng factory để tạo handlers và services
             handlers, services = await DependencyContainer.create_webhook_handlers(session)
 
@@ -383,10 +371,19 @@ class JiraWebhookQueueService:
                 handlers=handlers
             )
 
+            yield webhook_service
+        except Exception as e:
+            log.error(f"Error in webhook service session: {str(e)}")
             try:
-                yield webhook_service
-            finally:
+                await session.rollback()
+            except Exception as rollback_error:
+                log.warning(f"Error rolling back session: {str(rollback_error)}")
+            raise
+        finally:
+            try:
                 await session.close()
+            except Exception as close_error:
+                log.warning(f"Error closing webhook service session: {str(close_error)}")
 
     async def _process_webhook_with_new_session(self, webhook_data: BaseJiraWebhookDTO) -> bool:
         """Xử lý webhook với một session database mới và độc lập"""
@@ -398,13 +395,14 @@ class JiraWebhookQueueService:
 
                 # Kiểm tra kết quả
                 if result and "error" in result:
+                    log.warning(f"Error in webhook processing: {result['error']}")
                     return False
 
-                log.info(f"Successfully processed {webhook_data.webhook_event} for issue {webhook_data}")
                 return True
 
         except Exception as e:
             log.error(f"Exception processing webhook: {str(e)}")
+            # Don't try to close the session here as it's managed by the context manager
             return False
 
     # Cleanup method để xóa các retry counts cũ

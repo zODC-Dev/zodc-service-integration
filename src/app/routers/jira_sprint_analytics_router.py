@@ -1,3 +1,5 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, Path
 
 from src.app.controllers.jira_sprint_analytics_controller import JiraSprintAnalyticsController
@@ -12,6 +14,7 @@ from src.app.schemas.responses.jira_sprint_analytics import (
     SprintBurndownResponse,
     SprintBurnupResponse,
     SprintGoalResponse,
+    WorkloadResponse,
 )
 
 router = APIRouter()
@@ -138,4 +141,24 @@ async def check_sprint_feasibility(
         project_key=project_key,
         sprint_id=sprint_id,
         params=params
+    )
+
+
+@router.get(
+    "/{project_key}/sprints/{sprint_id}/analytics/workload",
+    response_model=StandardResponse[List[WorkloadResponse]],
+    summary="Get workload data for team members in a sprint",
+    description="Returns data about workload distribution among team members, including completed and remaining points"
+)
+async def get_team_workload(
+    project_key: str = Path(..., description="Project key"),
+    sprint_id: int = Path(..., description="Sprint ID"),
+    claims: JWTClaims = Depends(get_jwt_claims),
+    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller)
+):
+    """Get workload data for team members in a sprint"""
+    return await controller.get_team_workload(
+        user_id=int(claims.sub),
+        project_key=project_key,
+        sprint_id=sprint_id
     )

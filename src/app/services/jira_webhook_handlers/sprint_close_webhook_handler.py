@@ -60,6 +60,7 @@ class SprintCloseWebhookHandler(JiraWebhookHandler):
             return {"error": f"Failed to update sprint {sprint_id}"}
 
         # Reset is_system_linked flag for all issues in this sprint
+        assert updated_sprint.id is not None, "sprint id is not None"
         await self.reset_system_linked_flag(updated_sprint.id)
 
         # Log sync event

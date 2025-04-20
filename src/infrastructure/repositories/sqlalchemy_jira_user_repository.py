@@ -21,6 +21,22 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
         """Create a new user in the database"""
         try:
             # Convert DTO to dictionary
+            log.debug(f"Creating user: {user_data}")
+
+            # Check if user already exists if email or jira_account_id or user_id is not None
+            stmt = select(JiraUserEntity).where(
+                or_(
+                    col(JiraUserEntity.email) == user_data.email,
+                    col(JiraUserEntity.jira_account_id) == user_data.jira_account_id,
+                    col(JiraUserEntity.user_id) == user_data.user_id
+                )
+            )
+            result = await self.session.exec(stmt)
+            existing_user = result.first()
+            if existing_user:
+                log.debug(f"User already exists: {existing_user}")
+                return JiraUserModel.model_validate(existing_user)
+
             user_dict = user_data.model_dump()
 
             # Convert datetime objects to timezone-naive for PostgreSQL

@@ -10,6 +10,7 @@ from src.app.schemas.responses.jira_sprint_analytics import (
     SprintBurnupResponse,
     SprintGoalResponse,
     TaskReportResponse,
+    WorkloadResponse,
 )
 from src.configs.logger import log
 from src.domain.models.apis.jira_user import JiraAssigneeResponse
@@ -244,4 +245,29 @@ class JiraSprintAnalyticsApplicationService:
             )
         except Exception as e:
             log.error(f"Error getting bug report: {str(e)}")
+            raise
+
+    async def get_team_workload(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: int
+    ) -> List[WorkloadResponse]:
+        """Lấy dữ liệu workload của các thành viên trong sprint"""
+        try:
+            workload_data = await self.sprint_analytics_service.get_team_workload_data(
+                user_id, project_key, sprint_id
+            )
+
+            # Chuyển đổi domain model sang response DTO
+            return [
+                WorkloadResponse(
+                    user_name=item.user_name,
+                    completed_points=item.completed_points,
+                    remaining_points=item.remaining_points
+                )
+                for item in workload_data
+            ]
+        except Exception as e:
+            log.error(f"Error getting team workload: {str(e)}")
             raise

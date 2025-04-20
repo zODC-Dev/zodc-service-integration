@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
+from typing import List
 
 from src.domain.models.jira_sprint_analytics import (
     BugReportDataModel,
     SprintBurndownModel,
     SprintBurnupModel,
     SprintGoalModel,
+    WorkloadModel,
 )
 
 
@@ -49,4 +51,14 @@ class IJiraSprintAnalyticsService(ABC):
         sprint_id: int
     ) -> BugReportDataModel:
         """Lấy dữ liệu báo cáo bug cho một sprint"""
+        pass
+
+    @abstractmethod
+    async def get_team_workload_data(
+        self,
+        user_id: int,
+        project_key: str,
+        sprint_id: int
+    ) -> List[WorkloadModel]:
+        """Lấy dữ liệu workload của các thành viên trong sprint"""
         pass

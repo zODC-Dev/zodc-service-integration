@@ -41,11 +41,18 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     Yields:
         AsyncSession: a new database session
     """
-    async with AsyncSessionLocal() as session:
+    session = AsyncSessionLocal()
+    try:
+        yield session
+    except Exception as e:
+        log.error(f"Database session error: {str(e)}")
+        await session.rollback()
+        raise
+    finally:
         try:
-            yield session
-        finally:
             await session.close()
+        except Exception as e:
+            log.warning(f"Error closing session: {str(e)}")
 
 
 async def init_db() -> None:

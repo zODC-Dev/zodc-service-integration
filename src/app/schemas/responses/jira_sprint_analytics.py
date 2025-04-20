@@ -125,3 +125,13 @@ class BugReportDataResponse(BaseResponse):
 
     class Config:
         populate_by_name = True
+
+
+class WorkloadResponse(BaseModel):
+    """DTO for team member workload data in API response"""
+    user_name: str = Field(alias="userName")
+    completed_points: float = Field(alias="completedPoints")
+    remaining_points: float = Field(alias="remainingPoints")
+
+    class Config:
+        populate_by_name = True

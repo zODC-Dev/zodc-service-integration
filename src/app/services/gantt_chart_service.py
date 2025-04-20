@@ -140,6 +140,14 @@ class GanttChartApplicationService:
             for conn in flattened_connections:
                 log.debug(f"[GANTT] Flattened connection: {conn.from_node_id} -> {conn.to_node_id} ({conn.type})")
 
+            if not sprint.start_date or not sprint.end_date:
+                log.warning("[GANTT] Sprint start or end date is not set")
+                return GanttChartModel(
+                    sprint_id=sprint_id,
+                    sprint_name=sprint.name or f"Sprint {sprint_id}",
+                    project_key=project_key,
+                )
+
             # Calculate schedule
             log.debug(
                 f"[GANTT] Calculating schedule for {len(gantt_chart_issues_list)} issues with {len(flattened_connections)} connections")

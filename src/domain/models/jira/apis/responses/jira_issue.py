@@ -52,7 +52,7 @@ class JiraIssueAPIGetResponseDTO(JiraAPIResponseBase):
     id: str
     key: str
     self: str
-    rendered_fields: Dict[str, Any] = Field(alias="renderedFields")
+    rendered_fields: Optional[Dict[str, Any]] = Field(default=None, alias="renderedFields")
     fields: JiraAPIIssueFieldsResponse
 
 

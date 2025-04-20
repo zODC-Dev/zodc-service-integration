@@ -143,3 +143,10 @@ class BugReportDataModel(BaseModel):
     """Model for bug report data"""
     bugs: List[BugTaskModel]
     bugs_chart: List[BugChartModel]
+
+
+class WorkloadModel(BaseModel):
+    """Model for team member workload data"""
+    user_name: str
+    completed_points: float
+    remaining_points: float

@@ -458,8 +458,14 @@ async def get_webhook_handlers(
         # Issue handlers
         IssueCreateWebhookHandler(jira_issue_repository, sync_log_repository,
                                   jira_issue_api_service, jira_project_repository, redis_service),
-        IssueUpdateWebhookHandler(jira_issue_repository=jira_issue_repository, sync_log_repository=sync_log_repository,
-                                  jira_issue_api_service=jira_issue_api_service, issue_history_sync_service=issue_history_sync_service, nats_application_service=nats_application_service, jira_sprint_repository=jira_sprint_repository),
+        IssueUpdateWebhookHandler(
+            jira_issue_repository=jira_issue_repository,
+            sync_log_repository=sync_log_repository,
+            jira_issue_api_service=jira_issue_api_service,
+            issue_history_sync_service=issue_history_sync_service,
+            nats_application_service=nats_application_service,
+            jira_sprint_repository=jira_sprint_repository
+        ),
         IssueDeleteWebhookHandler(jira_issue_repository, sync_log_repository),
 
         # Sprint handlers

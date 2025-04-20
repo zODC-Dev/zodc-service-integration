@@ -229,7 +229,8 @@ class JiraIssueMapper:
 
             # Đảm bảo truy cập các field từ fields object
             summary = fields.summary if hasattr(fields, 'summary') else ""
-            description: Optional[str] = api_response.rendered_fields.get("description", None)
+            description: Optional[str] = api_response.rendered_fields.get(
+                "description", None) if api_response.rendered_fields else None
             if description is None:
                 description = JiraIssueMapper._convert_adf_to_html(fields.description)
 
