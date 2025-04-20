@@ -262,9 +262,9 @@ class JiraSprintAnalyticsApplicationService:
             # Chuyển đổi domain model sang response DTO
             return [
                 WorkloadResponse(
-                    userName=item.user_name,
-                    completedPoints=item.completed_points,
-                    remainingPoints=item.remaining_points
+                    user_name=item.user_name,
+                    completed_points=item.completed_points,
+                    remaining_points=item.remaining_points
                 )
                 for item in workload_data
             ]
