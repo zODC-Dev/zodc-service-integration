@@ -200,10 +200,10 @@ class BaseJiraWebhookDTO(BaseModel):
         """Factory method để tạo đúng loại DTO dựa trên webhook_event"""
         # log.info(f"Parsing webhook data: {data}, type: {type(data)}")
         converted_data = data
-        if type(data) == dict:
+        if isinstance(data, dict):
             if not data or ("webhookEvent" not in data and "webhook_event" not in data):
                 raise ValueError("Invalid webhook payload: missing webhookEvent field")
-        elif type(data) != dict:
+        elif not isinstance(data, dict):
             converted_data = data.model_dump()
 
         webhook_event: str = converted_data.get("webhookEvent") or converted_data.get("webhook_event")

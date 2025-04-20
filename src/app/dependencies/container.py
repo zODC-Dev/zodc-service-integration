@@ -5,11 +5,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from redis.asyncio import Redis
 
-from src.domain.services.jira_user_api_service import IJiraUserAPIService
-from src.infrastructure.services.jira_user_api_service import JiraUserAPIService
-from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
-from src.domain.services.jira_project_api_service import IJiraProjectAPIService
-from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_issue_service import JiraIssueApplicationService
@@ -33,6 +28,10 @@ from src.configs.database import get_db, session_maker
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.nats_events import NATSSubscribeTopic
+from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
+from src.domain.services.jira_project_api_service import IJiraProjectAPIService
+from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
+from src.domain.services.jira_user_api_service import IJiraUserAPIService
 from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import (
     SQLAlchemyJiraIssueHistoryRepository,
 )
@@ -54,6 +53,7 @@ from src.infrastructure.services.jira_project_database_service import JiraProjec
 from src.infrastructure.services.jira_service import JiraAPIClient
 from src.infrastructure.services.jira_sprint_api_service import JiraSprintAPIService
 from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
+from src.infrastructure.services.jira_user_api_service import JiraUserAPIService
 from src.infrastructure.services.jira_user_database_service import JiraUserDatabaseService
 from src.infrastructure.services.nats_service import NATSService
 from src.infrastructure.services.nats_workflow_service_client import NATSWorkflowServiceClient
