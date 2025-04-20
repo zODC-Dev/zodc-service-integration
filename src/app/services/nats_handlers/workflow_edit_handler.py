@@ -188,7 +188,7 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
 
         return result_issues
 
-    async def _create_issue(self, issue: WorkflowEditIssue, project_key: str, sprint_id: int) -> JiraIssueModel:
+    async def _create_issue(self, issue: WorkflowEditIssue, project_key: str, sprint_id: Optional[int]) -> JiraIssueModel:
         """Create a new issue in Jira"""
         # Map issue type to Jira issue type
         issue_type = self._map_issue_type(issue.type)

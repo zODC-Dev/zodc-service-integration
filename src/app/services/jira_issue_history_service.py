@@ -69,7 +69,7 @@ class JiraIssueHistoryApplicationService:
             # Lấy các thay đổi từ changelog
             items = changelog.items
             if not items:
-                return
+                return []
 
             # Chuyển đổi sang các đối tượng IssueHistoryChangeModel
             changes: List[JiraIssueHistoryChangeDBCreateDTO] = []

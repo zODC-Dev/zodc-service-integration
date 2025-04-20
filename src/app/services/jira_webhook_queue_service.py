@@ -398,7 +398,6 @@ class JiraWebhookQueueService:
                     log.warning(f"Error in webhook processing: {result['error']}")
                     return False
 
-                log.info(f"Successfully processed {webhook_data.webhook_event} for issue {webhook_data}")
                 return True
 
         except Exception as e:

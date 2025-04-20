@@ -1,10 +1,15 @@
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Dict, Optional
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from redis.asyncio import Redis
 
+from src.domain.services.jira_user_api_service import IJiraUserAPIService
+from src.infrastructure.services.jira_user_api_service import JiraUserAPIService
+from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
+from src.domain.services.jira_project_api_service import IJiraProjectAPIService
+from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_issue_service import JiraIssueApplicationService
@@ -47,6 +52,7 @@ from src.infrastructure.services.jira_issue_history_database_service import Jira
 from src.infrastructure.services.jira_project_api_service import JiraProjectAPIService
 from src.infrastructure.services.jira_project_database_service import JiraProjectDatabaseService
 from src.infrastructure.services.jira_service import JiraAPIClient
+from src.infrastructure.services.jira_sprint_api_service import JiraSprintAPIService
 from src.infrastructure.services.jira_sprint_database_service import JiraSprintDatabaseService
 from src.infrastructure.services.jira_user_database_service import JiraUserDatabaseService
 from src.infrastructure.services.nats_service import NATSService
@@ -88,9 +94,12 @@ class DependencyContainer:
     token_scheduler_service: Optional[TokenSchedulerService] = None
     jira_issue_database_service: Optional[JiraIssueDatabaseService] = None
     jira_api_client: Optional[JiraAPIClient] = None
-    jira_issue_api_service: Optional[JiraIssueAPIService] = None
+    jira_api_admin_client: Optional[JiraAPIClient] = None
+    jira_issue_api_service: Optional[IJiraIssueAPIService] = None
+    jira_sprint_api_service: Optional[IJiraSprintAPIService] = None
+    jira_user_api_service: Optional[IJiraUserAPIService] = None
     sync_session: Optional[SQLAlchemyJiraSyncSession] = None
-    jira_project_api_service: Optional[JiraProjectAPIService] = None
+    jira_project_api_service: Optional[IJiraProjectAPIService] = None
     jira_project_database_service: Optional[JiraProjectDatabaseService] = None
     jira_sprint_database_service: Optional[JiraSprintDatabaseService] = None
     issue_history_db_service: Optional[JiraIssueHistoryDatabaseService] = None
@@ -167,13 +176,30 @@ class DependencyContainer:
         )
 
         instance.jira_api_client = JiraAPIClient(
-            instance.redis_service,
-            instance.token_scheduler_service
+            redis_service=instance.redis_service,
+            token_scheduler_service=instance.token_scheduler_service,
+        )
+
+        instance.jira_api_admin_client = JiraAPIClient(
+            redis_service=instance.redis_service,
+            token_scheduler_service=instance.token_scheduler_service,
+            use_admin_auth=True
         )
 
         instance.jira_issue_api_service = JiraIssueAPIService(
-            instance.jira_api_client,
-            instance.jira_user_repository
+            client=instance.jira_api_client,
+            user_repository=instance.jira_user_repository,
+            admin_client=instance.jira_api_admin_client
+        )
+
+        instance.jira_sprint_api_service = JiraSprintAPIService(
+            client=instance.jira_api_client,
+            admin_client=instance.jira_api_admin_client
+        )
+
+        instance.jira_user_api_service = JiraUserAPIService(
+            client=instance.jira_api_client,
+            admin_client=instance.jira_api_admin_client
         )
 
         instance.jira_issue_application_service = JiraIssueApplicationService(
@@ -338,7 +364,7 @@ class DependencyContainer:
             await db.close()
 
     @classmethod
-    async def create_webhook_handlers(cls, session):
+    async def create_webhook_handlers(cls, session) -> Tuple[List[Callable], Dict]:
         """Tạo các webhook handlers với session tùy chọn"""
         from redis.asyncio import Redis
 
@@ -391,7 +417,7 @@ class DependencyContainer:
         # Sử dụng các services từ container chính
         jira_issue_api_service = container.jira_issue_api_service
         jira_sprint_api_service = container.jira_sprint_api_service
-
+        jira_user_api_service = container.jira_user_api_service
         # Tạo các services cần thiết
         jira_issue_db_service = JiraIssueDatabaseService(issue_repo)
         jira_user_db_service = JiraUserDatabaseService(user_repo)
@@ -409,8 +435,14 @@ class DependencyContainer:
         handlers = [
             # Issue handlers
             IssueCreateWebhookHandler(issue_repo, sync_log_repo, jira_issue_api_service, project_repo, redis_service),
-            IssueUpdateWebhookHandler(issue_repo, sync_log_repo, jira_issue_api_service,
-                                      issue_history_sync_service, container.nats_application_service, sprint_repo),
+            IssueUpdateWebhookHandler(
+                jira_issue_repository=issue_repo,
+                sync_log_repository=sync_log_repo,
+                jira_issue_api_service=jira_issue_api_service,
+                issue_history_sync_service=issue_history_sync_service,
+                nats_application_service=container.nats_application_service,
+                jira_sprint_repository=sprint_repo
+            ),
             IssueDeleteWebhookHandler(issue_repo, sync_log_repo),
 
             # Sprint handlers
@@ -421,13 +453,13 @@ class DependencyContainer:
             SprintDeleteWebhookHandler(sprint_database_service, sync_log_repo, jira_sprint_api_service),
 
             # User handlers
-            UserCreateWebhookHandler(jira_user_db_service, sync_log_repo, jira_issue_api_service),
-            UserUpdateWebhookHandler(jira_user_db_service, sync_log_repo, jira_issue_api_service),
+            UserCreateWebhookHandler(jira_user_db_service, sync_log_repo, jira_user_api_service),
+            UserUpdateWebhookHandler(jira_user_db_service, sync_log_repo, jira_user_api_service),
             UserDeleteWebhookHandler(jira_user_db_service, sync_log_repo)
         ]
 
         # Đóng gói vào một dictionary để trả về
-        services_dict = {
+        services_dict: Dict[str, Any] = {
             'jira_issue_api_service': jira_issue_api_service,
             'jira_sprint_api_service': jira_sprint_api_service,
             'sprint_database_service': sprint_database_service,
@@ -437,7 +469,10 @@ class DependencyContainer:
             'project_repo': project_repo,
             'redis_service': redis_service,
             'sprint_repo': sprint_repo,
-            'nats_service': container.nats_service
+            'nats_service': container.nats_service,
+            'nats_application_service': container.nats_application_service,
+            'jira_user_api_service': jira_user_api_service,
+            'jira_user_db_service': jira_user_db_service
         }
 
         return handlers, services_dict
