@@ -28,7 +28,7 @@ class JiraSprintApplicationService:
         if sprint is None:
             return None
         await self.jira_sprint_api_service.start_sprint(sprint_id=sprint.jira_sprint_id)
-        sprint.state = JiraSprintState.ACTIVE
+        sprint.state = JiraSprintState.ACTIVE.value
         return sprint
 
     async def end_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
@@ -40,7 +40,7 @@ class JiraSprintApplicationService:
 
         # End sprint in Jira
         await self.jira_sprint_api_service.end_sprint(sprint_id=sprint.jira_sprint_id)
-        sprint.state = JiraSprintState.CLOSED
+        sprint.state = JiraSprintState.CLOSED.value
 
         # Reset is_system_linked flag for all issues in this sprint
         try:
@@ -48,7 +48,5 @@ class JiraSprintApplicationService:
             log.info(f"Reset is_system_linked flag for {updated_count} issues in sprint {sprint_id}")
         except Exception as e:
             log.error(f"Error resetting is_system_linked flag for issues in sprint {sprint_id}: {str(e)}")
-            # We don't want to fail the sprint end process if resetting flags fails
-            # So just log the error and continue
 
         return sprint

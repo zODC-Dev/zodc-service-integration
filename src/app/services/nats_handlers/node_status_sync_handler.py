@@ -6,9 +6,10 @@ from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraC
 from src.domain.models.nats.replies.node_status_sync import NodeStatusSyncReply
 from src.domain.models.nats.requests.node_status_sync import NodeStatusSyncRequest
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
+from src.domain.services.nats_message_handler import INATSRequestHandler
 
 
-class NodeStatusSyncHandler:
+class NodeStatusSyncHandler(INATSRequestHandler):
     """Xử lý message đồng bộ trạng thái node từ hệ thống khác sang Jira"""
 
     def __init__(self, jira_issue_api_service: IJiraIssueAPIService):
@@ -62,7 +63,7 @@ class NodeStatusSyncHandler:
                     success=False,
                     error_message=f"Không thể cập nhật trạng thái cho issue {request.jira_key}",
                     data={"transaction_id": request.transaction_id}
-                )
+                ).model_dump()
 
             log.info(f"[NodeStatusSyncHandler] Cập nhật trạng thái thành công cho issue {request.jira_key}")
             result = NodeStatusSyncReply(
@@ -73,7 +74,7 @@ class NodeStatusSyncHandler:
                     "node_id": request.node_id,
                     "status": request.status
                 }
-            )
+            ).model_dump()
 
             return result.model_dump()
 
@@ -83,7 +84,7 @@ class NodeStatusSyncHandler:
                 success=False,
                 error_message=f"Lỗi xác thực Jira: {str(e)}",
                 data={"transaction_id": transaction_id}
-            )
+            ).model_dump()
 
         except JiraConnectionError as e:
             log.error(f"[NodeStatusSyncHandler] Lỗi kết nối Jira: {str(e)}, transaction_id={transaction_id}")
@@ -91,7 +92,7 @@ class NodeStatusSyncHandler:
                 success=False,
                 error_message=f"Lỗi kết nối Jira: {str(e)}",
                 data={"transaction_id": transaction_id}
-            )
+            ).model_dump()
 
         except JiraRequestError as e:
             log.error(f"[NodeStatusSyncHandler] Lỗi request Jira: {str(e)}, transaction_id={transaction_id}")
@@ -99,7 +100,7 @@ class NodeStatusSyncHandler:
                 success=False,
                 error_message=f"Lỗi request Jira: {str(e)}",
                 data={"transaction_id": transaction_id}
-            )
+            ).model_dump()
 
         except Exception as e:
             log.error(f"[NodeStatusSyncHandler] Lỗi không xác định: {str(e)}, transaction_id={transaction_id}")
@@ -107,4 +108,4 @@ class NodeStatusSyncHandler:
                 success=False,
                 error_message=f"Lỗi không xác định: {str(e)}",
                 data={"transaction_id": transaction_id}
-            )
+            ).model_dump()

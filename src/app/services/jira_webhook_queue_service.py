@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 import time
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Dict, List, Optional, Set
 
 from src.app.dependencies.container import DependencyContainer
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
@@ -11,7 +11,6 @@ from src.domain.constants.jira import JiraWebhookEvent
 from src.domain.models.jira.webhooks.jira_webhook import (
     BaseJiraWebhookDTO,
 )
-from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
@@ -73,33 +72,20 @@ class JiraWebhookQueueService:
         if not task.cancelled() and task.exception():
             log.error(f"Task failed with exception: {task.exception()}")
 
-    async def add_webhook_to_queue(self, webhook_data: Union[Dict[str, Any], BaseJiraWebhookDTO]) -> bool:
+    async def add_webhook_to_queue(self, webhook_data: BaseJiraWebhookDTO) -> bool:
         """Thêm webhook vào hàng đợi và xử lý theo thứ tự ưu tiên"""
         try:
-            # Kiểm tra kiểu dữ liệu và phân tích nếu cần
-            parsed_webhook = None
-
-            # Nếu dữ liệu là dictionary (dữ liệu thô), thử phân tích
-            if isinstance(webhook_data, dict):
-                log.debug("Received raw webhook data, parsing...")
-                try:
-                    parsed_webhook = BaseJiraWebhookDTO.parse_webhook(webhook_data)
-                    log.debug(f"Successfully parsed raw webhook as {type(parsed_webhook).__name__}")
-                except Exception as e:
-                    log.error(f"Failed to parse webhook: {str(e)}")
-                    return False
-            else:
-                # Đã là DTO, sử dụng trực tiếp
-                parsed_webhook = webhook_data
+            # Đã là DTO, sử dụng trực tiếp
+            parsed_webhook = webhook_data
 
             # Kiểm tra webhook có hợp lệ không
-            if not parsed_webhook or not hasattr(parsed_webhook, 'webhook_event'):
+            if not hasattr(parsed_webhook, 'webhook_event'):
                 log.error("Invalid webhook: missing webhook_event")
                 return False
 
             # Xác định entity ID (issue, sprint hoặc user)
-            entity_id = None
-            entity_type = None
+            entity_id: Optional[str] = None
+            entity_type: Optional[str] = None
 
             # Kiểm tra nếu là issue webhook
             if hasattr(parsed_webhook, 'issue') and parsed_webhook.issue and hasattr(parsed_webhook.issue, 'id'):
@@ -117,11 +103,11 @@ class JiraWebhookQueueService:
                 log.warning(f"Cannot determine entity ID from webhook event {parsed_webhook.webhook_event}")
                 return False
 
-            log.info(f"Determined entity type: {entity_type}, entity ID: {entity_id}")
+            log.debug(f"Determined entity type: {entity_type}, entity ID: {entity_id}")
 
             # Tính độ ưu tiên cho webhook này
             priority = self._calculate_priority(parsed_webhook)
-            log.info(f"Calculated priority {priority} for webhook {parsed_webhook.webhook_event}")
+            log.debug(f"Calculated priority {priority} for webhook {parsed_webhook.webhook_event}")
 
             # Lấy hoặc tạo queue cho entity này
             if entity_id not in self.queues:
@@ -215,29 +201,6 @@ class JiraWebhookQueueService:
             self.processing.remove(entity_id)
             if entity_id in self.queues and self.queues[entity_id].empty():
                 del self.queues[entity_id]
-
-    async def _get_handler(self, webhook_event: str) -> Optional[JiraWebhookHandler]:
-        """Get appropriate handler for webhook event"""
-        # Dùng đúng tên event đã được chuẩn hóa
-        log.info(f"Finding handler for event: {webhook_event}")
-
-        for handler in self.webhook_handlers:
-            if await handler.can_handle(webhook_event):
-                log.info(f"Found handler {handler.__class__.__name__} for event {webhook_event}")
-                return handler
-
-        log.warning(f"No handler found for event {webhook_event}")
-        return None
-
-    async def _get_latest_issue_data(self, issue_id: str) -> Optional[JiraIssueModel]:
-        """Lấy data mới nhất của issue từ Jira API"""
-        try:
-            # Lấy issue từ Jira API
-            issue = await self.jira_issue_api_service.get_issue_with_admin_auth(issue_id)
-            return issue
-        except Exception as e:
-            log.error(f"Error fetching issue {issue_id} from Jira API: {str(e)}")
-            return None
 
     async def _process_retry_queue(self) -> None:
         """Process the retry queue periodically"""
