@@ -32,6 +32,7 @@ from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.domain.services.jira_user_api_service import IJiraUserAPIService
+from src.domain.services.nats_message_handler import INATSMessageHandler, INATSRequestHandler
 from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import (
     SQLAlchemyJiraIssueHistoryRepository,
 )
@@ -117,8 +118,8 @@ class DependencyContainer:
     system_config_application_service: Optional[SystemConfigApplicationService] = None
     nats_application_service: Optional[NATSApplicationService] = None
     # Handlers
-    message_handlers: Dict = {}
-    request_handlers: Dict = {}
+    message_handlers: Dict[str, INATSMessageHandler] = {}
+    request_handlers: Dict[str, INATSRequestHandler] = {}
 
     @classmethod
     def get_instance(cls) -> 'DependencyContainer':
@@ -514,7 +515,7 @@ def setup_scheduled_jobs(scheduler: AsyncIOScheduler) -> None:
     from apscheduler.triggers.interval import IntervalTrigger
 
     # Add token cleanup job
-    async def cleanup_expired_tokens():
+    async def cleanup_expired_tokens() -> None:
         try:
             db = await DependencyContainer.get_db_for_job()
             try:
@@ -527,7 +528,7 @@ def setup_scheduled_jobs(scheduler: AsyncIOScheduler) -> None:
             log.error(f"Error cleaning up expired tokens: {str(e)}")
 
     # Add token refresh check job
-    async def check_tokens_for_refresh():
+    async def check_tokens_for_refresh() -> None:
         try:
             db = await DependencyContainer.get_db_for_job()
             try:

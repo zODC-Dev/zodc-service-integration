@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlmodel import col, select, update
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
@@ -90,20 +90,26 @@ class SQLAlchemyWorkflowMappingRepository(IWorkflowMappingRepository):
 
     async def update_status(self, workflow_id: str, status: str) -> Optional[WorkflowMappingModel]:
         try:
-            stmt = update(WorkflowMappingEntity).where(
+            stmt = select(WorkflowMappingEntity).where(
                 col(WorkflowMappingEntity.workflow_id) == workflow_id
-            ).values(
-                status=status,
-                updated_at=datetime.now(timezone.utc)
             )
 
-            await self.session.exec(stmt)
+            result = await self.session.exec(stmt)
+            entity = result.first()
+
+            if entity:
+                entity.status = status
+                entity.updated_at = datetime.now(timezone.utc)
+
+            # .values(
+            #     status=status,
+            #     updated_at=datetime.now(timezone.utc)
+            # )
+            self.session.add(entity)
             await self.session.commit()
 
             # Fetch updated entity
-            query = select(WorkflowMappingEntity).where(col(WorkflowMappingEntity.workflow_id) == workflow_id)
-            result = await self.session.exec(query)
-            entity = result.first()
+            await self.session.refresh(entity)
 
             return self._to_domain(entity) if entity else None
         except Exception as e:

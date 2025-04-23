@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class WorkflowEditReplyIssue(BaseModel):
     node_id: str
     jira_key: str
+    jira_link_url: Optional[str] = None
 
 
 class WorkflowEditReply(BaseModel):

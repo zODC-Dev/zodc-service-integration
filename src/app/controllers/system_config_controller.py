@@ -137,15 +137,15 @@ class SystemConfigController:
         try:
             # Get the value based on the type
             value = None
-            if data.type == ConfigType.INT:
+            if data.type.value == ConfigType.INT.value:
                 value = data.int_value
-            elif data.type == ConfigType.FLOAT:
+            elif data.type.value == ConfigType.FLOAT.value:
                 value = data.float_value
-            elif data.type == ConfigType.STRING:
+            elif data.type.value == ConfigType.STRING.value:
                 value = data.string_value
-            elif data.type == ConfigType.BOOL:
+            elif data.type.value == ConfigType.BOOL.value:
                 value = data.bool_value
-            elif data.type == ConfigType.TIME:
+            elif data.type.value == ConfigType.TIME.value:
                 # Convert string to time object
                 if isinstance(data.time_value, str):
                     parts = data.time_value.split(":")
@@ -214,15 +214,15 @@ class SystemConfigController:
             # Handle value based on type
             if data.type is not None:
                 value = None
-                if data.type == ConfigType.INT and data.int_value is not None:
+                if data.type.value == ConfigType.INT.value and data.int_value is not None:
                     value = data.int_value
-                elif data.type == ConfigType.FLOAT and data.float_value is not None:
+                elif data.type.value == ConfigType.FLOAT.value and data.float_value is not None:
                     value = data.float_value
-                elif data.type == ConfigType.STRING and data.string_value is not None:
+                elif data.type.value == ConfigType.STRING.value and data.string_value is not None:
                     value = data.string_value
-                elif data.type == ConfigType.BOOL and data.bool_value is not None:
+                elif data.type.value == ConfigType.BOOL.value and data.bool_value is not None:
                     value = data.bool_value
-                elif data.type == ConfigType.TIME and data.time_value is not None:
+                elif data.type.value == ConfigType.TIME.value and data.time_value is not None:
                     # Convert string to time object
                     parts = data.time_value.split(":")
                     if len(parts) == 2:

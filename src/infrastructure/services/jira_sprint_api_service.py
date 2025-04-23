@@ -176,19 +176,38 @@ class JiraSprintAPIService(IJiraSprintAPIService):
             log.error(f"Error fetching board {board_id}: {str(e)}")
             return None
 
-    async def start_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
+    async def start_sprint(
+        self,
+        sprint_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        goal: Optional[str] = None
+    ) -> Optional[JiraSprintModel]:
         """Start a sprint in Jira"""
         log.info(f"Starting sprint {sprint_id}")
 
         for attempt in range(self.retry_attempts):
             try:
-                start_date = datetime.now().isoformat()
-                end_date = (datetime.now() + timedelta(days=14)).isoformat()
+                # Prepare dates if not provided
+                if start_date is None:
+                    start_date = datetime.now()
+
+                if end_date is None:
+                    end_date = start_date + timedelta(days=14)
+
+                # Create payload
                 payload = {
                     "state": "active",
-                    "startDate": start_date,
-                    "endDate": end_date
+                    "startDate": start_date.isoformat(),
+                    "endDate": end_date.isoformat()
                 }
+
+                # Add goal if provided
+                if goal is not None:
+                    payload["goal"] = goal
+
+                log.info(f"Starting sprint with payload: {payload}")
+
                 # Call Jira API to start the sprint
                 await self.client.post(
                     f"/rest/agile/1.0/sprint/{sprint_id}",
@@ -254,4 +273,53 @@ class JiraSprintAPIService(IJiraSprintAPIService):
                 log.error(f"Unexpected error ending sprint {sprint_id}: {str(e)}")
                 return None
 
+        return None
+
+    async def create_sprint(self, name: str, board_id: int, project_key: str) -> int:
+        """Create a new sprint in Jira
+
+        Args:
+            name (str): Name of the sprint to create
+            board_id (int): ID of the board to create the sprint on
+            project_key (str): Key of the project (for logging)
+
+        Returns:
+            int: The Jira sprint ID of the created sprint
+        """
+        log.info(f"Creating new sprint '{name}' on board {board_id} for project {project_key}")
+
+        for attempt in range(self.retry_attempts):
+            try:
+                # Call Jira API to create the sprint, state is future by default
+                payload = {
+                    "name": name,
+                    "originBoardId": board_id,
+                }
+
+                response = await self.client.post(
+                    "/rest/agile/1.0/sprint",
+                    None,  # Use admin auth
+                    data=payload,
+                    error_msg=f"Error creating sprint '{name}' for board {board_id}"
+                )
+
+                # Return the sprint ID from the response
+                sprint_id = response.get("id")
+                if not sprint_id:
+                    log.error(f"Created sprint response doesn't contain ID: {response}")
+                    return None
+
+                log.info(f"Successfully created sprint '{name}' with ID {sprint_id}")
+                return sprint_id
+
+            except Exception as e:
+                if attempt < self.retry_attempts - 1:
+                    wait_time = self.retry_delay * (2 ** attempt)  # exponential backoff
+                    log.warning(f"Retrying create_sprint after {wait_time}s (attempt {attempt + 1})")
+                    await asyncio.sleep(wait_time)
+                else:
+                    log.error(f"Failed to create sprint '{name}' after {self.retry_attempts} attempts: {str(e)}")
+                    raise Exception(f"Failed to create sprint: {str(e)}") from e
+
+        # This shouldn't be reached due to the exception in the last retry
         return None

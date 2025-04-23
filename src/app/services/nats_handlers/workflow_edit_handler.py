@@ -165,7 +165,8 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                     if jira_issue:
                         result_issues.append(WorkflowEditReplyIssue(
                             node_id=issue.node_id,
-                            jira_key=jira_issue.key
+                            jira_key=jira_issue.key,
+                            jira_link_url=jira_issue.link_url
                         ))
                         log.info(f"Created Jira issue: {jira_issue.key} for node: {issue.node_id}")
 
@@ -175,11 +176,12 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                         log.error(f"Cannot update issue without jira_key: {issue.node_id}")
                         continue
 
-                    jira_issue = await self._update_issue(issue)
+                    jira_issue = await self._update_issue(issue, request.project_key, request.sprint_id)
                     if jira_issue:
                         result_issues.append(WorkflowEditReplyIssue(
                             node_id=issue.node_id,
-                            jira_key=jira_issue.key
+                            jira_key=jira_issue.key,
+                            jira_link_url=jira_issue.link_url
                         ))
                         log.debug(f"Updated Jira issue: {jira_issue.key} for node: {issue.node_id}")
 
@@ -217,15 +219,21 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
             issue_data=create_dto
         )
 
-    async def _update_issue(self, issue: WorkflowEditIssue) -> JiraIssueModel:
+    async def _update_issue(self, issue: WorkflowEditIssue, project_key: str, sprint_id: Optional[int]) -> JiraIssueModel:
         """Update an existing issue in Jira"""
         if not issue.jira_key:
             raise Exception("Cannot update issue without jira_key")
 
+        # Tìm Jira sprint ID tương ứng từ sprint ID của DB nếu có
+        jira_sprint_id = await self._get_jira_sprint_id(project_key, sprint_id)
+        if not jira_sprint_id:
+            raise Exception(f"Jira sprint ID not found for sprint ID {sprint_id}")
+
         # Create update data
         update_dto = JiraIssueAPIUpdateRequestDTO(
             summary=issue.title,
-            assignee_id=str(issue.assignee_id)
+            assignee_id=str(issue.assignee_id),
+            sprint_id=jira_sprint_id
         )
 
         if issue.estimate_point:

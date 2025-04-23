@@ -59,7 +59,7 @@ app.include_router(jira_webhook_router, prefix=settings.API_V1_STR + "/jira-webh
 app.include_router(jira_sprint_analytics_router, prefix=settings.API_V1_STR +
                    "/jira/sprint-analytics", tags=["jira_sprint_analytics"])
 app.include_router(jira_sprint_router, prefix=settings.API_V1_STR +
-                   "/jira/sprint", tags=["jira_sprint"])
+                   "/jira/sprints", tags=["jira_sprints"])
 app.include_router(media_router, prefix=settings.API_V1_STR + "/media", tags=["media"])
 app.include_router(system_config_router, prefix=settings.API_V1_STR + "/configs", tags=["system_config"])
 

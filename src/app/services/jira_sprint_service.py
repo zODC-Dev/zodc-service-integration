@@ -1,7 +1,10 @@
+from datetime import datetime, timedelta
+import re
 from typing import Optional
 
+from src.app.schemas.responses.jira_project import TaskCountByStatus
 from src.configs.logger import log
-from src.domain.constants.jira import JiraSprintState
+from src.domain.constants.jira import JiraIssueStatus, JiraSprintState
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
@@ -21,14 +24,48 @@ class JiraSprintApplicationService:
         self.jira_sprint_database_service = jira_sprint_database_service
         self.jira_issue_repository = jira_issue_repository
 
-    async def start_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
-        """Start a sprint in Jira using admin account"""
+    async def start_sprint(
+        self,
+        sprint_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        goal: Optional[str] = None
+    ) -> Optional[JiraSprintModel]:
+        """Start a sprint in Jira using admin account
+
+        Args:
+            sprint_id: ID of the sprint to start
+            start_date: Optional start date for the sprint (default: current date)
+            end_date: Optional end date for the sprint (default: start_date + 14 days)
+            goal: Optional goal for the sprint
+        """
         # Get sprint from database
         sprint = await self.jira_sprint_database_service.get_sprint_by_id(sprint_id=sprint_id)
         if sprint is None:
             return None
-        await self.jira_sprint_api_service.start_sprint(sprint_id=sprint.jira_sprint_id)
-        sprint.state = JiraSprintState.ACTIVE
+
+        # Use default values if not provided
+        if start_date is None:
+            start_date = datetime.now()
+
+        if end_date is None:
+            end_date = start_date + timedelta(days=14)
+
+        # Start the sprint in Jira with the provided dates and goal
+        await self.jira_sprint_api_service.start_sprint(
+            sprint_id=sprint.jira_sprint_id,
+            start_date=start_date,
+            end_date=end_date,
+            goal=goal
+        )
+
+        # Update the sprint model with the new values
+        sprint.state = JiraSprintState.ACTIVE.value
+        sprint.start_date = start_date
+        sprint.end_date = end_date
+        if goal is not None:
+            sprint.goal = goal
+
         return sprint
 
     async def end_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
@@ -40,7 +77,7 @@ class JiraSprintApplicationService:
 
         # End sprint in Jira
         await self.jira_sprint_api_service.end_sprint(sprint_id=sprint.jira_sprint_id)
-        sprint.state = JiraSprintState.CLOSED
+        sprint.state = JiraSprintState.CLOSED.value
 
         # Reset is_system_linked flag for all issues in this sprint
         try:
@@ -48,7 +85,76 @@ class JiraSprintApplicationService:
             log.info(f"Reset is_system_linked flag for {updated_count} issues in sprint {sprint_id}")
         except Exception as e:
             log.error(f"Error resetting is_system_linked flag for issues in sprint {sprint_id}: {str(e)}")
-            # We don't want to fail the sprint end process if resetting flags fails
-            # So just log the error and continue
+
+        # Create a new future sprint after ending the current one
+        await self.create_sprint(sprint)
 
         return sprint
+
+    async def get_sprint_details(self, sprint_id: int) -> tuple[Optional[JiraSprintModel], TaskCountByStatus]:
+        """Get sprint details with tasks by status"""
+        # Get sprint from database
+        sprint = await self.jira_sprint_database_service.get_sprint_by_id(sprint_id=sprint_id)
+        if sprint is None:
+            return None, {}
+
+        # Get all issues for this sprint
+        issues = await self.jira_issue_repository.get_project_issues(
+            project_key=sprint.project_key,
+            sprint_id=sprint_id,
+            include_deleted=False
+        )
+
+        # Count issues by status
+        task_count_by_status = TaskCountByStatus(
+            to_do=0,
+            in_progress=0,
+            done=0
+        )
+
+        for issue in issues:
+            # Map Jira statuses to simplified status categories
+            if issue.status in [JiraIssueStatus.TO_DO, JiraIssueStatus.BACKLOG]:
+                task_count_by_status.to_do += 1
+            elif issue.status in [JiraIssueStatus.IN_PROGRESS, JiraIssueStatus.IN_REVIEW]:
+                task_count_by_status.in_progress += 1
+            elif issue.status in [JiraIssueStatus.DONE, JiraIssueStatus.CLOSED]:
+                task_count_by_status.done += 1
+
+        return sprint, task_count_by_status
+
+    async def create_sprint(self, sprint: JiraSprintModel) -> Optional[int]:
+        """Create a new sprint in Jira"""
+        # Create a new future sprint after ending the current one
+        try:
+            # Calculate next sprint number from current sprint name if possible
+            current_sprint_name = sprint.name
+            next_sprint_name = current_sprint_name
+
+            # Try to extract sprint number and increment it
+            # Current sprint name is in the format "PROJECT Sprint X"
+            sprint_number_match = re.search(rf'{sprint.project_key} Sprint\s+(\d+)', current_sprint_name, re.IGNORECASE)
+            if sprint_number_match:
+                current_number = int(sprint_number_match.group(1))
+                next_number = current_number + 1
+                next_sprint_name = f"{sprint.project_key} Sprint {next_number}"
+
+            else:
+                next_sprint_name = f"{sprint.project_key} Sprint 1"
+
+            # Create new sprint in Jira
+            # Log the next sprint name
+            log.debug(
+                f"Creating new sprint '{next_sprint_name}' in Jira, board_id: {sprint.board_id}, project_key: {sprint.project_key}")
+            new_sprint_jira_id = await self.jira_sprint_api_service.create_sprint(
+                name=next_sprint_name,
+                board_id=sprint.board_id,
+                project_key=sprint.project_key
+            )
+
+            log.debug(f"Created new future sprint '{next_sprint_name}' with Jira ID {new_sprint_jira_id}")
+            return new_sprint_jira_id
+        except Exception as e:
+            log.error(f"Error creating new future sprint after ending sprint {sprint.id}: {str(e)}")
+            # Don't fail the main operation if creating a new sprint fails
+            return None

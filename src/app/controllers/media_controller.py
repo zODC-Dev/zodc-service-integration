@@ -60,7 +60,7 @@ class MediaController:
                 detail=f"Failed to get media: {str(e)}"
             ) from e
 
-    async def remove_media(self, media_id: UUID) -> StandardResponse:
+    async def remove_media(self, media_id: UUID) -> StandardResponse[None]:
         try:
             success, message = await self.media_service.remove_media(media_id)
             if not success:

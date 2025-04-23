@@ -6,10 +6,11 @@ from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.nats.replies.jira_issue_reassign import JiraIssueReassignNATSReplyDTO
 from src.domain.models.nats.requests.jira_issue_reassign import JiraIssueReassignNATSRequestDTO
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
+from src.domain.services.nats_message_handler import INATSRequestHandler
 from src.infrastructure.services.nats_service import NATSService
 
 
-class JiraIssueReassignRequestHandler:
+class JiraIssueReassignRequestHandler(INATSRequestHandler):
     def __init__(
         self,
         jira_issue_service: JiraIssueApplicationService,
