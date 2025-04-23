@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+import re
 from typing import Optional
 
 from src.app.schemas.responses.jira_project import TaskCountByStatus
@@ -22,14 +24,48 @@ class JiraSprintApplicationService:
         self.jira_sprint_database_service = jira_sprint_database_service
         self.jira_issue_repository = jira_issue_repository
 
-    async def start_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
-        """Start a sprint in Jira using admin account"""
+    async def start_sprint(
+        self,
+        sprint_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        goal: Optional[str] = None
+    ) -> Optional[JiraSprintModel]:
+        """Start a sprint in Jira using admin account
+
+        Args:
+            sprint_id: ID of the sprint to start
+            start_date: Optional start date for the sprint (default: current date)
+            end_date: Optional end date for the sprint (default: start_date + 14 days)
+            goal: Optional goal for the sprint
+        """
         # Get sprint from database
         sprint = await self.jira_sprint_database_service.get_sprint_by_id(sprint_id=sprint_id)
         if sprint is None:
             return None
-        await self.jira_sprint_api_service.start_sprint(sprint_id=sprint.jira_sprint_id)
+
+        # Use default values if not provided
+        if start_date is None:
+            start_date = datetime.now()
+
+        if end_date is None:
+            end_date = start_date + timedelta(days=14)
+
+        # Start the sprint in Jira with the provided dates and goal
+        await self.jira_sprint_api_service.start_sprint(
+            sprint_id=sprint.jira_sprint_id,
+            start_date=start_date,
+            end_date=end_date,
+            goal=goal
+        )
+
+        # Update the sprint model with the new values
         sprint.state = JiraSprintState.ACTIVE.value
+        sprint.start_date = start_date
+        sprint.end_date = end_date
+        if goal is not None:
+            sprint.goal = goal
+
         return sprint
 
     async def end_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
@@ -87,7 +123,7 @@ class JiraSprintApplicationService:
 
         return sprint, task_count_by_status
 
-    async def create_sprint(self, sprint: JiraSprintModel) -> int:
+    async def create_sprint(self, sprint: JiraSprintModel) -> Optional[int]:
         """Create a new sprint in Jira"""
         # Create a new future sprint after ending the current one
         try:
@@ -97,16 +133,18 @@ class JiraSprintApplicationService:
 
             # Try to extract sprint number and increment it
             # Current sprint name is in the format "PROJECT Sprint X"
-            import re
             sprint_number_match = re.search(rf'{sprint.project_key} Sprint\s+(\d+)', current_sprint_name, re.IGNORECASE)
             if sprint_number_match:
                 current_number = int(sprint_number_match.group(1))
                 next_number = current_number + 1
                 next_sprint_name = f"{sprint.project_key} Sprint {next_number}"
 
+            else:
+                next_sprint_name = f"{sprint.project_key} Sprint 1"
+
             # Create new sprint in Jira
             # Log the next sprint name
-            log.info(
+            log.debug(
                 f"Creating new sprint '{next_sprint_name}' in Jira, board_id: {sprint.board_id}, project_key: {sprint.project_key}")
             new_sprint_jira_id = await self.jira_sprint_api_service.create_sprint(
                 name=next_sprint_name,
@@ -114,7 +152,9 @@ class JiraSprintApplicationService:
                 project_key=sprint.project_key
             )
 
-            log.info(f"Created new future sprint '{next_sprint_name}' with Jira ID {new_sprint_jira_id}")
+            log.debug(f"Created new future sprint '{next_sprint_name}' with Jira ID {new_sprint_jira_id}")
+            return new_sprint_jira_id
         except Exception as e:
             log.error(f"Error creating new future sprint after ending sprint {sprint.id}: {str(e)}")
             # Don't fail the main operation if creating a new sprint fails
+            return None

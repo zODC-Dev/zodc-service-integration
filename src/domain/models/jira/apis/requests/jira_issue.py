@@ -1,11 +1,10 @@
 from datetime import datetime, timezone
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.models.jira_issue import JiraIssueModel
-from src.domain.models.jira_sprint import JiraSprintModel
 
 
 class JiraIssueAPIUpdateRequestDTO(BaseModel):
@@ -20,7 +19,7 @@ class JiraIssueAPIUpdateRequestDTO(BaseModel):
     is_system_linked: Optional[bool] = None
     assignee_id: Optional[str] = None
     reporter_id: Optional[str] = None
-    sprints: Optional[List['JiraSprintModel']] = None
+    sprint_id: Optional[int] = None
     is_deleted: Optional[bool] = None
     type: Optional[Union[JiraIssueType, str]] = None
 

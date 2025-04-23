@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import List, Optional
 
 from src.domain.models.jira_board import JiraBoardModel
@@ -27,7 +28,7 @@ class IJiraSprintAPIService(ABC):
         pass
 
     @abstractmethod
-    async def start_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
+    async def start_sprint(self, sprint_id: int, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None, goal: Optional[str] = None) -> Optional[JiraSprintModel]:
         """Start a sprint in Jira"""
         pass
 

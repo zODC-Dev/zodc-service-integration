@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
+from src.app.schemas.requests.jira_sprint import SprintStartRequest
 from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.jira_project import GetJiraSprintDetailsResponse, GetJiraSprintResponse
 from src.app.services.jira_sprint_service import JiraSprintApplicationService
@@ -29,13 +30,28 @@ class JiraSprintController:
             log.error(f"Unexpected error when getting sprint {sprint_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e
 
-    async def start_sprint(self, sprint_id: int) -> StandardResponse[GetJiraSprintResponse]:
-        """Start a sprint in Jira using admin account"""
+    async def start_sprint(
+        self,
+        sprint_id: int,
+        sprint_data: SprintStartRequest = None
+    ) -> StandardResponse[GetJiraSprintResponse]:
+        """Start a sprint in Jira using admin account with optional parameters"""
         try:
-            updated_sprint = await self.sprint_service.start_sprint(sprint_id=sprint_id)
+            # Default to empty request if not provided
+            if sprint_data is None:
+                sprint_data = SprintStartRequest()
+
+            updated_sprint = await self.sprint_service.start_sprint(
+                sprint_id=sprint_id,
+                start_date=sprint_data.start_date,
+                end_date=sprint_data.end_date,
+                goal=sprint_data.goal
+            )
+
             log.info(f"Updated sprint: {updated_sprint}")
             if updated_sprint is None:
                 raise HTTPException(status_code=404, detail="Sprint not found")
+
             return StandardResponse(
                 message="Sprint started successfully",
                 data=GetJiraSprintResponse.from_domain(updated_sprint)

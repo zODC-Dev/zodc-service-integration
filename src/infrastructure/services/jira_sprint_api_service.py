@@ -176,19 +176,38 @@ class JiraSprintAPIService(IJiraSprintAPIService):
             log.error(f"Error fetching board {board_id}: {str(e)}")
             return None
 
-    async def start_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
+    async def start_sprint(
+        self,
+        sprint_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        goal: Optional[str] = None
+    ) -> Optional[JiraSprintModel]:
         """Start a sprint in Jira"""
         log.info(f"Starting sprint {sprint_id}")
 
         for attempt in range(self.retry_attempts):
             try:
-                start_date = datetime.now().isoformat()
-                end_date = (datetime.now() + timedelta(days=14)).isoformat()
+                # Prepare dates if not provided
+                if start_date is None:
+                    start_date = datetime.now()
+
+                if end_date is None:
+                    end_date = start_date + timedelta(days=14)
+
+                # Create payload
                 payload = {
                     "state": "active",
-                    "startDate": start_date,
-                    "endDate": end_date
+                    "startDate": start_date.isoformat(),
+                    "endDate": end_date.isoformat()
                 }
+
+                # Add goal if provided
+                if goal is not None:
+                    payload["goal"] = goal
+
+                log.info(f"Starting sprint with payload: {payload}")
+
                 # Call Jira API to start the sprint
                 await self.client.post(
                     f"/rest/agile/1.0/sprint/{sprint_id}",

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Path
 
 from src.app.controllers.jira_sprint_controller import JiraSprintController
 from src.app.dependencies.controllers import get_jira_sprint_controller
+from src.app.schemas.requests.jira_sprint import SprintStartRequest
 from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.jira_project import GetJiraSprintDetailsResponse, GetJiraSprintResponse
 
@@ -26,10 +27,18 @@ async def get_sprint_by_id(
 @router.post("/{sprint_id}/start", response_model=StandardResponse[GetJiraSprintResponse])
 async def start_sprint(
     sprint_id: int = Path(..., description="ID of the sprint to start"),
+    sprint_data: SprintStartRequest = None,
     controller: JiraSprintController = Depends(get_jira_sprint_controller)
 ) -> StandardResponse[GetJiraSprintResponse]:
-    """Start a sprint in Jira using admin account"""
-    return await controller.start_sprint(sprint_id=sprint_id)
+    """Start a sprint in Jira using admin account
+
+    Parameters:
+    - sprint_id: ID of the sprint to start
+    - start_date: Optional start date (default: current date)
+    - end_date: Optional end date (default: start_date + 14 days)
+    - goal: Optional sprint goal
+    """
+    return await controller.start_sprint(sprint_id=sprint_id, sprint_data=sprint_data)
 
 
 @router.post("/{sprint_id}/end", response_model=StandardResponse[GetJiraSprintResponse])

@@ -733,7 +733,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         if update.actual_point is not None:
             payload["fields"]["customfield_10017"] = update.actual_point
 
-        log.info(f"Updating issue {issue_id} with admin auth, payload: {payload}")
+        if update.sprint_id is not None:
+            payload["fields"]["customfield_10020"] = update.sprint_id
+
+        log.debug(f"Updating issue {issue_id} with admin auth, payload: {payload}")
 
         # Only send request if there is a field to update
         if payload["fields"]:
