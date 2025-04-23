@@ -115,7 +115,8 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
                     if jira_issue:
                         result_issues.append(WorkflowSyncReplyIssue(
                             node_id=issue.node_id,
-                            jira_key=jira_issue.key
+                            jira_key=jira_issue.key,
+                            jira_link_url=jira_issue.link_url
                         ))
                         log.info(f"Created Jira issue: {jira_issue.key} for node: {issue.node_id}")
 
@@ -129,7 +130,8 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
                     if jira_issue:
                         result_issues.append(WorkflowSyncReplyIssue(
                             node_id=issue.node_id,
-                            jira_key=jira_issue.key
+                            jira_key=jira_issue.key,
+                            jira_link_url=jira_issue.link_url
                         ))
                         log.info(f"Updated Jira issue: {jira_issue.key} for node: {issue.node_id}")
 
