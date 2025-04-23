@@ -35,3 +35,12 @@ class IJiraSprintAPIService(ABC):
     async def end_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
         """End a sprint in Jira"""
         pass
+
+    @abstractmethod
+    async def create_sprint(self, name: str, board_id: int, project_key: str) -> int:
+        """Create a new sprint in Jira
+
+        Returns:
+            int: The Jira sprint ID of the created sprint
+        """
+        pass
