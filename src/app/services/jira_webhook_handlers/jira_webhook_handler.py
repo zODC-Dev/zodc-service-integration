@@ -71,12 +71,9 @@ class JiraWebhookHandler(ABC):
                 return None
 
             if not await self.can_handle(event_type):
-                log.info(f"Handler {self.__class__.__name__} cannot handle event {event_type}")
                 return None
 
-            log.info(f"Processing webhook event {event_type} with handler {self.__class__.__name__}")
             result = await self.handle(webhook_data)
-            log.info(f"Successfully processed webhook event {event_type}")
             return result
 
         except Exception as e:

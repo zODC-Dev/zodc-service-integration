@@ -648,7 +648,6 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
                 # Tính toán điểm hoàn thành dựa trên trạng thái và hạn của issues
                 # Filter issues có trong sprint tính đến ngày day
-                log.info(f"Checking issues for day: {day_str}, day timezone: {day.tzinfo}")
                 sprint_issues = [issue for issue in issues if self._is_issue_in_sprint_at_date(
                     issue, sprint.jira_sprint_id, day, sprint_history_by_issue.get(issue.jira_issue_id, []))]
 

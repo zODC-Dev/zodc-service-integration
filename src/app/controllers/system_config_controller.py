@@ -1,5 +1,5 @@
 from datetime import time
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import HTTPException
 
@@ -22,6 +22,14 @@ class SystemConfigController:
 
     def __init__(self, system_config_service: SystemConfigApplicationService):
         self.system_config_service = system_config_service
+
+    async def list_scopes(self) -> StandardResponse[List[str]]:
+        """List all scopes"""
+        scopes = [scope.value for scope in ConfigScope]
+        return StandardResponse(
+            data=scopes,
+            message="Scopes retrieved successfully"
+        )
 
     async def get_config(self, id: int) -> StandardResponse[SystemConfigResponse]:
         """Get configuration by ID"""
@@ -52,7 +60,7 @@ class SystemConfigController:
             log.error(f"Error getting config: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e)) from e
 
-    async def get_config_by_key(self, key: str, scope: str = "global",
+    async def get_config_by_key(self, key: str, scope: str = "general",
                                 project_key: Optional[str] = None) -> StandardResponse[SystemConfigResponse]:
         """Get configuration by key, scope and project_key"""
         try:
@@ -89,15 +97,29 @@ class SystemConfigController:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
     async def list_configs(self, scope: Optional[str] = None, project_key: Optional[str] = None,
-                           limit: int = 100, offset: int = 0) -> StandardResponse[SystemConfigListResponse]:
-        """List configurations with pagination"""
+                           page: int = 1, page_size: int = 10, search: Optional[str] = None,
+                           sort_by: Optional[str] = None,
+                           sort_order: Optional[str] = None) -> StandardResponse[SystemConfigListResponse]:
+        """List configurations with pagination, search, and sorting"""
         try:
             # Convert string scope to enum if provided
             scope_enum = None
             if scope:
                 scope_enum = ConfigScope(scope)
 
-            configs = await self.system_config_service.list_configs(scope_enum, project_key, limit, offset)
+            # Calculate offset from page parameters
+            offset = (page - 1) * page_size
+            limit = page_size
+
+            configs, total_count = await self.system_config_service.list_configs(
+                scope=scope_enum,
+                project_key=project_key,
+                limit=limit,
+                offset=offset,
+                search=search,
+                sort_by=sort_by,
+                sort_order=sort_order
+            )
 
             # Convert domain models to response objects
             items = []
@@ -114,11 +136,15 @@ class SystemConfigController:
                     updated_at=config.updated_at
                 ))
 
+            # Calculate total pages
+            total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+
             result = SystemConfigListResponse(
                 items=items,
-                total=len(items),  # In a real app, should get a count from DB
-                limit=limit,
-                offset=offset
+                total=total_count,
+                page=page,
+                page_size=page_size,
+                total_pages=total_pages
             )
 
             return StandardResponse(
@@ -286,33 +312,17 @@ class SystemConfigController:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
     async def get_project_configs(self, project_key: str) -> StandardResponse[SystemConfigListResponse]:
-        """Get all configurations for a project, including global fallbacks"""
+        """Get all configurations for a project"""
         try:
             # Get project-specific configs
-            project_configs = await self.system_config_service.list_configs(
+            project_configs, total_count = await self.system_config_service.list_configs(
                 scope=ConfigScope.PROJECT,
                 project_key=project_key
             )
 
-            # Get global configs
-            global_configs = await self.system_config_service.list_configs(
-                scope=ConfigScope.GLOBAL
-            )
-
-            # Create a dictionary of configs by key
-            configs_dict = {}
-
-            # First add all global configs
-            for config in global_configs:
-                configs_dict[config.key] = config
-
-            # Then override with project-specific configs
-            for config in project_configs:
-                configs_dict[config.key] = config
-
             # Convert to response objects
             items = []
-            for config in configs_dict.values():
+            for config in project_configs:
                 items.append(SystemConfigResponse(
                     id=config.id,
                     key=config.key,
@@ -327,9 +337,10 @@ class SystemConfigController:
 
             result = SystemConfigListResponse(
                 items=items,
-                total=len(items),
-                limit=len(items),
-                offset=0
+                total=total_count,
+                page=1,
+                page_size=len(items),
+                total_pages=1
             )
 
             return StandardResponse(

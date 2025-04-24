@@ -20,5 +20,6 @@ class SystemConfigResponse(BaseResponse):
 class SystemConfigListResponse(BaseResponse):
     items: List[SystemConfigResponse]
     total: int
-    offset: int
-    limit: int
+    page: int
+    page_size: int
+    total_pages: int

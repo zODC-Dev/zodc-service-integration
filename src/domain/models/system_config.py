@@ -7,7 +7,8 @@ from src.domain.models.base import BaseModel
 
 class ConfigScope(str, Enum):
     """Scope of configuration"""
-    GLOBAL = "global"
+    ADMIN = "admin"
+    GENERAL = "general"
     PROJECT = "project"
 
 
@@ -38,7 +39,7 @@ class SystemConfigModel(BaseModel):
 
     @classmethod
     def create_from_value(cls, key: str, value: Union[int, float, str, bool, time],
-                          scope: ConfigScope = ConfigScope.GLOBAL,
+                          scope: ConfigScope = ConfigScope.GENERAL,
                           project_key: Optional[str] = None,
                           description: Optional[str] = None) -> 'SystemConfigModel':
         """Create a config model from a value, automatically determining the type"""

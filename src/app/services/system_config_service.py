@@ -15,7 +15,7 @@ class SystemConfigApplicationService:
         """Get a configuration by ID"""
         return await self.system_config_repository.get(id)
 
-    async def get_config_by_key(self, key: str, scope: ConfigScope = ConfigScope.GLOBAL,
+    async def get_config_by_key(self, key: str, scope: ConfigScope = ConfigScope.GENERAL,
                                 project_key: Optional[str] = None) -> Optional[SystemConfigModel]:
         """Get a configuration by key, scope and project_key"""
         return await self.system_config_repository.get_by_key(key, scope, project_key)
@@ -26,12 +26,23 @@ class SystemConfigApplicationService:
 
     async def list_configs(self, scope: Optional[ConfigScope] = None,
                            project_key: Optional[str] = None,
-                           limit: int = 100, offset: int = 0) -> List[SystemConfigModel]:
-        """List configurations with pagination, optionally filtered by scope and project_key"""
-        return await self.system_config_repository.list(scope, project_key, limit, offset)
+                           limit: int = 100, offset: int = 0,
+                           search: Optional[str] = None,
+                           sort_by: Optional[str] = None,
+                           sort_order: Optional[str] = None) -> tuple[List[SystemConfigModel], int]:
+        """List configurations with pagination, search, and sorting"""
+        return await self.system_config_repository.list(
+            scope=scope,
+            project_key=project_key,
+            limit=limit,
+            offset=offset,
+            search=search,
+            sort_by=sort_by,
+            sort_order=sort_order
+        )
 
     async def create_config(self, key: str, value: Union[int, float, str, bool, time],
-                            scope: ConfigScope = ConfigScope.GLOBAL,
+                            scope: ConfigScope = ConfigScope.GENERAL,
                             project_key: Optional[str] = None,
                             description: Optional[str] = None) -> SystemConfigModel:
         """Create a new configuration"""
@@ -84,7 +95,7 @@ class SystemConfigApplicationService:
         return await self.system_config_repository.delete(id)
 
     async def upsert_config(self, key: str, value: Union[int, float, str, bool, time],
-                            scope: ConfigScope = ConfigScope.GLOBAL,
+                            scope: ConfigScope = ConfigScope.GENERAL,
                             project_key: Optional[str] = None,
                             description: Optional[str] = None) -> SystemConfigModel:
         """Create or update a configuration based on key, scope and project_key"""

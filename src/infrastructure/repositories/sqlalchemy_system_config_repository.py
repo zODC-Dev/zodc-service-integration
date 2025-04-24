@@ -1,7 +1,7 @@
 from datetime import time
 from typing import List, Optional, Union
 
-from sqlmodel import and_, col, desc, select
+from sqlmodel import and_, col, desc, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
@@ -78,7 +78,7 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             return None
         return self._to_model(entity)
 
-    async def get_by_key(self, key: str, scope: ConfigScope = ConfigScope.GLOBAL,
+    async def get_by_key(self, key: str, scope: ConfigScope = ConfigScope.GENERAL,
                          project_key: Optional[str] = None) -> Optional[SystemConfigModel]:
         """Get configuration by key, scope and project_key"""
         query = select(SystemConfigEntity).where(
@@ -105,28 +105,82 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             return project_config
 
         # Fall back to global config
-        return await self.get_by_key(key, ConfigScope.GLOBAL)
+        return await self.get_by_key(key, ConfigScope.GENERAL)
 
     async def list(self, scope: Optional[ConfigScope] = None,
                    project_key: Optional[str] = None,
-                   limit: int = 100, offset: int = 0) -> List[SystemConfigModel]:
-        """List configurations with pagination, optionally filtered by scope and project_key"""
-        query = select(SystemConfigEntity)
+                   limit: int = 100, offset: int = 0,
+                   search: Optional[str] = None,
+                   sort_by: Optional[str] = None,
+                   sort_order: Optional[str] = None) -> tuple[List[SystemConfigModel], int]:
+        """List configurations with pagination, search, and sorting"""
+        try:
+            # Build basic query
+            query = select(SystemConfigEntity)
+            count_query = select(col(SystemConfigEntity.id))
 
-        # Apply filters if provided
-        if scope:
-            query = query.where(col(SystemConfigEntity.scope) == scope)
+            # Apply filters if provided
+            filters = []
+            if scope:
+                filters.append(col(SystemConfigEntity.scope) == scope)
 
-        if project_key:
-            query = query.where(col(SystemConfigEntity.project_key) == project_key)
+            if project_key:
+                filters.append(col(SystemConfigEntity.project_key) == project_key)
 
-        # Apply pagination
-        query = query.order_by(desc(col(SystemConfigEntity.key))).offset(offset).limit(limit)
+            # Apply search filter if provided
+            if search:
+                search_term = f"%{search}%"
+                filters.append(
+                    or_(
+                        col(SystemConfigEntity.key).ilike(search_term),
+                        col(SystemConfigEntity.description).ilike(search_term)
+                    )
+                )
 
-        result = await self.session.exec(query)
-        entities = result.all()
-        log.info(f"Found {len(entities)} configurations")
-        return [self._to_model(entity) for entity in entities]
+            # Apply all filters
+            if filters:
+                filter_clause = and_(*filters)
+                query = query.where(filter_clause)
+                count_query = count_query.where(filter_clause)
+
+            # Get total count
+            count_result = await self.session.exec(count_query)
+            total_count = len(list(count_result))
+
+            # Apply sorting
+            valid_sort_fields = {
+                "id": SystemConfigEntity.id,
+                "key": SystemConfigEntity.key,
+                "scope": SystemConfigEntity.scope,
+                "project_key": SystemConfigEntity.project_key,
+                "type": SystemConfigEntity.type,
+                "description": SystemConfigEntity.description,
+                "created_at": SystemConfigEntity.created_at,
+                "updated_at": SystemConfigEntity.updated_at
+            }
+
+            if sort_by and sort_by in valid_sort_fields:
+                sort_column = valid_sort_fields[sort_by]
+                if sort_order and sort_order.lower() == "desc":
+                    query = query.order_by(desc(sort_column))
+                else:
+                    query = query.order_by(sort_column)
+            else:
+                # Default sorting
+                query = query.order_by(desc(col(SystemConfigEntity.updated_at)))
+
+            # Apply pagination
+            query = query.offset(offset).limit(limit)
+
+            # Execute query
+            result = await self.session.exec(query)
+            entities = result.all()
+
+            # Convert to domain models
+            return [self._to_model(entity) for entity in entities], total_count
+        except Exception as e:
+            log.error(f"Error listing configurations: {str(e)}")
+            raise
 
     async def create(self, model: SystemConfigModel) -> SystemConfigModel:
         """Create a new configuration"""

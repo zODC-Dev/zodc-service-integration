@@ -300,11 +300,23 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                         col(JiraIssueSprintEntity.jira_sprint_id) == col(JiraSprintEntity.jira_sprint_id)
                     ).where(col(JiraSprintEntity.id) == sprint_id)
                 elif is_backlog:
-                    # Issues without any sprint are in backlog
-                    query = query.outerjoin(
+                    # Issues with has no sprints or all sprints are closed but task is not done yet, are backlog
+                    subquery = select(JiraIssueEntity.jira_issue_id).join(
                         JiraIssueSprintEntity,
                         col(JiraIssueEntity.jira_issue_id) == col(JiraIssueSprintEntity.jira_issue_id)
-                    ).where(col(JiraIssueSprintEntity.jira_sprint_id) == None)  # noqa: E711
+                    ).join(
+                        JiraSprintEntity,
+                        col(JiraIssueSprintEntity.jira_sprint_id) == col(JiraSprintEntity.jira_sprint_id)
+                    ).where(
+                        and_(
+                            col(JiraSprintEntity.state).not_in(['active', 'future']),
+                            col(JiraIssueEntity.status) != JiraIssueStatus.DONE.value
+                        )
+                    )
+
+                    query = query.where(
+                        col(JiraIssueEntity.jira_issue_id).in_(subquery)
+                    )
 
             else:
                 log.info("No sprint ID or is_backlog provided")

@@ -1,6 +1,5 @@
 from typing import List, Optional
 
-from src.configs.logger import log
 from src.domain.constants.jira import JiraSprintState
 from src.domain.models.database.jira_sprint import JiraSprintDBCreateDTO, JiraSprintDBUpdateDTO
 from src.domain.models.jira_sprint import JiraSprintModel
@@ -29,9 +28,7 @@ class JiraSprintDatabaseService(IJiraSprintDatabaseService):
 
     async def get_project_sprints(self, project_key: str, include_deleted: bool = False) -> List[JiraSprintModel]:
         """Get all sprints for a project and determine current sprint"""
-        log.info(f"Getting sprints for project {project_key}")
         sprints = await self.sprint_repository.get_project_sprints(project_key, include_deleted)
-
         if not sprints:
             return []
 

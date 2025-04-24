@@ -109,7 +109,7 @@ class JiraProjectApplicationService:
         self,
         project_key: str,
     ) -> List[JiraSprintModel]:
-        # Sprints are always fetched from API as they're dynamic
+        # Sprints are always fetched from database as they already synced
         sprints = await self.jira_sprint_db_service.get_project_sprints(
             project_key=project_key
         )
