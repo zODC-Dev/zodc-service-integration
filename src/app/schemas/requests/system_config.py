@@ -7,7 +7,8 @@ from pydantic.alias_generators import to_camel
 
 
 class ConfigScopeEnum(str, Enum):
-    GLOBAL = "global"
+    ADMIN = "admin"
+    GENERAL = "general"
     PROJECT = "project"
 
 
@@ -68,7 +69,7 @@ class TimeConfigRequest(ConfigValueTypeBase):
 
 class SystemConfigCreateRequest(BaseModel):
     key: str = Field(..., min_length=1, max_length=100)
-    scope: ConfigScopeEnum = ConfigScopeEnum.GLOBAL
+    scope: ConfigScopeEnum = ConfigScopeEnum.GENERAL
     project_key: Optional[str] = None
     type: ConfigTypeEnum
     int_value: Optional[int] = None

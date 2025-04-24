@@ -45,6 +45,9 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
 
     async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int, include_deleted: bool = False) -> Optional[JiraSprintModel]:
         """Get sprint by Jira sprint ID"""
+        # Clear the session cache to force a fresh query to the database
+        self.session.expire_all()
+
         query = select(JiraSprintEntity).where(col(JiraSprintEntity.jira_sprint_id) == jira_sprint_id)
 
         if not include_deleted:
@@ -56,6 +59,9 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
 
     async def get_sprint_by_id(self, sprint_id: int, include_deleted: bool = False) -> Optional[JiraSprintModel]:
         """Get sprint by internal ID"""
+        # Clear the session cache to force a fresh query to the database
+        self.session.expire_all()
+
         query = select(JiraSprintEntity).where(JiraSprintEntity.id == sprint_id)
 
         if not include_deleted:
@@ -67,6 +73,9 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
 
     async def get_sprints_by_project_key(self, project_key: str, include_deleted: bool = False) -> List[JiraSprintModel]:
         """Get all sprints for a project"""
+        # Clear the session cache to force a fresh query to the database
+        self.session.expire_all()
+
         query = select(JiraSprintEntity).where(col(JiraSprintEntity.project_key) == project_key)
 
         if not include_deleted:
@@ -116,6 +125,10 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
     async def get_project_sprints(self, project_key: str, include_deleted: bool = False) -> List[JiraSprintModel]:
         """Get all sprints for a specific project"""
         log.info(f"Getting sprints for project {project_key}")
+
+        # Clear the session cache to force a fresh query to the database
+        self.session.expire_all()
+
         query = select(JiraSprintEntity).where(
             and_(
                 col(JiraSprintEntity.project_key) == project_key,
@@ -125,7 +138,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
 
         result = await self.session.exec(query)
         sprints = result.all()
-        log.info(f"Found {len(sprints)} active sprints for project {project_key}")
+        log.info(f"Sprints: {sprints}")
         return [self._to_domain(sprint) for sprint in sprints]
 
     async def get_current_sprint(self, project_key: str) -> Optional[JiraSprintModel]:

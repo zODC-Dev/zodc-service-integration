@@ -16,9 +16,10 @@ engine = create_async_engine(str(settings.DATABASE_URL),
                              pool_timeout=60,
                              pool_pre_ping=True,
                              pool_recycle=3600,
+                             isolation_level="READ COMMITTED"
                              )
 
-AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=True)
 
 Base = declarative_base()
 
