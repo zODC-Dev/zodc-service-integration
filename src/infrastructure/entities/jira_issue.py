@@ -41,7 +41,8 @@ class JiraIssueEntity(SQLModel, table=True):
     )
     updated_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
 
-    project: "JiraProjectEntity" = Relationship(back_populates="jira_issues")
+    project: "JiraProjectEntity" = Relationship(
+        back_populates="jira_issues", sa_relationship_kwargs={'lazy': 'selectin'})
     sprints: List["JiraSprintEntity"] = Relationship(
         back_populates="issues",
         link_model=JiraIssueSprintEntity,

@@ -383,15 +383,12 @@ class SystemConfigController:
                     value = time(int(parts[0]), int(parts[1]), int(parts[2]))
 
             # Update the config with the new value
-            updated_config = await self.system_config_service.update_config(
-                id=id,
-                type=data.type,
-                scope=data.scope,
-                value=value,
-                description=data.description
-            )
 
             if data.project_key and (data.scope == ConfigScope.PROJECT or existing.scope == ConfigScope.PROJECT):
+                updated_config = await self.system_config_service.update_config(
+                    id=id,
+                    description=data.description
+                )
                 # Check if project config already exists
                 existing_project_config = None
                 for pc in updated_config.project_configs:

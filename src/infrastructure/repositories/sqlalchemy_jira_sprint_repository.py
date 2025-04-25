@@ -135,7 +135,6 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
 
         result = await self.session.exec(query)
         sprints = result.all()
-        log.info(f"Sprints: {sprints}")
         return [self._to_domain(sprint) for sprint in sprints]
 
     async def get_current_sprint(self, project_key: str) -> Optional[JiraSprintModel]:
@@ -203,6 +202,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             start_date=sprint.start_date,
             end_date=sprint.end_date,
             complete_date=sprint.complete_date,
+            project_key=sprint.project_key,
             created_at=sprint.created_at,
             updated_at=sprint.updated_at,
             goal=sprint.goal,

@@ -135,6 +135,8 @@ class JiraSprintApplicationService:
             current_sprint_name = old_sprint.name
             next_sprint_name = current_sprint_name
 
+            assert old_sprint.project_key is not None, "Project key is required to create a new sprint"
+
             # Try to extract sprint number and increment it
             # Current sprint name is in the format "PROJECT Sprint X"
             sprint_number_match = re.search(rf'{old_sprint.project_key} Sprint\s+(\d+)',
