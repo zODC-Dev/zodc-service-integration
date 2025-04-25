@@ -44,8 +44,8 @@ class JiraSprintDatabaseService(IJiraSprintDatabaseService):
             current_sprint_id = active_sprints[0].id
         # Case 2: Không có active nhưng có future
         elif future_sprints:
-            # Sắp xếp future sprints theo created_at tăng dần
-            future_sprints.sort(key=lambda x: x.created_at)
+            # Sắp xếp future sprints theo created_at giảm dần
+            future_sprints.sort(key=lambda x: x.created_at, reverse=True)
             current_sprint_id = future_sprints[0].id
         # Case 3: Không có active và future, lấy closed gần nhất
         elif closed_sprints:

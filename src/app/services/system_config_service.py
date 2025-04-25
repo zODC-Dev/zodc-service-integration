@@ -161,13 +161,14 @@ class SystemConfigApplicationService:
         """Update an existing configuration"""
         # Create DTO with initial values
         dto = SystemConfigDBUpdateDTO(
-            scope=scope,
-            type=type,
             description=description
         )
 
         # If value is provided, set the appropriate field based on type
         if value is not None:
+            dto.type = type
+            dto.scope = scope
+
             config_type = type
 
             # If type is not provided, get it from the existing config
