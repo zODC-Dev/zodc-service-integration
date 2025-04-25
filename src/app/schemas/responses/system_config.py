@@ -5,16 +5,25 @@ from src.app.schemas.requests.system_config import ConfigScopeEnum, ConfigTypeEn
 from src.app.schemas.responses.base import BaseResponse
 
 
+class ProjectConfigResponse(BaseResponse):
+    id: int
+    project_key: str
+    system_config_id: int
+    value: Union[int, float, str, bool, time, None]
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
 class SystemConfigResponse(BaseResponse):
     id: int
     key: str
     scope: ConfigScopeEnum
-    project_key: Optional[str] = None
     type: ConfigTypeEnum
     value: Union[int, float, str, bool, time, None]
     description: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    project_configs: List[ProjectConfigResponse] = []
 
 
 class SystemConfigListResponse(BaseResponse):

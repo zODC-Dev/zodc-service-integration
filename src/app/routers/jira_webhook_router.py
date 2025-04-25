@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends
 
 from src.app.controllers.jira_webhook_controller import JiraWebhookController
 from src.app.dependencies.controllers import get_webhook_controller
-from src.configs.logger import log
 
 router = APIRouter()
 
@@ -15,5 +14,4 @@ async def jira_webhook(
     controller: JiraWebhookController = Depends(get_webhook_controller)
 ) -> Dict[str, str]:
     """Handle Jira webhook events"""
-    log.info(f"Received Jira webhook event: {payload}")
     return await controller.handle_webhook(payload)

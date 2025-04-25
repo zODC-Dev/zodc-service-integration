@@ -1,7 +1,14 @@
 from datetime import time
 from typing import List, Optional, Union
 
-from src.domain.models.system_config import ConfigScope, ConfigType, SystemConfigModel
+from src.configs.database import log
+from src.domain.models.database.system_config import (
+    ProjectConfigDBCreateDTO,
+    ProjectConfigDBUpdateDTO,
+    SystemConfigDBCreateDTO,
+    SystemConfigDBUpdateDTO,
+)
+from src.domain.models.system_config import ConfigScope, ConfigType, ProjectConfigModel, SystemConfigModel
 from src.domain.repositories.system_config_repository import ISystemConfigRepository
 
 
@@ -15,17 +22,15 @@ class SystemConfigApplicationService:
         """Get a configuration by ID"""
         return await self.system_config_repository.get(id)
 
-    async def get_config_by_key(self, key: str, scope: ConfigScope = ConfigScope.GENERAL,
-                                project_key: Optional[str] = None) -> Optional[SystemConfigModel]:
-        """Get a configuration by key, scope and project_key"""
-        return await self.system_config_repository.get_by_key(key, scope, project_key)
+    async def get_config_by_key_and_project_key(self, key: str, project_key: str) -> Optional[SystemConfigModel]:
+        """Get a configuration by key and project_key"""
+        return await self.system_config_repository.get_by_key_for_project(key, project_key)
 
-    async def get_project_config_or_fallback(self, key: str, project_key: str) -> Optional[SystemConfigModel]:
-        """Get project-specific configuration if exists, otherwise fall back to global configuration"""
-        return await self.system_config_repository.get_by_key_with_fallback(key, project_key)
+    async def get_config_by_key(self, key: str, scope: ConfigScope = ConfigScope.GENERAL) -> Optional[SystemConfigModel]:
+        """Get a configuration by key and scope"""
+        return await self.system_config_repository.get_by_key(key, scope)
 
     async def list_configs(self, scope: Optional[ConfigScope] = None,
-                           project_key: Optional[str] = None,
                            limit: int = 100, offset: int = 0,
                            search: Optional[str] = None,
                            sort_by: Optional[str] = None,
@@ -33,7 +38,6 @@ class SystemConfigApplicationService:
         """List configurations with pagination, search, and sorting"""
         return await self.system_config_repository.list(
             scope=scope,
-            project_key=project_key,
             limit=limit,
             offset=offset,
             search=search,
@@ -41,133 +45,262 @@ class SystemConfigApplicationService:
             sort_order=sort_order
         )
 
+    async def list_project_configs(self, project_key: str,
+                                   limit: int = 100, offset: int = 0) -> tuple[List[SystemConfigModel], int]:
+        """List configurations for a specific project"""
+        return await self.system_config_repository.list_for_project(
+            project_key=project_key,
+            limit=limit,
+            offset=offset
+        )
+
     async def create_config(self, key: str, value: Union[int, float, str, bool, time],
                             scope: ConfigScope = ConfigScope.GENERAL,
-                            project_key: Optional[str] = None,
                             description: Optional[str] = None) -> SystemConfigModel:
         """Create a new configuration"""
-        config = SystemConfigModel.create_from_value(
-            key=key,
-            value=value,
-            scope=scope,
-            project_key=project_key,
-            description=description
-        )
-        return await self.system_config_repository.create(config)
+        # Determine the type based on value
+        config_type = None
+        if isinstance(value, int):
+            config_type = ConfigType.INT
+            dto = SystemConfigDBCreateDTO(
+                key=key,
+                scope=scope,
+                type=config_type,
+                int_value=value,
+                description=description
+            )
+        elif isinstance(value, float):
+            config_type = ConfigType.FLOAT
+            dto = SystemConfigDBCreateDTO(
+                key=key,
+                scope=scope,
+                type=config_type,
+                float_value=value,
+                description=description
+            )
+        elif isinstance(value, str):
+            config_type = ConfigType.STRING
+            dto = SystemConfigDBCreateDTO(
+                key=key,
+                scope=scope,
+                type=config_type,
+                string_value=value,
+                description=description
+            )
+        elif isinstance(value, bool):
+            config_type = ConfigType.BOOL
+            dto = SystemConfigDBCreateDTO(
+                key=key,
+                scope=scope,
+                type=config_type,
+                bool_value=value,
+                description=description
+            )
+        elif isinstance(value, time):
+            config_type = ConfigType.TIME
+            dto = SystemConfigDBCreateDTO(
+                key=key,
+                scope=scope,
+                type=config_type,
+                time_value=value,
+                description=description
+            )
+        else:
+            raise ValueError(f"Unsupported value type: {type(value)}")
 
-    async def update_config(self, id: int, key: Optional[str] = None,
-                            value: Optional[Union[int, float, str, bool, time]] = None,
+        return await self.system_config_repository.create(dto)
+
+    async def create_project_config(self, system_config_id: int, project_key: str,
+                                    value: Union[int, float, str, bool, time]) -> ProjectConfigModel:
+        """Create a project-specific configuration"""
+        # Get the system config to determine type
+        system_config = await self.get_config(system_config_id)
+        if not system_config:
+            raise ValueError(f"System config with ID {system_config_id} not found")
+
+        # Create the appropriate DTO based on type
+        if system_config.type == ConfigType.INT and isinstance(value, int):
+            dto = ProjectConfigDBCreateDTO(
+                system_config_id=system_config_id,
+                project_key=project_key,
+                int_value=value
+            )
+        elif system_config.type == ConfigType.FLOAT and isinstance(value, (int, float)):
+            dto = ProjectConfigDBCreateDTO(
+                system_config_id=system_config_id,
+                project_key=project_key,
+                float_value=value
+            )
+        elif system_config.type == ConfigType.STRING and isinstance(value, str):
+            dto = ProjectConfigDBCreateDTO(
+                system_config_id=system_config_id,
+                project_key=project_key,
+                string_value=value
+            )
+        elif system_config.type == ConfigType.BOOL and isinstance(value, bool):
+            dto = ProjectConfigDBCreateDTO(
+                system_config_id=system_config_id,
+                project_key=project_key,
+                bool_value=value
+            )
+        elif system_config.type == ConfigType.TIME and isinstance(value, time):
+            dto = ProjectConfigDBCreateDTO(
+                system_config_id=system_config_id,
+                project_key=project_key,
+                time_value=value
+            )
+        else:
+            raise ValueError(f"Value type doesn't match config type: {system_config.type}")
+
+        return await self.system_config_repository.create_project_config(dto)
+
+    async def update_config(self, id: int, type: Optional[ConfigType] = None,
                             scope: Optional[ConfigScope] = None,
-                            project_key: Optional[str] = None,
+                            value: Optional[Union[int, float, str, bool, time]] = None,
                             description: Optional[str] = None) -> Optional[SystemConfigModel]:
         """Update an existing configuration"""
-        config = await self.system_config_repository.get(id)
-        if not config:
-            return None
+        # Create DTO with initial values
+        dto = SystemConfigDBUpdateDTO(
+            scope=scope,
+            type=type,
+            description=description
+        )
 
-        # Update fields if provided
-        if key is not None:
-            config.key = key
-        if scope is not None:
-            config.scope = scope
-        if project_key is not None:
-            config.project_key = project_key
-        if description is not None:
-            config.description = description
+        # If value is provided, set the appropriate field based on type
         if value is not None:
-            # Determine new type based on value type
-            if isinstance(value, int):
-                config.type = ConfigType.INT
-            elif isinstance(value, float):
-                config.type = ConfigType.FLOAT
-            elif isinstance(value, str):
-                config.type = ConfigType.STRING
-            elif isinstance(value, bool):
-                config.type = ConfigType.BOOL
-            elif isinstance(value, time):
-                config.type = ConfigType.TIME
-            config.value = value
+            config_type = type
 
-        return await self.system_config_repository.update(config)
+            # If type is not provided, get it from the existing config
+            if config_type is None:
+                existing = await self.get_config(id)
+                if not existing:
+                    return None
+                config_type = existing.type
+
+            # Set the appropriate value field based on type
+            if config_type == ConfigType.INT and isinstance(value, int):
+                dto.int_value = value
+            elif config_type == ConfigType.FLOAT and isinstance(value, (int, float)):
+                dto.float_value = value
+            elif config_type == ConfigType.STRING and isinstance(value, str):
+                dto.string_value = value
+            elif config_type == ConfigType.BOOL and isinstance(value, bool):
+                dto.bool_value = value
+            elif config_type == ConfigType.TIME and isinstance(value, time):
+                dto.time_value = value
+            else:
+                raise ValueError(f"Value type doesn't match config type: {config_type}")
+
+        return await self.system_config_repository.update(id, dto)
+
+    async def update_project_config(self, id: int,
+                                    value: Union[int, float, str, bool, time],
+                                    value_type: ConfigType = ConfigType.STRING) -> Optional[ProjectConfigModel]:
+        """Update a project-specific configuration"""
+        # Get the existing project config to determine the system config type
+        project_config = await self.system_config_repository.get_project_config_by_id(id)
+        log.info(f"project_config: {project_config}")
+        if not project_config:
+            raise ValueError(f"Project config with ID {id} not found")
+
+        # Create DTO with the appropriate value field
+        dto = ProjectConfigDBUpdateDTO(
+            project_key=project_config.project_key,
+            system_config_id=project_config.system_config_id,
+        )
+
+        # Set the appropriate value field based on system config type
+        config_type = value_type
+        if config_type == ConfigType.INT and isinstance(value, int):
+            dto.int_value = value
+        elif config_type == ConfigType.FLOAT and isinstance(value, (int, float)):
+            dto.float_value = value
+        elif config_type == ConfigType.STRING and isinstance(value, str):
+            dto.string_value = value
+        elif config_type == ConfigType.BOOL and isinstance(value, bool):
+            dto.bool_value = value
+        elif config_type == ConfigType.TIME and isinstance(value, time):
+            dto.time_value = value
+        else:
+            raise ValueError(f"Value type doesn't match config type: {config_type}")
+
+        log.info(f"dto: {dto}")
+
+        return await self.system_config_repository.update_project_config(id, dto)
 
     async def delete_config(self, id: int) -> bool:
         """Delete a configuration"""
         return await self.system_config_repository.delete(id)
 
-    async def upsert_config(self, key: str, value: Union[int, float, str, bool, time],
-                            scope: ConfigScope = ConfigScope.GENERAL,
-                            project_key: Optional[str] = None,
-                            description: Optional[str] = None) -> SystemConfigModel:
-        """Create or update a configuration based on key, scope and project_key"""
-        config = SystemConfigModel.create_from_value(
-            key=key,
-            value=value,
-            scope=scope,
-            project_key=project_key,
-            description=description
-        )
-        return await self.system_config_repository.upsert(config)
+    async def delete_project_config(self, id: int) -> bool:
+        """Delete a project-specific configuration"""
+        return await self.system_config_repository.delete_project_config(id)
 
-    async def bulk_upsert_configs(self, configs: List[SystemConfigModel]) -> List[SystemConfigModel]:
-        """Bulk create or update configurations"""
-        return await self.system_config_repository.bulk_upsert(configs)
-
-    async def get_working_hours_per_day(self, project_key: Optional[str] = None) -> int:
+    async def get_working_hours_per_day(self) -> int:
         """Get working_hours_per_day config with fallback to default value"""
         key = "working_hours_per_day"
-        if project_key:
-            config = await self.get_project_config_or_fallback(key, project_key)
-        else:
-            config = await self.get_config_by_key(key)
+        config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
 
         return config.value if config else 8  # Default: 8 hours
 
     async def get_hours_per_point(self, project_key: Optional[str] = None) -> int:
         """Get hours_per_point config with fallback to default value"""
         key = "hours_per_point"
+
         if project_key:
-            config = await self.get_project_config_or_fallback(key, project_key)
+            # Try to get project-specific value
+            config = await self.get_config_by_key_and_project_key(key, project_key)
         else:
-            config = await self.get_config_by_key(key)
+            # Get general config
+            config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
 
         return config.value if config else 4  # Default: 4 hours
 
-    async def get_lunch_break_minutes(self, project_key: Optional[str] = None) -> int:
+    async def get_lunch_break_minutes(self) -> int:
         """Get lunch_break_minutes config with fallback to default value"""
         key = "lunch_break_minutes"
-        if project_key:
-            config = await self.get_project_config_or_fallback(key, project_key)
-        else:
-            config = await self.get_config_by_key(key)
+        config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
 
         return config.value if config else 30  # Default: 30 minutes
 
-    async def get_include_weekends(self, project_key: Optional[str] = None) -> bool:
+    async def get_include_weekends(self) -> bool:
         """Get include_weekends config with fallback to default value"""
         key = "include_weekends"
-        if project_key:
-            config = await self.get_project_config_or_fallback(key, project_key)
-        else:
-            config = await self.get_config_by_key(key)
+        config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
 
         return config.value if config else False  # Default: False
 
-    async def get_start_work_hour(self, project_key: Optional[str] = None) -> time:
+    async def get_start_work_hour(self) -> time:
         """Get start_work_hour config with fallback to default value"""
         key = "start_work_hour"
-        if project_key:
-            config = await self.get_project_config_or_fallback(key, project_key)
-        else:
-            config = await self.get_config_by_key(key)
+        config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
 
         return config.value if config else time(9, 0)  # Default: 9:00 AM
 
-    async def get_end_work_hour(self, project_key: Optional[str] = None) -> time:
+    async def get_end_work_hour(self) -> time:
         """Get end_work_hour config with fallback to default value"""
         key = "end_work_hour"
-        if project_key:
-            config = await self.get_project_config_or_fallback(key, project_key)
-        else:
-            config = await self.get_config_by_key(key)
+        config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
 
         return config.value if config else time(17, 30)  # Default: 5:30 PM
+
+    async def get_project_config(self, id: int) -> Optional[ProjectConfigModel]:
+        """Get a project-specific configuration by ID"""
+        try:
+            return await self.system_config_repository.get_project_config_by_id(id)
+        except Exception:
+            # If the method doesn't exist in the repository, let's implement it here
+            # This is temporary until we update the repository
+            result = None
+
+            # Get all configs and search for the project config with this ID
+            configs, _ = await self.list_configs()
+            for config in configs:
+                for pc in config.project_configs:
+                    if pc.id == id:
+                        result = pc
+                        break
+                if result:
+                    break
+
+            return result

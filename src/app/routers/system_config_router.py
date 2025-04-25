@@ -4,7 +4,11 @@ from fastapi import APIRouter, Depends, Path, Query
 
 from src.app.controllers.system_config_controller import SystemConfigController
 from src.app.dependencies.controllers import get_system_config_controller
-from src.app.schemas.requests.system_config import SystemConfigCreateRequest, SystemConfigUpdateRequest
+from src.app.schemas.requests.system_config import (
+    SystemConfigCreateRequest,
+    SystemConfigPatchRequest,
+    SystemConfigUpdateRequest,
+)
 from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.system_config import SystemConfigListResponse, SystemConfigResponse
 
@@ -13,13 +17,13 @@ router = APIRouter()
 
 @router.get("", response_model=StandardResponse[SystemConfigListResponse])
 async def list_configs(
-    scope: Optional[str] = Query(None, description="Filter by scope (global or project)"),
+    scope: Optional[str] = Query(None, description="Filter by scope (admin, general, or project)"),
     project_key: Optional[str] = Query(None, description="Filter by project key"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Items per page", alias="pageSize"),
     search: Optional[str] = Query(None, description="Search by config key or description"),
     sort_by: Optional[str] = Query(
-        None, description="Field to sort by (id, key, scope, project_key, type)", alias="sortBy"),
+        None, description="Field to sort by (id, key, scope, type)", alias="sortBy"),
     sort_order: Optional[str] = Query(None, description="Sort order (asc or desc)", alias="sortOrder"),
     controller: SystemConfigController = Depends(get_system_config_controller),
 ):
@@ -63,6 +67,16 @@ async def get_config_by_key(
     return await controller.get_config_by_key(key=key, scope=scope, project_key=project_key)
 
 
+@router.get("/projects/{project_key}/keys/{key}", response_model=StandardResponse[SystemConfigResponse])
+async def get_config_by_key_and_project_key(
+    key: str = Path(..., description="Configuration key"),
+    project_key: str = Path(..., description="Project key"),
+    controller: SystemConfigController = Depends(get_system_config_controller),
+):
+    """Get a system configuration by key and project key"""
+    return await controller.get_config_by_key_and_project_key(key=key, project_key=project_key)
+
+
 @router.post("", response_model=StandardResponse[SystemConfigResponse])
 async def create_config(
     data: SystemConfigCreateRequest,
@@ -80,6 +94,24 @@ async def update_config(
 ):
     """Update an existing system configuration"""
     return await controller.update_config(id=id, data=data)
+
+
+@router.patch("/{id}", response_model=StandardResponse[SystemConfigResponse])
+async def patch_config(
+    data: SystemConfigPatchRequest,
+    id: int = Path(..., description="Configuration ID"),
+    controller: SystemConfigController = Depends(get_system_config_controller),
+):
+    """Patch a system configuration with simpler value field.
+
+    This endpoint allows updating:
+    - type: Config type (int, float, string, bool, time)
+    - value: The value for the config (must match the type)
+    - scope: The scope (general, admin, project)
+    - project_key: (required if scope is 'project')
+    - description: Optional description
+    """
+    return await controller.patch_config(id=id, data=data)
 
 
 @router.delete("/{id}", response_model=StandardResponse[bool])

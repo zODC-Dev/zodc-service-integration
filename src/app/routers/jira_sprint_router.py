@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Query
 
 from src.app.controllers.jira_sprint_controller import JiraSprintController
 from src.app.dependencies.controllers import get_jira_sprint_controller
@@ -7,6 +7,15 @@ from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.jira_project import GetJiraSprintDetailsResponse, GetJiraSprintResponse
 
 router = APIRouter()
+
+
+@router.get("/current", response_model=StandardResponse[GetJiraSprintResponse])
+async def get_current_sprint(
+    controller: JiraSprintController = Depends(get_jira_sprint_controller),
+    project_key: str = Query(..., description="Key of the project to get current sprint", alias="projectKey")
+) -> StandardResponse[GetJiraSprintResponse]:
+    """Get the current sprint in Jira"""
+    return await controller.get_current_sprint(project_key=project_key)
 
 
 @router.get("/{sprint_id}", response_model=StandardResponse[GetJiraSprintDetailsResponse])

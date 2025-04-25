@@ -55,7 +55,7 @@ class GetJiraIssueResponse(BaseResponse):
     key: str
     summary: str
     assignee: Optional[JiraAssigneeResponse] = None
-    priority: Optional[JiraIssuePriorityResponse] = None
+    priority: Optional[str] = None
     type: JiraIssueType
     sprint: Optional[JiraIssueSprintResponse] = None
     estimate_point: float = 0

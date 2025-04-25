@@ -223,7 +223,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         }
 
         for bug in bug_issues:
-            priority = bug.priority.name.lower() if bug.priority else "medium"
+            priority = bug.priority.lower() if bug.priority else "medium"
             if priority in priority_bugs:
                 priority_bugs[priority].append(bug)
             else:
@@ -254,7 +254,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
                 link=bug.link_url or f"https://jira.example.com/browse/{bug.key}",  # Use link_url if available
                 summary=bug.summary,
                 points=bug.estimate_point or 0,
-                priority=bug.priority.name if bug.priority else "Medium",
+                priority=bug.priority if bug.priority else "Medium",
                 status=bug.status,
                 assignee=JiraAssigneeResponse.from_domain(bug.assignee) if bug.assignee else None,
                 created_at=bug.created_at,

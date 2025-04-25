@@ -18,12 +18,6 @@ class JiraBaseModel(BaseModel):
     )
 
 
-class JiraIssuePriorityModel(JiraBaseModel):
-    id: str
-    name: str
-    icon_url: str
-
-
 class JiraIssueModel(BaseModel):
     id: Optional[int] = None
     key: str
@@ -32,7 +26,7 @@ class JiraIssueModel(BaseModel):
     status: JiraIssueStatus
     assignee: Optional['JiraUserModel'] = None
     assignee_id: Optional[str] = None  # Add assignee_id field
-    priority: Optional['JiraIssuePriorityModel'] = None
+    priority: Optional[str] = None
     type: JiraIssueType
     sprints: List['JiraSprintModel'] = Field(default_factory=list)
     estimate_point: float = Field(default=0)

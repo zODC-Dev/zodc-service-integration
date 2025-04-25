@@ -45,9 +45,6 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
 
     async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int, include_deleted: bool = False) -> Optional[JiraSprintModel]:
         """Get sprint by Jira sprint ID"""
-        # Clear the session cache to force a fresh query to the database
-        self.session.expire_all()
-
         query = select(JiraSprintEntity).where(col(JiraSprintEntity.jira_sprint_id) == jira_sprint_id)
 
         if not include_deleted:
