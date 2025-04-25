@@ -35,6 +35,12 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
     async def create(self, issue: JiraIssueDBCreateDTO) -> JiraIssueModel:
         try:
             issue_model = JiraIssueDBCreateDTO._to_domain(issue)
+
+            # Check if issue key is already exists
+            existing_issue = await self.get_by_jira_issue_key(issue_model.key)
+            if existing_issue:
+                raise ValueError(f"Issue with key {issue_model.key} already exists")
+
             # Create issue entity
             issue_entity = self._to_entity(issue_model)
             self.session.add(issue_entity)
@@ -195,7 +201,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             description=model.description,
             status=model.status.value,
             type=model.type.value,
-            priority_id=model.priority.id if model.priority else None,
+            priority_id=model.priority,
             estimate_point=model.estimate_point,
             actual_point=model.actual_point,
             project_key=model.project_key,
@@ -250,6 +256,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             actual_point=entity.actual_point,
             project_key=entity.project_key,
             reporter_id=entity.reporter_id,
+            priority=entity.priority_id,
             assignee_id=entity.assignee_id,
             created_at=entity.created_at,
             updated_at=entity.updated_at,

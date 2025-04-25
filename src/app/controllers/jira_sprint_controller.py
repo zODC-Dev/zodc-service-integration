@@ -30,17 +30,26 @@ class JiraSprintController:
             log.error(f"Unexpected error when getting sprint {sprint_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e
 
+    async def get_current_sprint(self, project_key: str) -> StandardResponse[GetJiraSprintResponse]:
+        """Get the current sprint in Jira"""
+        try:
+            current_sprint = await self.sprint_service.get_current_sprint(project_key=project_key)
+            current_sprint.is_current = True
+            return StandardResponse(
+                message="Current sprint retrieved successfully",
+                data=GetJiraSprintResponse.from_domain(current_sprint)
+            )
+        except Exception as e:
+            log.error("Unexpected error when getting current sprint: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e
+
     async def start_sprint(
         self,
         sprint_id: int,
-        sprint_data: SprintStartRequest = None
+        sprint_data: SprintStartRequest
     ) -> StandardResponse[GetJiraSprintResponse]:
         """Start a sprint in Jira using admin account with optional parameters"""
         try:
-            # Default to empty request if not provided
-            if sprint_data is None:
-                sprint_data = SprintStartRequest()
-
             updated_sprint = await self.sprint_service.start_sprint(
                 sprint_id=sprint_id,
                 start_date=sprint_data.start_date,

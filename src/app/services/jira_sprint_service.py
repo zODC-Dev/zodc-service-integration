@@ -24,6 +24,10 @@ class JiraSprintApplicationService:
         self.jira_sprint_database_service = jira_sprint_database_service
         self.jira_issue_repository = jira_issue_repository
 
+    async def get_current_sprint(self, project_key: str) -> Optional[JiraSprintModel]:
+        """Get the current sprint in Jira"""
+        return await self.jira_sprint_database_service.get_current_sprint(project_key=project_key)
+
     async def start_sprint(
         self,
         sprint_id: int,
@@ -123,38 +127,39 @@ class JiraSprintApplicationService:
 
         return sprint, task_count_by_status
 
-    async def create_sprint(self, sprint: JiraSprintModel) -> Optional[int]:
+    async def create_sprint(self, old_sprint: JiraSprintModel) -> Optional[int]:
         """Create a new sprint in Jira"""
         # Create a new future sprint after ending the current one
         try:
             # Calculate next sprint number from current sprint name if possible
-            current_sprint_name = sprint.name
+            current_sprint_name = old_sprint.name
             next_sprint_name = current_sprint_name
 
             # Try to extract sprint number and increment it
             # Current sprint name is in the format "PROJECT Sprint X"
-            sprint_number_match = re.search(rf'{sprint.project_key} Sprint\s+(\d+)', current_sprint_name, re.IGNORECASE)
+            sprint_number_match = re.search(rf'{old_sprint.project_key} Sprint\s+(\d+)',
+                                            current_sprint_name, re.IGNORECASE)
             if sprint_number_match:
                 current_number = int(sprint_number_match.group(1))
                 next_number = current_number + 1
-                next_sprint_name = f"{sprint.project_key} Sprint {next_number}"
+                next_sprint_name = f"{old_sprint.project_key} Sprint {next_number}"
 
             else:
-                next_sprint_name = f"{sprint.project_key} Sprint 1"
+                next_sprint_name = f"{old_sprint.project_key} Sprint 1"
 
             # Create new sprint in Jira
             # Log the next sprint name
             log.debug(
-                f"Creating new sprint '{next_sprint_name}' in Jira, board_id: {sprint.board_id}, project_key: {sprint.project_key}")
+                f"Creating new sprint '{next_sprint_name}' in Jira, board_id: {old_sprint.board_id}, project_key: {old_sprint.project_key}")
             new_sprint_jira_id = await self.jira_sprint_api_service.create_sprint(
                 name=next_sprint_name,
-                board_id=sprint.board_id,
-                project_key=sprint.project_key
+                board_id=old_sprint.board_id,
+                project_key=old_sprint.project_key
             )
 
             log.debug(f"Created new future sprint '{next_sprint_name}' with Jira ID {new_sprint_jira_id}")
             return new_sprint_jira_id
         except Exception as e:
-            log.error(f"Error creating new future sprint after ending sprint {sprint.id}: {str(e)}")
+            log.error(f"Error creating new future sprint after ending sprint {old_sprint.id}: {str(e)}")
             # Don't fail the main operation if creating a new sprint fails
             return None

@@ -4,11 +4,10 @@ from typing import Any, Dict, List, Optional, Union
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
-from src.domain.models.jira.apis.responses.common import JiraAPIIssuePriorityResponse
 from src.domain.models.jira.apis.responses.jira_issue import JiraIssueAPIGetResponseDTO
 from src.domain.models.jira.apis.responses.jira_sprint import JiraSprintAPIGetResponseDTO
 from src.domain.models.jira.apis.responses.jira_user import JiraUserAPIGetResponseDTO
-from src.domain.models.jira_issue import JiraIssueModel, JiraIssuePriorityModel
+from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
 
@@ -269,6 +268,7 @@ class JiraIssueMapper:
                 type=JiraIssueType(fields.issuetype.name) if hasattr(fields, 'issuetype') else JiraIssueType.TASK,
                 status=JiraIssueStatus(fields.status.name) if hasattr(fields, 'status') else JiraIssueStatus.TO_DO,
                 assignee_id=assignee_id,
+                priority=fields.priority.name if hasattr(fields, 'priority') else None,
                 reporter_id=reporter_id,
                 estimate_point=fields.customfield_10016 or 0,
                 actual_point=fields.customfield_10017 or 0,
@@ -282,14 +282,6 @@ class JiraIssueMapper:
         except Exception as e:
             log.error(f"Error mapping API response to domain issue: {str(e)}")
             raise
-
-    @staticmethod
-    def _map_priority(api_priority: JiraAPIIssuePriorityResponse) -> JiraIssuePriorityModel:
-        return JiraIssuePriorityModel(
-            id=api_priority.id,
-            name=api_priority.name,
-            icon_url=api_priority.iconUrl
-        )
 
     @staticmethod
     def _map_sprint(api_sprint: JiraSprintAPIGetResponseDTO, project_key: str) -> Optional[JiraSprintModel]:

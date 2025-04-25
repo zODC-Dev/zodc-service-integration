@@ -20,6 +20,7 @@ class JiraIssueDBCreateDTO(BaseModel):
     reporter_id: Optional[str] = None
     estimate_point: Optional[float] = None
     actual_point: Optional[float] = None
+    priority: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = Field(default_factory=datetime.now)
     sprints: List[JiraSprintModel] = Field(default_factory=list)
@@ -47,6 +48,7 @@ class JiraIssueDBCreateDTO(BaseModel):
             is_deleted=False,
             link_url=entity.link_url,
             sprints=entity.sprints,
+            priority=entity.priority,
         )
 
     @classmethod
@@ -105,6 +107,7 @@ class JiraIssueDBUpdateDTO(BaseModel):
     is_system_linked: Optional[bool] = None
     assignee_id: Optional[str] = None
     reporter_id: Optional[str] = None
+    priority: Optional[str] = None
     sprints: Optional[List[JiraSprintModel]] = None
     is_deleted: Optional[bool] = None
     type: Optional[Union[JiraIssueType, str]] = None
@@ -151,4 +154,5 @@ class JiraIssueDBUpdateDTO(BaseModel):
             is_deleted=domain.is_deleted,
             type=domain.type,
             sprints=domain.sprints,
+            priority=domain.priority,
         )

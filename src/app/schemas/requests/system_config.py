@@ -131,3 +131,55 @@ class SystemConfigUpdateRequest(BaseModel):
     class Config:
         populate_by_name = True
         alias_generator = to_camel
+
+
+class SystemConfigPatchRequest(BaseModel):
+    value: Any
+    type: ConfigTypeEnum
+    scope: Optional[ConfigScopeEnum] = None
+    project_key: Optional[str] = Field(None, description="Only used when scope is PROJECT", alias="projectKey")
+    description: Optional[str] = None
+
+    @field_validator('value')
+    @classmethod
+    def validate_value_type(cls, v, info: Any):
+        config_type = info.data.get('type')
+        if not config_type:
+            return v
+
+        if config_type == ConfigTypeEnum.INT and not isinstance(v, int):
+            raise ValueError("Value must be an integer when type is 'int'")
+        elif config_type == ConfigTypeEnum.FLOAT and not isinstance(v, (int, float)):
+            raise ValueError("Value must be a number when type is 'float'")
+        elif config_type == ConfigTypeEnum.STRING and not isinstance(v, str):
+            raise ValueError("Value must be a string when type is 'string'")
+        elif config_type == ConfigTypeEnum.BOOL and not isinstance(v, bool):
+            raise ValueError("Value must be a boolean when type is 'bool'")
+        elif config_type == ConfigTypeEnum.TIME and not isinstance(v, str):
+            # Time validation
+            try:
+                parts = v.split(':')
+                if len(parts) == 2:
+                    hour, minute = parts
+                    time(int(hour), int(minute))
+                elif len(parts) == 3:
+                    hour, minute, second = parts
+                    time(int(hour), int(minute), int(second))
+                else:
+                    raise ValueError("Time must be in format HH:MM or HH:MM:SS")
+            except Exception as e:
+                raise ValueError(f"Invalid time format: {e}") from e
+
+        return v
+
+    @field_validator('project_key')
+    @classmethod
+    def validate_project_key(cls, v, info: Any):
+        values = info.data
+        if values.get('scope') == ConfigScopeEnum.PROJECT and not v:
+            raise ValueError("project_key is required when scope is 'project'")
+        return v
+
+    class Config:
+        populate_by_name = True
+        alias_generator = to_camel
