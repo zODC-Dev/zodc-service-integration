@@ -383,11 +383,11 @@ class SystemConfigController:
                     value = time(int(parts[0]), int(parts[1]), int(parts[2]))
 
             # Update the config with the new value
-            updated_config = await self.system_config_service.update_config(
-                id=id,
-                description=data.description
-            )
             if data.project_key and (data.scope == ConfigScope.PROJECT or existing.scope == ConfigScope.PROJECT):
+                updated_config = await self.system_config_service.update_config(
+                    id=id,
+                    description=data.description
+                )
                 # Check if project config already exists
                 existing_project_config = None
                 for pc in updated_config.project_configs:
@@ -413,17 +413,36 @@ class SystemConfigController:
                 # Refresh config with updated project configs
                 updated_config = await self.system_config_service.get_config(id)
 
-            result = SystemConfigResponse(
-                id=updated_config.id,
-                key=updated_config.key,
-                scope=updated_config.scope,
-                type=updated_config.type,
-                value=updated_config.value,
-                description=updated_config.description,
-                created_at=updated_config.created_at,
-                updated_at=updated_config.updated_at,
-                project_configs=[self._to_project_config_response(pc) for pc in updated_config.project_configs]
-            )
+                result = SystemConfigResponse(
+                    id=updated_config.id,
+                    key=updated_config.key,
+                    scope=updated_config.scope,
+                    type=updated_config.type,
+                    value=updated_config.value,
+                    description=updated_config.description,
+                    created_at=updated_config.created_at,
+                    updated_at=updated_config.updated_at,
+                    project_configs=[self._to_project_config_response(pc) for pc in updated_config.project_configs]
+                )
+            else:
+                updated_config = await self.system_config_service.update_config(
+                    id=id,
+                    description=data.description,
+                    type=data.type,
+                    scope=data.scope,
+                    value=value
+                )
+
+                result = SystemConfigResponse(
+                    id=updated_config.id,
+                    key=updated_config.key,
+                    scope=updated_config.scope,
+                    type=updated_config.type,
+                    value=updated_config.value,
+                    description=updated_config.description,
+                    created_at=updated_config.created_at,
+                    updated_at=updated_config.updated_at,
+                )
 
             return StandardResponse(
                 data=result,
