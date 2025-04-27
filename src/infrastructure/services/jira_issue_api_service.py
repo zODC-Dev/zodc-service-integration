@@ -143,7 +143,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         log.info(f"Creating issue with data: {issue_data}")
 
         # Prepare payload
-        payload = {
+        payload: Dict[str, Any] = {
             "fields": {
                 "project": {"key": issue_data.project_key},
                 "summary": issue_data.summary,

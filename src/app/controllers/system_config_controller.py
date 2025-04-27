@@ -1,5 +1,5 @@
 from datetime import time
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from fastapi import HTTPException
 
@@ -212,7 +212,7 @@ class SystemConfigController:
         """Create a new system configuration"""
         try:
             # Get the value based on the type
-            value = None
+            value: Optional[Union[int, float, str, bool, time]] = None
             if data.type.value == ConfigType.INT.value:
                 value = data.int_value
             elif data.type.value == ConfigType.FLOAT.value:
@@ -241,6 +241,7 @@ class SystemConfigController:
                 description=data.description
             )
 
+            assert config.id is not None, "Config ID is required"
             # If scope is PROJECT and project_key is provided, create project-specific value
             if data.scope == ConfigScope.PROJECT and data.project_key:
                 await self.system_config_service.create_project_config(
@@ -249,8 +250,7 @@ class SystemConfigController:
                     value=value
                 )
 
-                # Refresh config to include the newly created project config
-                config = await self.system_config_service.get_config(config.id)
+            config = await self.system_config_service.get_config(config.id)
 
             result = SystemConfigResponse(
                 id=config.id,
@@ -284,7 +284,7 @@ class SystemConfigController:
                 raise HTTPException(status_code=404, detail=f"Config with ID {id} not found")
 
             # Get the value based on type
-            value = None
+            value: Optional[Union[int, float, str, bool, time]] = None
             if data.type:
                 if data.type.value == ConfigType.INT.value and data.int_value is not None:
                     value = data.int_value
@@ -383,12 +383,11 @@ class SystemConfigController:
                     value = time(int(parts[0]), int(parts[1]), int(parts[2]))
 
             # Update the config with the new value
-
+            updated_config = await self.system_config_service.update_config(
+                id=id,
+                description=data.description
+            )
             if data.project_key and (data.scope == ConfigScope.PROJECT or existing.scope == ConfigScope.PROJECT):
-                updated_config = await self.system_config_service.update_config(
-                    id=id,
-                    description=data.description
-                )
                 # Check if project config already exists
                 existing_project_config = None
                 for pc in updated_config.project_configs:
@@ -396,10 +395,8 @@ class SystemConfigController:
                         existing_project_config = pc
                         break
 
-                log.info(f"existing_project_config: {existing_project_config}")
-                if existing_project_config:
+                if existing_project_config and existing_project_config.id is not None:
                     # Update existing project config
-                    log.info(f"hehe: {existing_project_config.id}")
                     await self.system_config_service.update_project_config(
                         existing_project_config.id,
                         value=value,

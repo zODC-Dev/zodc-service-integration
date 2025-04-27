@@ -197,7 +197,7 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
                 col(ProjectConfigEntity.system_config_id) == entity.id
             )
         )
-        project_configs = result.all()
+        project_configs = list(result.all())
 
         return self._to_system_config_model(entity, project_configs)
 
@@ -472,7 +472,6 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             if not entity:
                 return None
 
-            log.info(f"entity: {entity}")
             # Get the system config to determine type
             system_config_id = dto.system_config_id or entity.system_config_id
             system_config = await self.session.get(SystemConfigEntity, system_config_id)
@@ -557,7 +556,7 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             )
             entity = result.first()
 
-            if entity:
+            if entity and entity.id is not None:
                 # Update existing
                 update_dto = SystemConfigDBUpdateDTO(**dto.dict())
                 return await self.update(entity.id, update_dto)
@@ -584,7 +583,7 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
 
             if entity:
                 # Update existing
-                update_dto = ProjectConfigDBUpdateDTO(**dto.dict())
+                update_dto = ProjectConfigDBUpdateDTO(**dto.model_dump())
                 return await self.update_project_config(entity.id, update_dto)
             else:
                 # Create new

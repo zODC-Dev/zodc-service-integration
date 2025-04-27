@@ -23,18 +23,26 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
             # Convert DTO to dictionary
             log.debug(f"Creating user: {user_data}")
 
+            if user_data.email is None or user_data.email == "":
+                raise ValueError("Email is required")
+
             # Check if user already exists if email or jira_account_id or user_id is not None
-            stmt = select(JiraUserEntity).where(
-                or_(
-                    col(JiraUserEntity.email) == user_data.email,
-                    col(JiraUserEntity.jira_account_id) == user_data.jira_account_id,
-                    col(JiraUserEntity.user_id) == user_data.user_id
-                )
-            )
+            conditions = []
+            if user_data.email and user_data.email != "":
+                conditions.append(col(JiraUserEntity.email) == user_data.email)
+            if user_data.jira_account_id and user_data.jira_account_id != "":
+                conditions.append(col(JiraUserEntity.jira_account_id) == user_data.jira_account_id)
+            if user_data.user_id and user_data.user_id != 0:
+                conditions.append(col(JiraUserEntity.user_id) == user_data.user_id)
+
+            if conditions:
+                stmt = select(JiraUserEntity).where(or_(*conditions))
+            else:
+                stmt = select(JiraUserEntity).where(False)
             result = await self.session.exec(stmt)
             existing_user = result.first()
             if existing_user:
-                log.debug(f"User already exists: {existing_user}")
+                log.debug(f"User already exists: {existing_user} conditions: {conditions}")
                 return JiraUserModel.model_validate(existing_user)
 
             user_dict = user_data.model_dump()

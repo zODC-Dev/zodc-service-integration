@@ -34,7 +34,7 @@ class JiraIssueConverter:
         return JiraIssueDBUpdateDTO(
             summary=issue_data.summary,
             description=issue_data.description,
-            status=issue_data.status,
+            status=issue_data.status.value,
             type=issue_data.type,
             assignee_id=issue_data.assignee_id,
             reporter_id=issue_data.reporter_id,

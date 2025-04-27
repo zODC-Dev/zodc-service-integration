@@ -35,8 +35,8 @@ async def get_sprint_by_id(
 
 @router.post("/{sprint_id}/start", response_model=StandardResponse[GetJiraSprintResponse])
 async def start_sprint(
+    sprint_data: SprintStartRequest,
     sprint_id: int = Path(..., description="ID of the sprint to start"),
-    sprint_data: SprintStartRequest = None,
     controller: JiraSprintController = Depends(get_jira_sprint_controller)
 ) -> StandardResponse[GetJiraSprintResponse]:
     """Start a sprint in Jira using admin account
