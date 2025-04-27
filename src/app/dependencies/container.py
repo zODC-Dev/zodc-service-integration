@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple
+from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
@@ -365,8 +365,8 @@ class DependencyContainer:
             await db.close()
 
     @classmethod
-    async def create_webhook_handlers(cls, session) -> Tuple[List[Callable], Dict]:
-        """Tạo các webhook handlers với session tùy chọn"""
+    async def create_webhook_handlers(cls, session) -> Tuple[List[Callable[[], Awaitable[None]]], Dict[str, Any]]:
+        """Create webhook handlers with optional session"""
         from redis.asyncio import Redis
 
         from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService

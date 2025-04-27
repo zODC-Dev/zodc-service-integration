@@ -1,7 +1,7 @@
 from datetime import time
 from typing import List, Optional, Union
 
-from src.app.schemas.requests.system_config import ConfigScopeEnum, ConfigTypeEnum
+from src.domain.models.system_config import ConfigScope, ConfigType
 from src.app.schemas.responses.base import BaseResponse
 
 
@@ -17,8 +17,8 @@ class ProjectConfigResponse(BaseResponse):
 class SystemConfigResponse(BaseResponse):
     id: int
     key: str
-    scope: ConfigScopeEnum
-    type: ConfigTypeEnum
+    scope: ConfigScope
+    type: ConfigType
     value: Union[int, float, str, bool, time, None]
     description: Optional[str] = None
     created_at: Optional[str] = None

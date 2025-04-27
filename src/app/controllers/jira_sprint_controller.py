@@ -34,6 +34,10 @@ class JiraSprintController:
         """Get the current sprint in Jira"""
         try:
             current_sprint = await self.sprint_service.get_current_sprint(project_key=project_key)
+
+            if current_sprint is None:
+                raise HTTPException(status_code=404, detail="No current sprint found")
+
             current_sprint.is_current = True
             return StandardResponse(
                 message="Current sprint retrieved successfully",

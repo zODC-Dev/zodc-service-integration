@@ -5,48 +5,36 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator
 from pydantic.alias_generators import to_camel
 
-
-class ConfigScopeEnum(str, Enum):
-    ADMIN = "admin"
-    GENERAL = "general"
-    PROJECT = "project"
-
-
-class ConfigTypeEnum(str, Enum):
-    INT = "int"
-    FLOAT = "float"
-    STRING = "string"
-    BOOL = "bool"
-    TIME = "time"
+from src.domain.models.system_config import ConfigScope, ConfigType
 
 
 class ConfigValueTypeBase(BaseModel):
-    type: ConfigTypeEnum
+    type: ConfigType
     description: Optional[str] = None
 
 
 class IntConfigRequest(ConfigValueTypeBase):
-    type: ConfigTypeEnum = ConfigTypeEnum.INT
+    type: ConfigType = ConfigType.INT
     value: int
 
 
 class FloatConfigRequest(ConfigValueTypeBase):
-    type: ConfigTypeEnum = ConfigTypeEnum.FLOAT
+    type: ConfigType = ConfigType.FLOAT
     value: float
 
 
 class StringConfigRequest(ConfigValueTypeBase):
-    type: ConfigTypeEnum = ConfigTypeEnum.STRING
+    type: ConfigType = ConfigType.STRING
     value: str
 
 
 class BoolConfigRequest(ConfigValueTypeBase):
-    type: ConfigTypeEnum = ConfigTypeEnum.BOOL
+    type: ConfigType = ConfigType.BOOL
     value: bool
 
 
 class TimeConfigRequest(ConfigValueTypeBase):
-    type: ConfigTypeEnum = ConfigTypeEnum.TIME
+    type: ConfigType = ConfigType.TIME
     value: str  # Format HH:MM:SS or HH:MM
 
     @field_validator('value')
@@ -69,9 +57,9 @@ class TimeConfigRequest(ConfigValueTypeBase):
 
 class SystemConfigCreateRequest(BaseModel):
     key: str = Field(..., min_length=1, max_length=100)
-    scope: ConfigScopeEnum = ConfigScopeEnum.GENERAL
+    scope: ConfigScope = ConfigScope.GENERAL
     project_key: Optional[str] = None
-    type: ConfigTypeEnum
+    type: ConfigType
     int_value: Optional[int] = None
     float_value: Optional[float] = None
     string_value: Optional[str] = None
@@ -87,7 +75,7 @@ class SystemConfigCreateRequest(BaseModel):
     @classmethod
     def validate_project_key(cls, v, info: Any):
         values = info.data
-        if values.get('scope') == ConfigScopeEnum.PROJECT and not v:
+        if values.get('scope') == ConfigScope.PROJECT and not v:
             raise ValueError("project_key is required when scope is 'project'")
         return v
 
@@ -102,15 +90,15 @@ class SystemConfigCreateRequest(BaseModel):
         field_name = f"{config_type.value}_value"
 
         # Check that the value is provided for the right type
-        if field_name == 'int_value' and config_type == ConfigTypeEnum.INT and v is None:
+        if field_name == 'int_value' and config_type == ConfigType.INT and v is None:
             raise ValueError("int_value must be provided when type is 'int'")
-        elif field_name == 'float_value' and config_type == ConfigTypeEnum.FLOAT and v is None:
+        elif field_name == 'float_value' and config_type == ConfigType.FLOAT and v is None:
             raise ValueError("float_value must be provided when type is 'float'")
-        elif field_name == 'string_value' and config_type == ConfigTypeEnum.STRING and v is None:
+        elif field_name == 'string_value' and config_type == ConfigType.STRING and v is None:
             raise ValueError("string_value must be provided when type is 'string'")
-        elif field_name == 'bool_value' and config_type == ConfigTypeEnum.BOOL and v is None:
+        elif field_name == 'bool_value' and config_type == ConfigType.BOOL and v is None:
             raise ValueError("bool_value must be provided when type is 'bool'")
-        elif field_name == 'time_value' and config_type == ConfigTypeEnum.TIME and v is None:
+        elif field_name == 'time_value' and config_type == ConfigType.TIME and v is None:
             raise ValueError("time_value must be provided when type is 'time'")
 
         return v
@@ -118,9 +106,9 @@ class SystemConfigCreateRequest(BaseModel):
 
 class SystemConfigUpdateRequest(BaseModel):
     key: Optional[str] = Field(None, min_length=1, max_length=100)
-    scope: Optional[ConfigScopeEnum] = None
+    scope: Optional[ConfigScope] = None
     project_key: Optional[str] = None
-    type: Optional[ConfigTypeEnum] = None
+    type: Optional[ConfigType] = None
     int_value: Optional[int] = None
     float_value: Optional[float] = None
     string_value: Optional[str] = None
@@ -135,8 +123,8 @@ class SystemConfigUpdateRequest(BaseModel):
 
 class SystemConfigPatchRequest(BaseModel):
     value: Any
-    type: ConfigTypeEnum
-    scope: Optional[ConfigScopeEnum] = None
+    type: ConfigType
+    scope: Optional[ConfigScope] = None
     project_key: Optional[str] = Field(None, description="Only used when scope is PROJECT", alias="projectKey")
     description: Optional[str] = None
 
@@ -147,15 +135,15 @@ class SystemConfigPatchRequest(BaseModel):
         if not config_type:
             return v
 
-        if config_type == ConfigTypeEnum.INT and not isinstance(v, int):
+        if config_type == ConfigType.INT and not isinstance(v, int):
             raise ValueError("Value must be an integer when type is 'int'")
-        elif config_type == ConfigTypeEnum.FLOAT and not isinstance(v, (int, float)):
+        elif config_type == ConfigType.FLOAT and not isinstance(v, (int, float)):
             raise ValueError("Value must be a number when type is 'float'")
-        elif config_type == ConfigTypeEnum.STRING and not isinstance(v, str):
+        elif config_type == ConfigType.STRING and not isinstance(v, str):
             raise ValueError("Value must be a string when type is 'string'")
-        elif config_type == ConfigTypeEnum.BOOL and not isinstance(v, bool):
+        elif config_type == ConfigType.BOOL and not isinstance(v, bool):
             raise ValueError("Value must be a boolean when type is 'bool'")
-        elif config_type == ConfigTypeEnum.TIME and not isinstance(v, str):
+        elif config_type == ConfigType.TIME and not isinstance(v, str):
             # Time validation
             try:
                 parts = v.split(':')
@@ -176,7 +164,7 @@ class SystemConfigPatchRequest(BaseModel):
     @classmethod
     def validate_project_key(cls, v, info: Any):
         values = info.data
-        if values.get('scope') == ConfigScopeEnum.PROJECT and not v:
+        if values.get('scope') == ConfigScope.PROJECT and not v:
             raise ValueError("project_key is required when scope is 'project'")
         return v
 

@@ -74,7 +74,7 @@ class NodeStatusSyncHandler(INATSRequestHandler):
                     "node_id": request.node_id,
                     "status": request.status
                 }
-            ).model_dump()
+            )
 
             return result.model_dump()
 

@@ -98,7 +98,7 @@ class JiraIssueDBCreateDTO(BaseModel):
 class JiraIssueDBUpdateDTO(BaseModel):
     summary: Optional[str] = None
     description: Optional[str] = None
-    status: Optional[Union[JiraIssueStatus, str]] = None
+    status: Optional[str] = None
     assignee: Optional[str] = None
     estimate_point: Optional[float] = None
     actual_point: Optional[float] = None

@@ -102,6 +102,7 @@ class JiraSprintApplicationService:
         if sprint is None:
             return None, {}
 
+        assert sprint.project_key is not None, "Sprint must have a project key"
         # Get all issues for this sprint
         issues = await self.jira_issue_repository.get_project_issues(
             project_key=sprint.project_key,
@@ -118,11 +119,11 @@ class JiraSprintApplicationService:
 
         for issue in issues:
             # Map Jira statuses to simplified status categories
-            if issue.status in [JiraIssueStatus.TO_DO, JiraIssueStatus.BACKLOG]:
+            if issue.status in [JiraIssueStatus.TO_DO]:
                 task_count_by_status.to_do += 1
-            elif issue.status in [JiraIssueStatus.IN_PROGRESS, JiraIssueStatus.IN_REVIEW]:
+            elif issue.status in [JiraIssueStatus.IN_PROGRESS]:
                 task_count_by_status.in_progress += 1
-            elif issue.status in [JiraIssueStatus.DONE, JiraIssueStatus.CLOSED]:
+            elif issue.status in [JiraIssueStatus.DONE]:
                 task_count_by_status.done += 1
 
         return sprint, task_count_by_status
@@ -153,6 +154,10 @@ class JiraSprintApplicationService:
             # Log the next sprint name
             log.debug(
                 f"Creating new sprint '{next_sprint_name}' in Jira, board_id: {old_sprint.board_id}, project_key: {old_sprint.project_key}")
+
+            # assert board id is not None, since last sprint must have a board id
+            assert old_sprint.board_id is not None, "Last sprint must have a board id"
+
             new_sprint_jira_id = await self.jira_sprint_api_service.create_sprint(
                 name=next_sprint_name,
                 board_id=old_sprint.board_id,
