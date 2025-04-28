@@ -215,8 +215,7 @@ class JiraIssueApplicationService:
             # Call Jira API to update assignee
             result = await self.jira_issue_api_service.update_issue_assignee_with_admin_auth(
                 issue_key=issue_key,
-                assignee_account_id=assignee_account_id,
-                user_id=user_id
+                assignee_account_id=assignee_account_id
             )
 
             # Create sync log entry

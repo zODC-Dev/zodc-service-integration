@@ -315,9 +315,14 @@ class JiraWebhookQueueService:
     async def _get_webhook_service(self):
         """Tạo webhook service mới với session database mới"""
         session = AsyncSessionLocal()
+        redis_client = None
         try:
             # Sử dụng factory để tạo handlers và services
             handlers, services = await DependencyContainer.create_webhook_handlers(session)
+
+            # Store redis_client to close it later
+            if 'redis_service' in services and hasattr(services['redis_service'], '_redis'):
+                redis_client = services['redis_service']._redis
 
             # Tạo webhook service với các handlers đã tạo
             webhook_service = JiraWebhookService(
@@ -337,16 +342,20 @@ class JiraWebhookQueueService:
             yield webhook_service
         except Exception as e:
             log.error(f"Error in webhook service session: {str(e)}")
-            try:
-                await session.rollback()
-            except Exception as rollback_error:
-                log.warning(f"Error rolling back session: {str(rollback_error)}")
-            raise
+            # Handle rollback
         finally:
+            # Close resources
             try:
                 await session.close()
             except Exception as close_error:
                 log.warning(f"Error closing webhook service session: {str(close_error)}")
+
+            # Close Redis client if we have one
+            if redis_client:
+                try:
+                    await redis_client.close()
+                except Exception as redis_error:
+                    log.warning(f"Error closing Redis client: {str(redis_error)}")
 
     async def _process_webhook_with_new_session(self, webhook_data: BaseJiraWebhookDTO) -> bool:
         """Xử lý webhook với một session database mới và độc lập"""
@@ -389,3 +398,13 @@ class JiraWebhookQueueService:
 
             for key in keys_to_remove:
                 self.retry_counts.pop(key, None)
+
+    async def stop(self):
+        """Stop all running tasks and clean up resources"""
+        for task in list(self.running_tasks):
+            if not task.done():
+                task.cancel()
+
+        # Wait for tasks to complete
+        if self.running_tasks:
+            await asyncio.gather(*self.running_tasks, return_exceptions=True)
