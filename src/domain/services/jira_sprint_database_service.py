@@ -33,3 +33,7 @@ class IJiraSprintDatabaseService(ABC):
     @abstractmethod
     async def get_current_sprint(self, project_key: str) -> Optional[JiraSprintModel]:
         pass
+
+    @abstractmethod
+    async def get_all_sprints(self) -> List[JiraSprintModel]:
+        pass

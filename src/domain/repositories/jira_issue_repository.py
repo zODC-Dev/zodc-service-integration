@@ -12,6 +12,10 @@ class IJiraIssueRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_by_user_id(self, user_id: int) -> List[JiraIssueModel]:
+        pass
+
+    @abstractmethod
     async def update(self, issue_id: str, issue_update: JiraIssueDBUpdateDTO) -> JiraIssueModel:
         pass
 

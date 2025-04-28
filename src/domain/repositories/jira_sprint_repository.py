@@ -39,3 +39,7 @@ class IJiraSprintRepository(ABC):
     @abstractmethod
     async def update_sprint_by_jira_sprint_id(self, jira_sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
         pass
+
+    @abstractmethod
+    async def get_all_sprints(self) -> List[JiraSprintModel]:
+        pass

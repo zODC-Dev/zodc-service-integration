@@ -19,6 +19,10 @@ class JiraIssueDatabaseService(IJiraIssueDatabaseService):
         """Get issue from database by ID"""
         return await self.issue_repository.get_by_jira_issue_id(issue_id)
 
+    async def get_issues_by_user_id(self, user_id: int) -> List[JiraIssueModel]:
+        """Get issues from database by user ID"""
+        return await self.issue_repository.get_by_user_id(user_id)
+
     async def create_issue(self, user_id: int, issue: JiraIssueDBCreateDTO) -> JiraIssueModel:
         """Create a new issue in database"""
         return await self.issue_repository.create(issue)

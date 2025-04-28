@@ -7,7 +7,6 @@ from src.domain.models.nats.replies.jira_issue_reassign import JiraIssueReassign
 from src.domain.models.nats.requests.jira_issue_reassign import JiraIssueReassignNATSRequestDTO
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.nats_message_handler import INATSRequestHandler
-from src.infrastructure.services.nats_service import NATSService
 
 
 class JiraIssueReassignRequestHandler(INATSRequestHandler):
@@ -23,8 +22,8 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
         """Handle Jira issue reassign request
 
         Args:
-            data: Request data from NATS
-            nats_service: NATS service instance
+            subject: Subject of the NATS message
+            message: Request data from NATS
 
         Returns:
             dict: Response data to be sent back through NATS

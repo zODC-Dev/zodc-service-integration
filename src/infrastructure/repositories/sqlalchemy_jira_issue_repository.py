@@ -32,6 +32,16 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         entity = result.first()
         return self._to_domain(entity) if entity else None
 
+    async def get_by_user_id(self, user_id: int) -> List[JiraIssueModel]:
+        query = (
+            select(JiraIssueEntity)
+            .join(JiraUserEntity, JiraIssueEntity.assignee_id == JiraUserEntity.jira_account_id)
+            .where(JiraUserEntity.user_id == user_id)
+        )
+        result = await self.session.exec(query)
+        entities = result.all()
+        return [self._to_domain(entity) for entity in entities]
+
     async def create(self, issue: JiraIssueDBCreateDTO) -> JiraIssueModel:
         try:
             issue_model = JiraIssueDBCreateDTO._to_domain(issue)

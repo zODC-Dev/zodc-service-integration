@@ -1,6 +1,7 @@
 from fastapi import Depends
 
 from src.app.controllers.jira_issue_controller import JiraIssueController
+from src.app.controllers.jira_performance_summary_controller import JiraPerformanceSummaryController
 from src.app.controllers.jira_project_controller import JiraProjectController
 from src.app.controllers.jira_sprint_analytics_controller import JiraSprintAnalyticsController
 from src.app.controllers.jira_sprint_controller import JiraSprintController
@@ -14,6 +15,7 @@ from src.app.dependencies.services import (
     get_gantt_chart_service,
     get_jira_issue_history_sync_service,
     get_jira_issue_service,
+    get_jira_performance_summary_service,
     get_jira_project_application_service,
     get_jira_sprint_database_service,
     get_jira_sprint_service,
@@ -33,6 +35,7 @@ from src.app.services.microsoft_calendar_service import MicrosoftCalendarApplica
 from src.app.services.system_config_service import SystemConfigApplicationService
 from src.app.services.util_service import UtilService
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
+from src.domain.services.jira_performance_summary_service import IJiraPerformanceSummaryService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
 
 
@@ -106,3 +109,10 @@ def get_system_config_controller(
     return SystemConfigController(
         system_config_service=system_config_service
     )
+
+
+def get_jira_performance_summary_controller(
+    jira_performance_summary_service: IJiraPerformanceSummaryService = Depends(get_jira_performance_summary_service)
+) -> JiraPerformanceSummaryController:
+    """Dependency injection cho JiraPerformanceSummaryController"""
+    return JiraPerformanceSummaryController(jira_performance_summary_service)

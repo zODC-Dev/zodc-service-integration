@@ -669,7 +669,6 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
                         points_history_by_issue.get(issue.jira_issue_id, [])
                     )
                     completed_points += points
-                    log.info(f"Issue {issue.key} is completed with {points} points on {day_str}")
 
                 # Tính total points cho đến ngày này
                 total_points_day = total_points_initial

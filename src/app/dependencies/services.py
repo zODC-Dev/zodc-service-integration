@@ -46,11 +46,13 @@ from src.domain.repositories.workflow_mapping_repository import IWorkflowMapping
 from src.domain.services.gantt_chart_calculator_service import IGanttChartCalculatorService
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
+from src.domain.services.jira_performance_summary_service import IJiraPerformanceSummaryService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
 from src.domain.services.jira_sprint_analytics_service import IJiraSprintAnalyticsService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
 from src.domain.services.jira_user_api_service import IJiraUserAPIService
+from src.domain.services.jira_user_database_service import IJiraUserDatabaseService
 from src.domain.services.nats_service import INATSService
 from src.domain.services.token_scheduler_service import ITokenSchedulerService
 from src.domain.services.workflow_service_client import IWorkflowServiceClient
@@ -60,6 +62,7 @@ from src.infrastructure.services.gantt_chart_calculator_service import GanttChar
 from src.infrastructure.services.jira_issue_api_service import JiraIssueAPIService
 from src.infrastructure.services.jira_issue_database_service import JiraIssueDatabaseService
 from src.infrastructure.services.jira_issue_history_database_service import JiraIssueHistoryDatabaseService
+from src.infrastructure.services.jira_performance_summary_service import JiraPerformanceSummaryService
 from src.infrastructure.services.jira_project_api_service import JiraProjectAPIService
 from src.infrastructure.services.jira_project_database_service import JiraProjectDatabaseService
 from src.infrastructure.services.jira_service import JiraAPIClient
@@ -492,7 +495,7 @@ async def get_webhook_service(
     issue_history_sync_service=Depends(get_jira_issue_history_sync_service),
     jira_project_repository=Depends(get_jira_project_repository),
     redis_service=Depends(get_redis_service),
-    nats_application_service=Depends(get_nats_service),
+    nats_application_service=Depends(get_nats_application_service),
     jira_sprint_repository=Depends(get_jira_sprint_repository)
 ) -> JiraWebhookService:
     """Get Jira webhook service"""
@@ -628,4 +631,19 @@ def get_system_config_service(
     """Get system config service"""
     return SystemConfigApplicationService(
         system_config_repository=system_config_repository
+    )
+
+
+def get_jira_performance_summary_service(
+    jira_issue_db_service: IJiraIssueDatabaseService = Depends(get_jira_issue_database_service),
+    jira_sprint_db_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service),
+    jira_issue_history_db_service: IJiraIssueHistoryDatabaseService = Depends(get_jira_issue_history_database_service),
+    jira_user_db_service: IJiraUserDatabaseService = Depends(get_jira_user_database_service)
+) -> IJiraPerformanceSummaryService:
+    """Dependency injection cho JiraPerformanceSummaryService"""
+    return JiraPerformanceSummaryService(
+        jira_issue_db_service=jira_issue_db_service,
+        jira_sprint_db_service=jira_sprint_db_service,
+        jira_issue_history_db_service=jira_issue_history_db_service,
+        jira_user_db_service=jira_user_db_service
     )

@@ -137,6 +137,13 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
         sprints = result.all()
         return [self._to_domain(sprint) for sprint in sprints]
 
+    async def get_all_sprints(self) -> List[JiraSprintModel]:
+        """Get all sprints"""
+        query = select(JiraSprintEntity).where(not_(col(JiraSprintEntity.is_deleted)))
+        result = await self.session.exec(query)
+        sprints = result.all()
+        return [self._to_domain(sprint) for sprint in sprints]
+
     async def get_current_sprint(self, project_key: str) -> Optional[JiraSprintModel]:
         """Get current active sprint for a project.
 

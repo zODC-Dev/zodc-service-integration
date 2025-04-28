@@ -12,6 +12,10 @@ class IJiraIssueDatabaseService(ABC):
         pass
 
     @abstractmethod
+    async def get_issues_by_user_id(self, user_id: int) -> List[JiraIssueModel]:
+        pass
+
+    @abstractmethod
     async def create_issue(
         self,
         user_id: int,

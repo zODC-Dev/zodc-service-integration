@@ -8,6 +8,7 @@ from src.app.routers.jira_issue_router import router as jira_issue_router
 from src.app.routers.jira_project_router import router as jira_project_router
 from src.app.routers.jira_sprint_analytics_router import router as jira_sprint_analytics_router
 from src.app.routers.jira_sprint_router import router as jira_sprint_router
+from src.app.routers.jira_user_router import router as jira_user_router
 from src.app.routers.jira_webhook_router import router as jira_webhook_router
 from src.app.routers.media_router import router as media_router
 from src.app.routers.microsoft_calendar_router import router as microsoft_calendar_router
@@ -62,6 +63,7 @@ app.include_router(jira_sprint_router, prefix=settings.API_V1_STR +
                    "/jira/sprints", tags=["jira_sprints"])
 app.include_router(media_router, prefix=settings.API_V1_STR + "/media", tags=["media"])
 app.include_router(system_config_router, prefix=settings.API_V1_STR + "/configs", tags=["system_config"])
+app.include_router(jira_user_router, prefix=settings.API_V1_STR + "/jira/users", tags=["jira_users"])
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,8 +1,8 @@
 from datetime import time
 from typing import List, Optional, Union
 
-from src.domain.models.system_config import ConfigScope, ConfigType
 from src.app.schemas.responses.base import BaseResponse
+from src.domain.models.system_config import ConfigScope, ConfigType
 
 
 class ProjectConfigResponse(BaseResponse):

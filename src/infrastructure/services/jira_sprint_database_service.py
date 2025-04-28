@@ -66,3 +66,6 @@ class JiraSprintDatabaseService(IJiraSprintDatabaseService):
 
     async def get_current_sprint(self, project_key: str) -> Optional[JiraSprintModel]:
         return await self.sprint_repository.get_current_sprint(project_key)
+
+    async def get_all_sprints(self) -> List[JiraSprintModel]:
+        return await self.sprint_repository.get_all_sprints()
