@@ -959,13 +959,12 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         issues = JiraIssueBulkFetchAPIGetResponseDTO.model_validate(response_data)
         return [JiraIssueMapper.to_domain(issue) for issue in issues.issues]
 
-    async def update_issue_assignee_with_admin_auth(self, issue_key: str, assignee_account_id: str, user_id: int) -> bool:
+    async def update_issue_assignee_with_admin_auth(self, issue_key: str, assignee_account_id: str) -> bool:
         """Update the assignee of a Jira issue
 
         Args:
             issue_key: The Jira issue key
             assignee_account_id: The Jira account ID of the new assignee
-            user_id: The user ID making the request
 
         Returns:
             bool: Whether the update was successful

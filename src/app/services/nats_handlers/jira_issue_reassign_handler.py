@@ -19,7 +19,7 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
         self.jira_issue_service = jira_issue_service
         self.jira_user_repository = jira_user_repository
 
-    async def handle(self, data: Dict[str, Any], nats_service: NATSService) -> Dict[str, Any]:
+    async def handle(self, subject: str, message: Dict[str, Any]) -> Dict[str, Any]:
         """Handle Jira issue reassign request
 
         Args:
@@ -30,10 +30,10 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
             dict: Response data to be sent back through NATS
         """
         try:
-            log.info(f"Received Jira issue reassign request: {data}")
+            log.info(f"Received Jira issue reassign request: {message}")
 
             # Parse request
-            request = JiraIssueReassignNATSRequestDTO(**data)
+            request = JiraIssueReassignNATSRequestDTO(**message)
 
             # Find Jira account IDs for the users
             old_user = await self.jira_user_repository.get_user_by_id(request.old_user_id)
@@ -54,7 +54,7 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
             # Call Jira API to update assignee
             # Assuming we need the authenticated user to make API call
             # Using the old_user as the authenticated user if available, otherwise use new_user
-            user_id = old_user.id if old_user else new_user.id
+            user_id = request.old_user_id or request.new_user_id
 
             assert user_id is not None, "user_id is not None"
 
@@ -80,10 +80,10 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
             log.error(f"Jira API error during issue reassign: {str(e)}")
             return JiraIssueReassignNATSReplyDTO(
                 success=False,
-                jira_key=request.jira_key if 'request' in locals() else data.get('jira_key', ''),
-                node_id=request.node_id if 'request' in locals() else data.get('node_id', 0),
-                old_user_id=request.old_user_id if 'request' in locals() else data.get('old_user_id', 0),
-                new_user_id=request.new_user_id if 'request' in locals() else data.get('new_user_id', 0),
+                jira_key=request.jira_key if 'request' in locals() else message.get('jira_key', ''),
+                node_id=request.node_id if 'request' in locals() else message.get('node_id', 0),
+                old_user_id=request.old_user_id if 'request' in locals() else message.get('old_user_id', 0),
+                new_user_id=request.new_user_id if 'request' in locals() else message.get('new_user_id', 0),
                 error_message=str(e)
             ).model_dump()
 
@@ -91,9 +91,9 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
             log.error(f"Error handling Jira issue reassign request: {str(e)}", exc_info=True)
             return JiraIssueReassignNATSReplyDTO(
                 success=False,
-                jira_key=request.jira_key if 'request' in locals() else data.get('jira_key', ''),
-                node_id=request.node_id if 'request' in locals() else data.get('node_id', 0),
-                old_user_id=request.old_user_id if 'request' in locals() else data.get('old_user_id', 0),
-                new_user_id=request.new_user_id if 'request' in locals() else data.get('new_user_id', 0),
+                jira_key=request.jira_key if 'request' in locals() else message.get('jira_key', ''),
+                node_id=request.node_id if 'request' in locals() else message.get('node_id', 0),
+                old_user_id=request.old_user_id if 'request' in locals() else message.get('old_user_id', 0),
+                new_user_id=request.new_user_id if 'request' in locals() else message.get('new_user_id', 0),
                 error_message=f"Internal error: {str(e)}"
             ).model_dump()

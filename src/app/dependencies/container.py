@@ -413,70 +413,78 @@ class DependencyContainer:
             encoding="utf-8",
             decode_responses=True
         )
-        redis_service = RedisService(redis_client)
 
-        # Sử dụng các services từ container chính
-        jira_issue_api_service = container.jira_issue_api_service
-        jira_sprint_api_service = container.jira_sprint_api_service
-        jira_user_api_service = container.jira_user_api_service
-        # Tạo các services cần thiết
-        jira_issue_db_service = JiraIssueDatabaseService(issue_repo)
-        jira_user_db_service = JiraUserDatabaseService(user_repo)
-        sprint_database_service = JiraSprintDatabaseService(sprint_repo)
-        issue_history_db_service = JiraIssueHistoryDatabaseService(issue_history_repo)
+        try:
+            redis_service = RedisService(redis_client)
+            # Sử dụng các services từ container chính
+            jira_issue_api_service = container.jira_issue_api_service
+            jira_sprint_api_service = container.jira_sprint_api_service
+            jira_user_api_service = container.jira_user_api_service
+            # Tạo các services cần thiết
+            jira_issue_db_service = JiraIssueDatabaseService(issue_repo)
+            jira_user_db_service = JiraUserDatabaseService(user_repo)
+            sprint_database_service = JiraSprintDatabaseService(sprint_repo)
+            issue_history_db_service = JiraIssueHistoryDatabaseService(issue_history_repo)
 
-        issue_history_sync_service = JiraIssueHistoryApplicationService(
-            jira_issue_api_service,
-            issue_history_db_service,
-            jira_issue_db_service,
-            jira_user_db_service
-        )
+            issue_history_sync_service = JiraIssueHistoryApplicationService(
+                jira_issue_api_service,
+                issue_history_db_service,
+                jira_issue_db_service,
+                jira_user_db_service
+            )
 
-        # Tạo handlers
-        handlers = [
-            # Issue handlers
-            IssueCreateWebhookHandler(issue_repo, sync_log_repo, jira_issue_api_service, project_repo, redis_service),
-            IssueUpdateWebhookHandler(
-                jira_issue_repository=issue_repo,
-                sync_log_repository=sync_log_repo,
-                jira_issue_api_service=jira_issue_api_service,
-                issue_history_sync_service=issue_history_sync_service,
-                nats_application_service=container.nats_application_service,
-                jira_sprint_repository=sprint_repo
-            ),
-            IssueDeleteWebhookHandler(issue_repo, sync_log_repo),
+            # Tạo handlers
+            handlers = [
+                # Issue handlers
+                IssueCreateWebhookHandler(issue_repo, sync_log_repo, jira_issue_api_service,
+                                          project_repo, redis_service),
+                IssueUpdateWebhookHandler(
+                    jira_issue_repository=issue_repo,
+                    sync_log_repository=sync_log_repo,
+                    jira_issue_api_service=jira_issue_api_service,
+                    issue_history_sync_service=issue_history_sync_service,
+                    nats_application_service=container.nats_application_service,
+                    jira_sprint_repository=sprint_repo
+                ),
+                IssueDeleteWebhookHandler(issue_repo, sync_log_repo),
 
-            # Sprint handlers
-            SprintCreateWebhookHandler(sprint_database_service, sync_log_repo, jira_sprint_api_service),
-            SprintUpdateWebhookHandler(sprint_database_service, sync_log_repo, jira_sprint_api_service),
-            SprintStartWebhookHandler(sprint_database_service, sync_log_repo, jira_sprint_api_service),
-            SprintCloseWebhookHandler(sprint_database_service, sync_log_repo, jira_sprint_api_service, issue_repo),
-            SprintDeleteWebhookHandler(sprint_database_service, sync_log_repo, jira_sprint_api_service),
+                # Sprint handlers
+                SprintCreateWebhookHandler(sprint_database_service, sync_log_repo, jira_sprint_api_service),
+                SprintUpdateWebhookHandler(sprint_database_service, sync_log_repo, jira_sprint_api_service),
+                SprintStartWebhookHandler(sprint_database_service, sync_log_repo, jira_sprint_api_service),
+                SprintCloseWebhookHandler(sprint_database_service, sync_log_repo, jira_sprint_api_service, issue_repo),
+                SprintDeleteWebhookHandler(sprint_database_service, sync_log_repo, jira_sprint_api_service),
 
-            # User handlers
-            UserCreateWebhookHandler(jira_user_db_service, sync_log_repo, jira_user_api_service),
-            UserUpdateWebhookHandler(jira_user_db_service, sync_log_repo, jira_user_api_service),
-            UserDeleteWebhookHandler(jira_user_db_service, sync_log_repo)
-        ]
+                # User handlers
+                UserCreateWebhookHandler(jira_user_db_service, sync_log_repo, jira_user_api_service),
+                UserUpdateWebhookHandler(jira_user_db_service, sync_log_repo, jira_user_api_service),
+                UserDeleteWebhookHandler(jira_user_db_service, sync_log_repo)
+            ]
 
-        # Đóng gói vào một dictionary để trả về
-        services_dict: Dict[str, Any] = {
-            'jira_issue_api_service': jira_issue_api_service,
-            'jira_sprint_api_service': jira_sprint_api_service,
-            'sprint_database_service': sprint_database_service,
-            'issue_history_sync_service': issue_history_sync_service,
-            'issue_repo': issue_repo,
-            'sync_log_repo': sync_log_repo,
-            'project_repo': project_repo,
-            'redis_service': redis_service,
-            'sprint_repo': sprint_repo,
-            'nats_service': container.nats_service,
-            'nats_application_service': container.nats_application_service,
-            'jira_user_api_service': jira_user_api_service,
-            'jira_user_db_service': jira_user_db_service
-        }
+            # Đóng gói vào một dictionary để trả về
+            services_dict: Dict[str, Any] = {
+                'jira_issue_api_service': jira_issue_api_service,
+                'jira_sprint_api_service': jira_sprint_api_service,
+                'sprint_database_service': sprint_database_service,
+                'issue_history_sync_service': issue_history_sync_service,
+                'issue_repo': issue_repo,
+                'sync_log_repo': sync_log_repo,
+                'project_repo': project_repo,
+                'redis_service': redis_service,
+                'sprint_repo': sprint_repo,
+                'nats_service': container.nats_service,
+                'nats_application_service': container.nats_application_service,
+                'jira_user_api_service': jira_user_api_service,
+                'jira_user_db_service': jira_user_db_service
+            }
 
-        return handlers, services_dict
+            return handlers, services_dict
+        finally:
+            # Close Redis client when done
+            try:
+                await redis_client.close()
+            except Exception as close_error:
+                log.warning(f"Error closing Redis client in webhook handlers: {str(close_error)}")
 
 
 @asynccontextmanager
@@ -503,10 +511,31 @@ async def lifespan_manager(app: FastAPI) -> AsyncGenerator[None, None]:
     container.scheduler.start()
     app.state.scheduler = container.scheduler
 
+    # Create webhook queue service directly
+    webhook_queue_service = None
     try:
+        # Import here to avoid circular imports
+        from src.app.services.jira_webhook_queue_service import JiraWebhookQueueService
+
+        # Create webhook queue service using container services
+        webhook_queue_service = JiraWebhookQueueService(
+            jira_issue_api_service=container.jira_issue_api_service,
+            jira_sprint_api_service=container.jira_sprint_api_service,
+            jira_issue_history_service=container.issue_history_db_service,
+            webhook_handlers=[]  # We can leave this empty as the service will get handlers from container
+        )
+        app.state.webhook_queue_service = webhook_queue_service
+
         yield
     finally:
+        # Shutdown code
         log.info(f"Shutting down {settings.APP_NAME}")
+
+        # Stop webhook queue service tasks first
+        if webhook_queue_service:
+            await webhook_queue_service.stop()
+
+        # Then clean up other resources
         await DependencyContainer.cleanup()
 
 

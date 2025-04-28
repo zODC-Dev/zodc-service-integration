@@ -44,7 +44,7 @@ class JiraSprintController:
                 data=GetJiraSprintResponse.from_domain(current_sprint)
             )
         except Exception as e:
-            log.error("Unexpected error when getting current sprint: {str(e)}")
+            log.error(f"Unexpected error when getting current sprint: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e
 
     async def start_sprint(

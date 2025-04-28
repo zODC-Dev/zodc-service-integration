@@ -49,7 +49,6 @@ class IssueCreateWebhookHandler(JiraWebhookHandler):
 
         # Check if issue is system linked
         is_system_linked = await self.redis_service.get(f"system_linked:jira_issue:{issue_data.key}")
-        log.info(f"is_system_linked: {is_system_linked}")
         if is_system_linked:
             create_dto.is_system_linked = True
 

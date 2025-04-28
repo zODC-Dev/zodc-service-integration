@@ -125,6 +125,9 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         # Get updated timestamp
         updated_at = issue_data.updated_at
 
+        # Get old status as string
+        old_status = old_issue.status.value if old_issue.status else None
+
         # Create update data model
         update_data = JiraIssueUpdateDataPublishDTO(
             jira_key=jira_key,
@@ -136,7 +139,7 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
             status=status,
             sprint_id=sprint_id,
             updated_at=updated_at,
-            old_status=old_issue.status.value
+            old_status=old_status
         )
 
         # Create publish DTO and send via NATS
