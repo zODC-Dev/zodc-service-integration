@@ -44,7 +44,6 @@ class JiraAPIIssueFieldsResponse(JiraAPIFieldsBase):
     created: datetime
     updated: datetime
     customfield_10016: Optional[float] = None  # Story points
-    customfield_10017: Optional[float] = None  # Actual points
     customfield_10020: Optional[List[JiraSprintAPIGetResponseDTO]] = None  # Sprints
 
 

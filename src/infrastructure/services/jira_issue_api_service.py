@@ -101,7 +101,6 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                             "created",
                             "updated",
                             "customfield_10016",  # story points
-                            "customfield_10017",  # actual points
                             "customfield_10020",  # sprint
                             # Add any other needed fields
                         ]
@@ -248,9 +247,6 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         if update.estimate_point is not None:
             payload["fields"]["customfield_10016"] = update.estimate_point
-
-        if update.actual_point is not None:
-            payload["fields"]["customfield_10017"] = update.actual_point
 
         log.info(f"Updating issue {issue_id} with payload: {payload}")
 
@@ -729,9 +725,6 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         if update.estimate_point is not None:
             payload["fields"]["customfield_10016"] = update.estimate_point
-
-        if update.actual_point is not None:
-            payload["fields"]["customfield_10017"] = update.actual_point
 
         if update.sprint_id is not None:
             payload["fields"]["customfield_10020"] = update.sprint_id

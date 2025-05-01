@@ -32,7 +32,8 @@ class SQLAlchemyJiraProjectRepository(IJiraProjectRepository):
             name=project_data.name,
             description=project_data.description,
             avatar_url=project_data.avatar_url,
-            user_id=project_data.user_id
+            user_id=project_data.user_id,
+            project_id=project_data.project_id
         )
         self.session.add(project)
         await self.session.flush()

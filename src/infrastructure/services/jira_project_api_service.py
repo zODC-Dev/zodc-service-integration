@@ -181,12 +181,13 @@ class JiraProjectAPIService(IJiraProjectAPIService):
 
         issues: List[JiraIssueModel] = []
         for issue_data in response_data.get("issues", []):
-            issue: JiraIssueModel = await self.client.map_to_domain(
+            issue: Optional[JiraIssueModel] = await self.client.map_to_domain(
                 issue_data,
                 JiraIssueAPIGetResponseDTO,
                 JiraIssueMapper
             )
-            issues.append(issue)
+            if issue:
+                issues.append(issue)
 
         return issues
 

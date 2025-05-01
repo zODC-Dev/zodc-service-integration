@@ -178,7 +178,7 @@ class JiraAPIClient:
         """Parse response data into model class"""
         return model_class.model_validate(response_data)
 
-    async def map_to_domain(self, response_data: Dict[str, Any], model_class: Type[U], mapper: Any) -> T:
+    async def map_to_domain(self, response_data: Dict[str, Any], model_class: Type[U], mapper: Any) -> Optional[T]:
         """Map API response to domain model"""
         api_model = await self.parse_response_with_model(response_data, model_class)
         domain_model = mapper.to_domain(api_model)

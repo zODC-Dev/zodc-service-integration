@@ -221,7 +221,7 @@ class JiraIssueMapper:
             return None
 
     @staticmethod
-    def to_domain(api_response: JiraIssueAPIGetResponseDTO) -> JiraIssueModel:
+    def to_domain(api_response: JiraIssueAPIGetResponseDTO) -> Optional[JiraIssueModel]:
         try:
             fields = api_response.fields
             now = datetime.now(timezone.utc)
@@ -259,19 +259,28 @@ class JiraIssueMapper:
             if board_id:
                 link_url = f"{settings.JIRA_DASHBOARD_URL}/jira/software/projects/{project_key}/boards/{board_id}?selectedIssue={api_response.key}"
 
+            # Map issue type
+            # if issue type is subtask or epic, ignore it
+            if hasattr(fields, 'issuetype') and fields.issuetype.name not in [JiraIssueType.TASK.value, JiraIssueType.STORY.value, JiraIssueType.BUG.value]:
+                return None
+            else:
+                issue_type = JiraIssueType(fields.issuetype.name)
+
+            # Map status
+            status = JiraIssueStatus(fields.status.name) if hasattr(fields, 'status') else JiraIssueStatus.TO_DO
+
             return JiraIssueModel(
                 jira_issue_id=api_response.id,
                 key=api_response.key,
                 project_key=project_key,
                 summary=summary,
                 description=description,
-                type=JiraIssueType(fields.issuetype.name) if hasattr(fields, 'issuetype') else JiraIssueType.TASK,
-                status=JiraIssueStatus(fields.status.name) if hasattr(fields, 'status') else JiraIssueStatus.TO_DO,
+                type=issue_type,
+                status=status,
                 assignee_id=assignee_id,
                 priority=fields.priority.name if hasattr(fields, 'priority') else None,
                 reporter_id=reporter_id,
                 estimate_point=fields.customfield_10016 or 0,
-                actual_point=fields.customfield_10017 or 0,
                 created_at=fields.created if hasattr(fields, 'created') else now,
                 updated_at=fields.updated if hasattr(fields, 'updated') else now,
                 sprints=sprints,
