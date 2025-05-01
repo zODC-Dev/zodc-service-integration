@@ -65,7 +65,11 @@ class SQLAlchemyJiraProjectRepository(IJiraProjectRepository):
                 project.key = project_data.key
             if project_data.description is not None:
                 project.description = project_data.description
-            await self.session.commit()
+
+            self.session.add(project)
+            # Only commit if not in a transaction
+            if not self.session.in_transaction():
+                await self.session.commit()
             await self.session.refresh(project)
             return self._to_domain(project)
         else:
@@ -76,7 +80,9 @@ class SQLAlchemyJiraProjectRepository(IJiraProjectRepository):
         project = await self.session.get(JiraProjectEntity, project_id)
         if project:
             await self.session.delete(project)
-            await self.session.commit()
+            # Only commit if not in a transaction
+            if not self.session.in_transaction():
+                await self.session.commit()
 
     async def get_by_jira_project_id(self, jira_project_id: str) -> Optional[JiraProjectModel]:
         """Get project by Jira project ID"""

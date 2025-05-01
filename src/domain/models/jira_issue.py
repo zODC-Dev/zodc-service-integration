@@ -27,6 +27,7 @@ class JiraIssueModel(BaseModel):
     assignee: Optional['JiraUserModel'] = None
     assignee_id: Optional[str] = None  # Add assignee_id field
     priority: Optional[str] = None
+    reporter: Optional['JiraUserModel'] = None
     type: JiraIssueType
     sprints: List['JiraSprintModel'] = Field(default_factory=list)
     estimate_point: float = Field(default=0)
@@ -42,6 +43,10 @@ class JiraIssueModel(BaseModel):
     is_deleted: bool = Field(default=False)
     link_url: Optional[str] = None
     history_items: Optional[List[JiraIssueHistoryModel]] = None
+    planned_start_time: Optional[datetime] = None
+    planned_end_time: Optional[datetime] = None
+    actual_start_time: Optional[datetime] = None
+    actual_end_time: Optional[datetime] = None
 
     class Config:
         from_attributes = True

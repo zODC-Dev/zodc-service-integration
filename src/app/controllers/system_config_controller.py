@@ -250,18 +250,21 @@ class SystemConfigController:
                     value=value
                 )
 
-            config = await self.system_config_service.get_config(config.id)
+            created_config = await self.system_config_service.get_config(config.id)
+
+            if created_config is None:
+                raise HTTPException(status_code=500, detail="Failed to create config")
 
             result = SystemConfigResponse(
-                id=config.id,
-                key=config.key,
-                scope=config.scope,
-                type=config.type,
-                value=config.value,
-                description=config.description,
-                created_at=config.created_at,
-                updated_at=config.updated_at,
-                project_configs=[self._to_project_config_response(pc) for pc in config.project_configs]
+                id=created_config.id,
+                key=created_config.key,
+                scope=created_config.scope,
+                type=created_config.type,
+                value=created_config.value,
+                description=created_config.description,
+                created_at=created_config.created_at,
+                updated_at=created_config.updated_at,
+                project_configs=[self._to_project_config_response(pc) for pc in created_config.project_configs]
             )
 
             return StandardResponse(
@@ -320,7 +323,7 @@ class SystemConfigController:
                         existing_project_config = pc
                         break
 
-                if existing_project_config:
+                if existing_project_config and existing_project_config.id is not None:
                     # Update existing project config
                     if value is not None:
                         await self.system_config_service.update_project_config(

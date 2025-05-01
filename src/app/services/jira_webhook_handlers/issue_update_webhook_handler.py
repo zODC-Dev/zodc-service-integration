@@ -1,10 +1,11 @@
+from datetime import datetime
 from typing import Any, Dict
 
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.app.services.nats_application_service import NATSApplicationService
 from src.configs.logger import log
-from src.domain.constants.jira import JiraWebhookEvent
+from src.domain.constants.jira import JiraIssueStatus, JiraWebhookEvent
 from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira.webhooks.jira_webhook import JiraWebhookResponseDTO
@@ -78,6 +79,13 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
 
         # Update in database
         update_dto = JiraIssueConverter._convert_to_update_dto(issue_data)
+
+        # If issue is done, update actual end time, if issue is in progress, update actual start time
+        if update_dto.status == JiraIssueStatus.DONE.value:
+            update_dto.actual_end_time = datetime.now()
+        elif update_dto.status == JiraIssueStatus.IN_PROGRESS.value:
+            update_dto.actual_start_time = datetime.now()
+
         updated_issue = await self.jira_issue_repository.update(issue_id, update_dto)
 
         # Publish issue update to NATS for masterflow service

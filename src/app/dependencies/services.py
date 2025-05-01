@@ -406,10 +406,16 @@ async def get_sprint_analytics_service(
 
 
 async def get_sprint_analytics_application_service(
-    sprint_analytics_service: IJiraSprintAnalyticsService = Depends(get_sprint_analytics_service)
+    sprint_analytics_service: IJiraSprintAnalyticsService = Depends(get_sprint_analytics_service),
+    jira_sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository),
+    jira_issue_repository: IJiraIssueRepository = Depends(get_jira_issue_repository)
 ) -> JiraSprintAnalyticsApplicationService:
     """Get the sprint analytics application service"""
-    return JiraSprintAnalyticsApplicationService(sprint_analytics_service)
+    return JiraSprintAnalyticsApplicationService(
+        sprint_analytics_service=sprint_analytics_service,
+        jira_sprint_repository=jira_sprint_repository,
+        jira_issue_repository=jira_issue_repository
+    )
 
 
 # ============================ GANTT CHART SERVICE ===========================================

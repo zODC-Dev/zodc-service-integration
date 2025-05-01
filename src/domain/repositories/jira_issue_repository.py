@@ -45,6 +45,10 @@ class IJiraIssueRepository(ABC):
         pass
 
     @abstractmethod
+    async def update_by_key(self, jira_issue_key: str, issue_update: JiraIssueDBUpdateDTO) -> JiraIssueModel:
+        pass
+
+    @abstractmethod
     async def get_issues_by_keys(self, keys: List[str]) -> List[JiraIssueModel]:
         """Get issues by their Jira keys
 

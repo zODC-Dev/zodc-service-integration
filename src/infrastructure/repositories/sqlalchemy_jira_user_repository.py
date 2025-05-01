@@ -92,6 +92,8 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
                 if value is not None:
                     setattr(user_entity, key, value)
 
+            self.session.add(user_entity)
+
             # Commit changes
             await self.session.commit()
             await self.session.refresh(user_entity)
@@ -127,6 +129,7 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
                     setattr(user_entity, key, value)
 
             # Commit changes
+            self.session.add(user_entity)
             await self.session.commit()
             await self.session.refresh(user_entity)
 

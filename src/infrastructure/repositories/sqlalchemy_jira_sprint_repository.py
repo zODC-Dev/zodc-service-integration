@@ -9,6 +9,7 @@ from src.domain.constants.jira import JiraSprintState
 from src.domain.models.database.jira_sprint import JiraSprintDBCreateDTO, JiraSprintDBUpdateDTO
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
+from src.infrastructure.entities.jira_project import JiraProjectEntity
 from src.infrastructure.entities.jira_sprint import JiraSprintEntity
 
 
@@ -32,14 +33,24 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
 
     async def create_sprint(self, sprint_data: JiraSprintDBCreateDTO) -> JiraSprintModel:
         data = self._prepare_data(sprint_data.model_dump())
+
         sprint = JiraSprintEntity(**data)
         self.session.add(sprint)
+
+        # check if project key is in the database
+        project = await self.session.exec(select(JiraProjectEntity).where(col(JiraProjectEntity.key) == sprint.project_key))
+        if not project:
+            raise Exception(f"Project with key {sprint.project_key} not found")
+
         try:
-            await self.session.commit()
+            # Commit if not in a transaction
+            if not self.session.in_transaction():
+                await self.session.commit()
             await self.session.refresh(sprint)
             return self._to_domain(sprint)
         except Exception as e:
-            await self.session.rollback()
+            if not self.session.in_transaction():
+                await self.session.rollback()
             log.error(f"Error creating sprint: {str(e)}")
             raise
 
@@ -82,21 +93,25 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
         sprints = result.all()
         return [self._to_domain(sprint) for sprint in sprints]
 
-    async def update_sprint(self, sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> Optional[JiraSprintModel]:
+    async def update_sprint(self, sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
         try:
             sprint = await self.session.get(JiraSprintEntity, sprint_id)
             if not sprint:
-                return None
+                raise Exception(f"Sprint with ID {sprint_id} not found")
 
             data = self._prepare_data(sprint_data.model_dump())
             for key, value in data.items():
                 setattr(sprint, key, value)
 
-            await self.session.commit()
+            self.session.add(sprint)
+            # Commit if not in a transaction
+            if not self.session.in_transaction():
+                await self.session.commit()
             await self.session.refresh(sprint)
             return self._to_domain(sprint)
         except Exception as e:
-            await self.session.rollback()
+            if not self.session.in_transaction():
+                await self.session.rollback()
             log.error(f"Error updating sprint {sprint_id}: {str(e)}")
             raise
 
@@ -111,11 +126,15 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
             for key, value in data.items():
                 setattr(sprint, key, value)
 
-            await self.session.commit()
+            self.session.add(sprint)
+            # Commit if not in a transaction
+            if not self.session.in_transaction():
+                await self.session.commit()
             await self.session.refresh(sprint)
             return self._to_domain(sprint)
         except Exception as e:
-            await self.session.rollback()
+            if not self.session.in_transaction():
+                await self.session.rollback()
             log.error(f"Error updating sprint {jira_sprint_id}: {str(e)}")
             raise Exception(f"Error updating sprint {jira_sprint_id}: {str(e)}") from e
 
@@ -124,7 +143,7 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
         log.info(f"Getting sprints for project {project_key}")
 
         # Clear the session cache to force a fresh query to the database
-        self.session.expire_all()
+        # self.session.expire_all()
 
         query = select(JiraSprintEntity).where(
             and_(

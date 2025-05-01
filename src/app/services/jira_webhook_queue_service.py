@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 import time
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 from src.app.dependencies.container import DependencyContainer
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
@@ -28,18 +28,18 @@ class JiraWebhookQueueService:
         webhook_handlers: List[JiraWebhookHandler]
     ):
         # Dùng PriorityQueue để đảm bảo xử lý theo thứ tự ưu tiên
-        self.queues: Dict[str, asyncio.PriorityQueue] = {}
+        self.queues: Dict[str, asyncio.PriorityQueue[BaseJiraWebhookDTO]] = {}
         self.processing: Set[str] = set()
         self.last_created_webhooks: Dict[str, float] = {}
 
         # Theo dõi tất cả task đang chạy
-        self.running_tasks: Set[asyncio.Task] = set()
+        self.running_tasks: Set[asyncio.Task[None]] = set()
 
         # Số lần retry tối đa cho webhook update khi không tìm thấy issue
         self.max_retries = 3
 
         # Queue cho các webhook cần retry
-        self.retry_queue: asyncio.Queue = asyncio.Queue()
+        self.retry_queue: asyncio.Queue[Tuple[int, float, BaseJiraWebhookDTO]] = asyncio.Queue()
         self.RETRY_INTERVAL = 1  # 1s
 
         # Bắt đầu worker xử lý retry
@@ -59,7 +59,7 @@ class JiraWebhookQueueService:
         retry_task = asyncio.create_task(self._process_retry_queue())
         self._track_task(retry_task)
 
-    def _track_task(self, task: asyncio.Task) -> None:
+    def _track_task(self, task: asyncio.Task[None]) -> None:
         """Theo dõi task để đảm bảo xử lý lỗi và dọn dẹp"""
         self.running_tasks.add(task)
         task.add_done_callback(lambda t: self.running_tasks.remove(t))
@@ -119,7 +119,7 @@ class JiraWebhookQueueService:
 
             # Khởi động worker mới nếu entity này chưa đang được xử lý
             if entity_id not in self.processing:
-                entity_task = asyncio.create_task(self._process_entity_queue(entity_id))
+                entity_task: asyncio.Task[None] = asyncio.create_task(self._process_entity_queue(entity_id))
                 self._track_task(entity_task)
                 log.debug(f"Started processing task for entity {entity_id}")
 
@@ -317,6 +317,9 @@ class JiraWebhookQueueService:
         session = AsyncSessionLocal()
         redis_client = None
         try:
+            # Begin the transaction explicitly
+            await session.begin()
+
             # Sử dụng factory để tạo handlers và services
             handlers, services = await DependencyContainer.create_webhook_handlers(session)
 
@@ -340,13 +343,25 @@ class JiraWebhookQueueService:
             )
 
             yield webhook_service
+
+            # Commit after successful execution (if no exception)
+            if session.is_active:
+                await session.commit()
+
         except Exception as e:
             log.error(f"Error in webhook service session: {str(e)}")
-            # Handle rollback
+            # Explicitly rollback the session if there's an error
+            if session.is_active:
+                try:
+                    await session.rollback()
+                except Exception as rollback_error:
+                    log.warning(f"Error rolling back session: {str(rollback_error)}")
         finally:
             # Close resources
             try:
-                await session.close()
+                # Only close if we're not in a transaction anymore
+                if not session.is_active:
+                    await session.close()
             except Exception as close_error:
                 log.warning(f"Error closing webhook service session: {str(close_error)}")
 

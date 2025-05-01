@@ -132,49 +132,103 @@ class JiraProjectApplicationService:
             log.info(f"Starting sync for project {request.project_key}")
             started_at = datetime.now(timezone.utc)
             synced_users = []
+            initial_log_data = None
 
+            # Prepare log data but don't create it yet
+            initial_log_data = SyncLogDBCreateDTO(
+                entity_type=EntityType.PROJECT,
+                entity_id=request.project_key,
+                operation=OperationType.SYNC,
+                source=SourceType.NATS,
+                sender=request.user_id,
+                request_payload={"project_key": request.project_key,
+                                 "user_id": request.user_id, "project_id": request.project_id},
+                created_at=datetime.now(timezone.utc),
+                status="PROCESSING"
+            )
+
+            # Use a dedicated session/unit of work for the entire sync operation
             async with self.sync_session as session:
-                # Sync project details
-                log.info("Syncing project details...")
-                project = await self._sync_project_details(request.user_id, request.project_key, request.project_id, session)
+                try:
+                    # Create the initial log within the session context
+                    if initial_log_data:
+                        await session.sync_log_repository.create_sync_log(initial_log_data)
 
-                # Sync project users
-                log.info("Syncing project users...")
-                users = await self._sync_project_users(request.user_id, request.project_key, session)
-                log.info(f"Successfully synced {len(users)} users")
+                    # Sync project details
+                    log.info("Syncing project details...")
+                    project = await self._sync_project_details(request.user_id, request.project_key, request.project_id, session)
 
-                # Prepare synced users for response
-                synced_users = [
-                    SyncedJiraUserDTO(
-                        id=user.id,
-                        jira_account_id=user.jira_account_id,
-                        name=user.name,
-                        email=user.email,
-                        is_active=user.is_active,
-                        avatar_url=user.avatar_url
-                    ) for user in users
-                ]
+                    # Sync project users
+                    log.info("Syncing project users...")
+                    users = await self._sync_project_users(request.user_id, request.project_key, session)
+                    log.info(f"Successfully synced {len(users)} users")
 
-                # Sync sprints
-                log.info("Syncing project sprints...")
-                sprint_id_mapping = await self._sync_project_sprints(request.user_id, request.project_key, session)
-                log.info(f"Successfully synced {len(sprint_id_mapping)} sprints")
+                    # Prepare synced users for response
+                    synced_users = [
+                        SyncedJiraUserDTO(
+                            id=user.id,
+                            jira_account_id=user.jira_account_id,
+                            name=user.name,
+                            email=user.email,
+                            is_active=user.is_active,
+                            avatar_url=user.avatar_url
+                        ) for user in users
+                    ]
 
-                # Sync issues
-                log.info("Syncing project issues...")
-                issues = await self._sync_project_issues(request.user_id, request.project_key, session)
-                log.info(f"Successfully synced {len(issues)} issues")
+                    # Sync sprints
+                    log.info("Syncing project sprints...")
+                    sprint_id_mapping = await self._sync_project_sprints(request.user_id, request.project_key, session)
+                    log.info(f"Successfully synced {len(sprint_id_mapping)} sprints")
 
-                # Sync changelog
-                log.info("Syncing project changelog...")
-                issue_ids = [issue.jira_issue_id for issue in issues]
-                log.info(f"Syncing changelog for {len(issue_ids)} issues")
-                # issue_ids = ['10383', '10382', '10381', '10380', '10379']
-                await self._sync_project_changelog(issue_ids, session)
+                    # Sync issues
+                    log.info("Syncing project issues...")
+                    issues = await self._sync_project_issues(request.user_id, request.project_key, session)
+                    log.info(f"Successfully synced {len(issues)} issues")
 
-                # Create sync log
-                await self._create_sync_log(request.user_id, project)
-                log.info(f"Successfully completed sync for project {request.project_key}")
+                    # Sync changelog
+                    log.info("Syncing project changelog...")
+                    issue_ids = [issue.jira_issue_id for issue in issues]
+                    log.info(f"Syncing changelog for {len(issue_ids)} issues")
+                    # issue_ids = ['10383', '10382', '10381', '10380', '10379']
+                    await self._sync_project_changelog(issue_ids, session)
+
+                    # Create success log within session context
+                    success_log_data = SyncLogDBCreateDTO(
+                        entity_type=EntityType.PROJECT,
+                        entity_id=project.key,
+                        operation=OperationType.SYNC,
+                        source=SourceType.NATS,
+                        sender=request.user_id,
+                        request_payload={"project_key": project.key, "project_id": project.id},
+                        response_status=200,
+                        response_body={"project_id": project.id, "project_key": project.key},
+                        created_at=datetime.now(timezone.utc),
+                        completed_at=datetime.now(timezone.utc),
+                        status="SUCCESS"
+                    )
+                    await session.sync_log_repository.create_sync_log(success_log_data)
+                    log.info(f"Successfully completed sync for project {request.project_key}")
+                except Exception as e:
+                    log.error(f"Error during sync operations: {str(e)}")
+                    # Create error log within session context before raising
+                    try:
+                        error_log_data = SyncLogDBCreateDTO(
+                            entity_type=EntityType.PROJECT,
+                            entity_id=request.project_key,
+                            operation=OperationType.SYNC,
+                            source=SourceType.NATS,
+                            sender=request.user_id,
+                            request_payload={"project_key": request.project_key, "user_id": request.user_id},
+                            error_message=str(e),
+                            created_at=datetime.now(timezone.utc),
+                            completed_at=datetime.now(timezone.utc),
+                            status="ERROR"
+                        )
+                        await session.sync_log_repository.create_sync_log(error_log_data)
+                    except Exception as log_error:
+                        log.error(f"Failed to create error log: {str(log_error)}")
+                    # This will trigger a rollback via the unit of work
+                    raise
 
                 return JiraProjectSyncNATSReplyDTO(
                     success=True,
@@ -182,13 +236,14 @@ class JiraProjectApplicationService:
                     sync_summary=JiraProjectSyncSummaryDTO(
                         started_at=started_at.isoformat(),
                         completed_at=datetime.now(timezone.utc).isoformat(),
-                        total_sprints=len(sprint_id_mapping),
-                        total_issues=len(issues),
-                        total_users=len(users),
-                        synced_users=len(users)
+                        total_sprints=len(sprint_id_mapping) if 'sprint_id_mapping' in locals() else 0,
+                        total_issues=len(issues) if 'issues' in locals() else 0,
+                        total_users=len(users) if 'users' in locals() else 0,
+                        synced_users=len(synced_users)
                     ),
                     synced_users=synced_users
                 )
+
         except Exception as e:
             log.error(f"Error during project sync: {str(e)}")
             raise
@@ -448,30 +503,6 @@ class JiraProjectApplicationService:
 
         # This should never be reached due to the raise in the loop
         raise last_exception if last_exception else RuntimeError("Retry loop exited unexpectedly")
-
-    async def _create_sync_log(self, user_id: int, project: JiraProjectModel) -> None:
-        """Create sync log entry for project sync"""
-        try:
-            await self.sync_log_repository.create_sync_log(
-                SyncLogDBCreateDTO(
-                    entity_type=EntityType.PROJECT,
-                    entity_id=project.key,
-                    operation=OperationType.SYNC,
-                    request_payload={},  # No specific payload for sync
-                    response_status=200,  # Success status
-                    response_body={
-                        "project_key": project.key,
-                        "project_name": project.name,
-                        "sync_time": datetime.now(timezone.utc).isoformat()
-                    },
-                    source=SourceType.NATS,
-                    sender=user_id,
-                    error_message=None
-                )
-            )
-        except Exception as e:
-            log.error(f"Error creating sync log for project {project.key}: {str(e)}")
-            # Don't raise the error as this is not critical for sync process
 
     async def _sync_project_changelog(self, issue_ids: List[str], session: IJiraSyncSession) -> None:
         """Sync issues changelog from Jira API to database"""

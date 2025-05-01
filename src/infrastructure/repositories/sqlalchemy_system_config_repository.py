@@ -309,14 +309,14 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             total_count = len(list(count_result))
 
             # Apply sorting
-            valid_sort_fields = {
-                "id": SystemConfigEntity.id,
-                "key": SystemConfigEntity.key,
-                "scope": SystemConfigEntity.scope,
-                "type": SystemConfigEntity.type,
-                "description": SystemConfigEntity.description,
-                "created_at": SystemConfigEntity.created_at,
-                "updated_at": SystemConfigEntity.updated_at
+            valid_sort_fields: Dict[str, Any] = {
+                "id": col(SystemConfigEntity.id),
+                "key": col(SystemConfigEntity.key),
+                "scope": col(SystemConfigEntity.scope),
+                "type": col(SystemConfigEntity.type),
+                "description": col(SystemConfigEntity.description),
+                "created_at": col(SystemConfigEntity.created_at),
+                "updated_at": col(SystemConfigEntity.updated_at)
             }
 
             if sort_by and sort_by in valid_sort_fields:

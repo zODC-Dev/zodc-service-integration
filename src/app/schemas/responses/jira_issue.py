@@ -55,6 +55,7 @@ class GetJiraIssueResponse(BaseResponse):
     key: str
     summary: str
     assignee: Optional[JiraAssigneeResponse] = None
+    reporter: Optional[JiraAssigneeResponse] = None
     priority: Optional[str] = None
     type: JiraIssueType
     sprint: Optional[JiraIssueSprintResponse] = None
@@ -92,7 +93,8 @@ class GetJiraIssueResponse(BaseResponse):
             is_system_linked=issue.is_system_linked,
             is_deleted=issue.is_deleted,
             link_url=issue.link_url,
-            last_synced_at=issue.last_synced_at
+            last_synced_at=issue.last_synced_at,
+            reporter=JiraAssigneeResponse.from_domain(issue.reporter) if issue.reporter else None
         )
 
 

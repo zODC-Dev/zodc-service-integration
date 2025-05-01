@@ -35,8 +35,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
     async def get_by_user_id(self, user_id: int) -> List[JiraIssueModel]:
         query = (
             select(JiraIssueEntity)
-            .join(JiraUserEntity, JiraIssueEntity.assignee_id == JiraUserEntity.jira_account_id)
-            .where(JiraUserEntity.user_id == user_id)
+            .join(JiraUserEntity, col(JiraIssueEntity.assignee_id) == col(JiraUserEntity.jira_account_id))
+            .where(col(JiraUserEntity.user_id) == user_id)
         )
         result = await self.session.exec(query)
         entities = result.all()
@@ -70,12 +70,16 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                     )
                     self.session.add(issue_sprint)
 
-            await self.session.commit()
+            # Only commit if not in an existing transaction
+            if not self.session.in_transaction():
+                await self.session.commit()
             await self.session.refresh(issue_entity)
             return self._to_domain(issue_entity)
 
         except Exception as e:
-            await self.session.rollback()
+            # Only rollback if not in an existing transaction
+            if not self.session.in_transaction():
+                await self.session.rollback()
             log.error(f"Error creating issue: {str(e)}")
             raise
 
@@ -104,6 +108,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                 if value is not None:  # Only update non-None values
                     setattr(issue_entity, key, value)
 
+            self.session.add(issue_entity)
+
             # Handle sprint updates if present
             if issue_update.sprints is not None:
                 # Remove existing relationships
@@ -128,12 +134,16 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                     )
                     self.session.add(issue_sprint)
 
-            await self.session.commit()
+            # Only commit if not in an existing transaction
+            if not self.session.in_transaction():
+                await self.session.commit()
             await self.session.refresh(issue_entity)
             return self._to_domain(issue_entity)
 
         except Exception as e:
-            await self.session.rollback()
+            # Only rollback if not in an existing transaction
+            if not self.session.in_transaction():
+                await self.session.rollback()
             log.error(f"Error updating issue: {str(e)}")
             raise
 
@@ -256,6 +266,18 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                 user_id=entity.assignee.user_id
             )
 
+        reporter = None
+        if entity.reporter:
+            reporter = JiraUserModel(
+                id=entity.reporter.id,
+                jira_account_id=entity.reporter.jira_account_id,
+                email=entity.reporter.email,
+                avatar_url=entity.reporter.avatar_url,
+                is_system_user=entity.reporter.is_system_user,
+                name=entity.reporter.name,
+                user_id=entity.reporter.user_id
+            )
+
         return JiraIssueModel(
             key=entity.key,
             summary=entity.summary,
@@ -278,7 +300,8 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             is_system_linked=entity.is_system_linked,
             assignee=assignee,
             is_deleted=entity.is_deleted,
-            link_url=entity.link_url
+            link_url=entity.link_url,
+            reporter=reporter
         )
 
     async def get_project_issues(
@@ -377,6 +400,33 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         entity = result.first()
         return self._to_domain(entity) if entity else None
 
+    async def update_by_key(self, jira_issue_key: str, issue_update: JiraIssueDBUpdateDTO) -> JiraIssueModel:
+        """Update issue by key"""
+        query = select(JiraIssueEntity).where(col(JiraIssueEntity.key) == jira_issue_key)
+        result = await self.session.exec(query)
+        entity = result.first()
+        if not entity:
+            raise ValueError(f"Issue with key {jira_issue_key} not found")
+
+        # Convert existing entity to domain model
+        existing_issue = self._to_domain(entity)
+
+        # Combine existing data with update data
+        updated_issue = self._merge_update_with_existing(existing_issue, issue_update)
+
+        # Convert back to entity and update fields
+        updated_entity = self._to_entity(updated_issue)
+        for key, value in updated_entity.model_dump(exclude={'id', 'sprints'}).items():
+            if value is not None:  # Only update non-None values
+                setattr(entity, key, value)
+
+        self.session.add(entity)
+        # Only commit if not in an existing transaction
+        if not self.session.in_transaction():
+            await self.session.commit()
+        await self.session.refresh(entity)
+        return self._to_domain(entity)
+
     async def get_issues_by_keys(self, keys: List[str]) -> List[JiraIssueModel]:
         """Get multiple issues by their Jira keys"""
         try:
@@ -444,13 +494,18 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             for issue in issues:
                 issue.is_system_linked = False
                 issue.updated_at = datetime.now(timezone.utc)
+                self.session.add(issue)
                 count += 1
 
-            await self.session.commit()
+            # Only commit if not in an existing transaction
+            if not self.session.in_transaction():
+                await self.session.commit()
             log.info(f"[REPO] Reset is_system_linked flag for {count} issues in sprint {sprint_id}")
             return count
 
         except Exception as e:
-            await self.session.rollback()
+            # Only rollback if not in an existing transaction
+            if not self.session.in_transaction():
+                await self.session.rollback()
             log.error(f"[REPO] Error resetting is_system_linked for sprint {sprint_id}: {str(e)}", exc_info=True)
             raise

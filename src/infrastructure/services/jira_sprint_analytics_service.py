@@ -694,7 +694,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         return daily_data
 
     def _is_sprint_id_in_value(self, sprint_id: int, value: Optional[str]) -> bool:
-        """Kiểm tra xem một sprint ID có nằm trong giá trị không (có thể là chuỗi chứa nhiều ID ngăn cách bởi dấu phẩy)"""
+        """Check if sprint id is in value (value can be a string contains multiple ids separated by comma)"""
         if not value:
             return False
 
@@ -712,8 +712,8 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         project_key: str,
         sprint_id: int
     ) -> List[WorkloadModel]:
-        """Lấy dữ liệu workload của các thành viên trong sprint"""
-        # Lấy thông tin sprint
+        """Get workload data of members in sprint"""
+        # Get sprint details
         sprint = await self._get_sprint_details(sprint_id)
         if not sprint:
             log.error(f"Sprint {sprint_id} not found")

@@ -223,32 +223,9 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
                         log.debug(
                             f"[GANTT-CALC] Task {node_id} depends on start of {dep_node} ({dep_type}): {latest_dependency_end}")
 
-            # Add some staggering for task visualization if no dependencies
-            # This ensures tasks don't all start at the same time when they don't have dependencies
-            if latest_dependency_end == sprint_start and len(sorted_tasks) > 1:
-                # For bug and task with no dependencies, add 1 hour between each task type
-                index = sorted_tasks.index(node_id)
-                if index > 0 and issue.type != "STORY":
-                    # Add a small offset to start time if this is not the first task
-                    latest_dependency_end = sprint_start + timedelta(hours=index)
-                    log.debug(f"[GANTT-CALC] Adding staggering for {node_id}: +{index} hours")
-
             # Calculate start time
             start_time = self._next_work_time(latest_dependency_end, work_start, work_end, config.include_weekends)
             log.debug(f"[GANTT-CALC] Task {node_id} raw start time: {latest_dependency_end} -> adjusted: {start_time}")
-
-            # For tasks with zero estimate, use a minimal duration but vary by type
-            if estimate_hours <= 0:
-                # Stories take longer than tasks or bugs
-                if issue.type == "STORY":
-                    estimate_hours = 4  # Stories take 4 hours by default
-                elif issue.type == "TASK":
-                    estimate_hours = 2  # Tasks take 2 hours by default
-                else:
-                    estimate_hours = 1  # Bugs take 1 hour by default
-
-                log.debug(
-                    f"[GANTT-CALC] Task {node_id} has zero estimate, using {estimate_hours} hours based on type {issue.type}")
 
             # Calculate end time
             end_time = self._add_work_hours(

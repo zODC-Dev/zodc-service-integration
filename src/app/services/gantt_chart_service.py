@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional
 
 from src.configs.logger import log
+from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
 from src.domain.models.gantt_chart import (
     GanttChartConnectionModel,
     GanttChartJiraIssueModel,
@@ -160,6 +161,15 @@ class GanttChartApplicationService:
                 config=config
             )
             log.debug(f"[GANTT] Schedule calculation completed: {len(tasks)} tasks scheduled")
+
+            for task in tasks:
+                # Update issue with planned start and end times
+                if task.jira_key:
+                    update_dto = JiraIssueDBUpdateDTO(
+                        planned_start_time=task.plan_start_time,
+                        planned_end_time=task.plan_end_time
+                    )
+                    await self.issue_repository.update_by_key(jira_issue_key=task.jira_key, issue_update=update_dto)
 
             # Check if schedule is feasible
             is_feasible = self.gantt_calculator_service.is_schedule_feasible(

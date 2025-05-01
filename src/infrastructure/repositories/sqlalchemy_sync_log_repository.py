@@ -27,7 +27,7 @@ class SQLAlchemySyncLogRepository(ISyncLogRepository):
         )
         self.session.add(sync_log_entity)
         # Remove the commit from here - let the calling service manage the transaction
-        # await self.session.commit()
+        await self.session.commit()
 
         # Still need to flush to ensure the entity has an ID
         await self.session.flush()

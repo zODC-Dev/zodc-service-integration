@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
@@ -167,12 +167,12 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
         reworks = 0
 
         # Khởi tạo các dictionary đếm theo loại và độ ưu tiên
-        task_by_type = {}
-        task_by_priority = {}
+        task_by_type: Dict[str, int] = {}
+        task_by_priority: Dict[str, int] = {}
 
         # Khởi tạo danh sách hiệu suất theo sprint và tháng
-        sprint_performance = []
-        monthly_performance = {}
+        sprint_performance: List[Dict[str, Any]] = []
+        monthly_performance: Dict[str, Dict[str, Any]] = {}
 
         # Lấy lịch sử thay đổi trạng thái của tất cả issues
         issue_ids = [issue.jira_issue_id for issue in issues]
@@ -375,7 +375,7 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
 
     def _update_sprint_performance(
         self,
-        sprint_performance: List[Dict],
+        sprint_performance: List[Dict[str, Any]],
         sprint: JiraSprintModel,
         issue: JiraIssueModel,
         is_completed: bool
