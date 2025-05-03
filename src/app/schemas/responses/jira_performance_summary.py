@@ -40,8 +40,11 @@ class UserPerformanceSummaryResponse(BaseResponse):
     """Response schema cho thông tin hiệu suất của người dùng"""
     user_id: int = Field(..., alias="userId")
     user_name: str = Field(..., alias="userName")
+    user_email: str = Field(..., alias="userEmail")
     quarter: int
     year: int
+
+    avatar_url: str = Field(..., alias="avatarUrl")
 
     # Chỉ số cơ bản
     total_tasks: int = Field(..., alias="totalTasks")

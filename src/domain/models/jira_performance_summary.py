@@ -8,8 +8,11 @@ class UserPerformanceSummaryModel(BaseModel):
     """Model cho thông tin hiệu suất của người dùng trong một quý"""
     user_id: int
     user_name: str
+    user_email: str
     quarter: int
     year: int
+
+    avatar_url: str
 
     # Chỉ số cơ bản
     total_tasks: int
