@@ -8,7 +8,7 @@ from src.app.dependencies.auth import get_jwt_claims
 from src.app.dependencies.controllers import get_sprint_analytics_controller
 from src.app.schemas.requests.auth import JWTClaims
 from src.app.schemas.responses.base import StandardResponse
-from src.app.schemas.responses.gantt_chart import GanttChartResponse
+from src.app.schemas.responses.gantt_chart import GanttTaskResponse
 from src.app.schemas.responses.jira_sprint_analytics import (
     BugReportDataResponse,
     SprintBurndownResponse,
@@ -133,7 +133,7 @@ async def get_team_workload(
 
 @router.get(
     "/{project_key}/sprints/{sprint_id}/analytics/gantt",
-    response_model=GanttChartResponse,
+    response_model=StandardResponse[List[GanttTaskResponse]],
     summary="Get Gantt chart data for a sprint",
     description="Returns data needed for rendering a Gantt chart, including tasks, dependencies, and schedule information"
 )

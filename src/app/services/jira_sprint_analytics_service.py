@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import Dict, List
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -316,20 +316,61 @@ class JiraSprintAnalyticsApplicationService:
             # Get all issues in the sprint
             issues = await self.jira_issue_repository.get_project_issues(session=session, project_key=project_key, sprint_id=sprint_id)
 
+            # Group tasks by their story_id for progress calculation
+            story_tasks: Dict[str, int] = {}
+            story_completed_tasks: Dict[str, int] = {}
+
+            # Set of completed statuses
+            completed_statuses = {
+                "done", "closed", "resolved", "completed"
+            }
+
+            # Set of story-like issue types
+            story_types = {
+                "story", "epic"
+            }
+
+            # First pass: identify stories and group tasks by story_id
+            for issue in issues:
+                # Add to story tasks count if it has a story_id
+                if issue.story_id:
+                    if issue.story_id not in story_tasks:
+                        story_tasks[issue.story_id] = 0
+                        story_completed_tasks[issue.story_id] = 0
+
+                    story_tasks[issue.story_id] += 1
+
+                    # Count completed tasks
+                    if issue.status.value.lower() in completed_statuses:
+                        story_completed_tasks[issue.story_id] += 1
+
             # Convert issues to GanttTaskResponse
             tasks: List[GanttTaskResponse] = []
             for issue in issues:
+                progress = None
+
+                # Calculate progress for stories
+                if issue.type.value.lower() in story_types and issue.jira_issue_id in story_tasks:
+                    total_tasks = story_tasks[issue.jira_issue_id]
+                    completed_tasks = story_completed_tasks[issue.jira_issue_id]
+
+                    if total_tasks > 0:
+                        progress = (completed_tasks / total_tasks) * 100
+                        log.debug(
+                            f"Calculated progress for story {issue.key}: {progress}% ({completed_tasks}/{total_tasks} tasks)")
+
                 task = GanttTaskResponse(
                     id=issue.jira_issue_id,
                     name=issue.summary,
                     assignee=issue.assignee.name if issue.assignee else None,
                     type=issue.type,
                     status=issue.status,
-                    # dependencies=issue.story_id,
+                    dependencies=issue.story_id,
                     plan_start=issue.planned_start_time,
                     plan_end=issue.planned_end_time,
                     actual_start=issue.actual_start_time,
-                    actual_end=issue.actual_end_time
+                    actual_end=issue.actual_end_time,
+                    progress=progress
                 )
                 tasks.append(task)
 

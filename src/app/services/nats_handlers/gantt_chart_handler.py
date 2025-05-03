@@ -43,7 +43,6 @@ class GanttChartRequestHandler(INATSRequestHandler):
                 project_key=request.project_key,
                 sprint_id=request.sprint_id,
                 config=config,
-                workflow_id=request.workflow_id,
                 issues=request.issues,
                 connections=request.connections
             )

@@ -290,7 +290,12 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             assignee=assignee,
             is_deleted=entity.is_deleted,
             link_url=entity.link_url,
-            reporter=reporter
+            reporter=reporter,
+            planned_start_time=entity.planned_start_time,
+            planned_end_time=entity.planned_end_time,
+            actual_start_time=entity.actual_start_time,
+            actual_end_time=entity.actual_end_time,
+            story_id=entity.story_id
         )
 
     async def get_project_issues(

@@ -39,7 +39,6 @@ class GanttChartApplicationService:
         project_key: str,
         sprint_id: int,
         config: Optional[ProjectConfigModel] = None,
-        workflow_id: Optional[int] = None,
         issues: Optional[List[GanttChartJiraIssueModel]] = None,
         connections: Optional[List[GanttChartConnectionModel]] = None
     ) -> GanttChartModel:
@@ -165,6 +164,12 @@ class GanttChartApplicationService:
             )
             log.debug(f"[GANTT] Schedule calculation completed: {len(tasks)} tasks scheduled")
 
+            # Create a reverse hierarchy map for quicker lookup (child_id -> parent_id)
+            reverse_hierarchy_map = {}
+            for parent, children in hierarchy_map.items():
+                for child in children:
+                    reverse_hierarchy_map[child] = parent
+
             for task in tasks:
                 # Update issue with planned start and end times
                 if task.jira_key:
@@ -172,6 +177,16 @@ class GanttChartApplicationService:
                         planned_start_time=task.plan_start_time,
                         planned_end_time=task.plan_end_time
                     )
+
+                    # If this task is a child of a story, update the story_id field
+                    if task.node_id in reverse_hierarchy_map:
+                        parent_node_id = reverse_hierarchy_map[task.node_id]
+                        # Find the parent's jira_key
+                        parent_task = next((t for t in tasks if t.node_id == parent_node_id), None)
+                        if parent_task and parent_task.jira_key:
+                            log.debug(f"[GANTT] Setting story_id for task {task.jira_key}: {parent_task.jira_key}")
+                            update_dto.story_id = parent_task.jira_key
+
                     await self.issue_repository.update_by_key(
                         session=session,
                         jira_issue_key=task.jira_key,

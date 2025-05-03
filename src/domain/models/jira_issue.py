@@ -47,6 +47,7 @@ class JiraIssueModel(BaseModel):
     planned_end_time: Optional[datetime] = None
     actual_start_time: Optional[datetime] = None
     actual_end_time: Optional[datetime] = None
+    story_id: Optional[str] = None
 
     class Config:
         from_attributes = True

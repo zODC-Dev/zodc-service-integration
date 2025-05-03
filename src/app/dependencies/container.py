@@ -361,7 +361,7 @@ class DependencyContainer:
             await db.close()
 
     @classmethod
-    async def create_webhook_handlers(cls, session) -> Tuple[List[JiraWebhookHandler], Dict[str, Any]]:
+    async def create_webhook_handlers(cls) -> Tuple[List[JiraWebhookHandler], Dict[str, Any]]:
         """Create webhook handlers with optional session"""
         from redis.asyncio import Redis
 

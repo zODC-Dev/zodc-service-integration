@@ -322,7 +322,7 @@ class JiraWebhookQueueService:
         async with AsyncSessionManager.session() as session:
             try:
                 # Use factory to create handlers and services
-                handlers, services = await DependencyContainer.create_webhook_handlers(session)
+                handlers, services = await DependencyContainer.create_webhook_handlers()
 
                 # Store redis_client to close it later
                 if 'redis_service' in services and hasattr(services['redis_service'], '_redis'):
