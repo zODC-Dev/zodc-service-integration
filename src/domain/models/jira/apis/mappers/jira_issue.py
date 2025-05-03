@@ -42,36 +42,6 @@ class JiraIssueMapper:
             )
 
     @staticmethod
-    def _convert_adf_to_text(adf_data: Union[str, Dict[str, Any], None]) -> Optional[str]:
-        """Convert Atlassian Document Format to plain text"""
-        if adf_data is None:
-            return None
-
-        if isinstance(adf_data, str):
-            return adf_data
-
-        try:
-            # Xử lý ADF object
-            if isinstance(adf_data, dict):
-                text_parts = []
-
-                # Lấy text từ content
-                if "content" in adf_data:
-                    for content in adf_data["content"]:
-                        if content.get("type") == "paragraph":
-                            for text_node in content.get("content", []):
-                                if text_node.get("type") == "text":
-                                    text_parts.append(text_node.get("text", ""))
-
-                return "\n".join(text_parts) if text_parts else None
-
-            return str(adf_data)
-
-        except Exception as e:
-            log.error(f"Error converting ADF to text: {str(e)}")
-            return None
-
-    @staticmethod
     def _convert_adf_to_html(adf_data: Union[str, Dict[str, Any], None]) -> Optional[str]:
         """Convert Atlassian Document Format to HTML"""
         if adf_data is None:

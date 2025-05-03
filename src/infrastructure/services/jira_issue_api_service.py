@@ -8,6 +8,7 @@ from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.jira.apis.mappers.jira_issue import JiraIssueMapper
+from src.domain.models.jira.apis.mappers.jira_issue_comment import JiraIssueCommentMapper
 from src.domain.models.jira.apis.mappers.jira_issue_link import JiraIssueLinkMapper
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
 from src.domain.models.jira.apis.responses.jira_changelog import (
@@ -18,12 +19,15 @@ from src.domain.models.jira.apis.responses.jira_issue import (
     JiraIssueAPIGetResponseDTO,
     JiraIssueBulkFetchAPIGetResponseDTO,
 )
+from src.domain.models.jira.apis.responses.jira_issue_comment import JiraIssueCommentAPIGetResponseDTO
 from src.domain.models.jira.apis.responses.jira_issue_link import JiraIssueLinksResponseDTO
 from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_issue_comment import JiraIssueCommentModel
 from src.domain.models.jira_issue_link import JiraIssueLinkModel
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.infrastructure.services.jira_service import JiraAPIClient
+from src.utils.jira_utils import convert_html_to_adf
 
 
 class JiraIssueAPIService(IJiraIssueAPIService):
@@ -463,34 +467,6 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         # Mặc định trả về rỗng nếu không tìm thấy đường dẫn
         return []
-
-    async def add_comment(self, session: AsyncSession, user_id: int, issue_id: str, comment: str) -> Dict[str, Any]:
-        """Add comment to issue"""
-        payload = {
-            "body": {
-                "type": "doc",
-                "version": 1,
-                "content": [
-                    {
-                        "type": "paragraph",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": comment
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
-
-        return await self.client.post(
-            session=session,
-            endpoint=f"/rest/api/3/issue/{issue_id}/comment",
-            user_id=user_id,
-            data=payload,
-            error_msg=f"Error when adding comment to issue {issue_id}"
-        )
 
     async def get_issue_history(self, session: AsyncSession, user_id: int, issue_id: str) -> List[Dict[str, Any]]:
         """Get issue history"""
@@ -1040,3 +1016,65 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         except Exception as e:
             log.error(f"Error getting issue links for {issue_key}: {str(e)}")
             return []
+
+    async def get_issue_comments_with_admin_auth(self, issue_key: str) -> List[JiraIssueCommentModel]:
+        """Get comments for an issue"""
+        client = self.admin_client or self.client
+
+        url = f"/rest/api/3/issue/{issue_key}/comment"
+
+        params = {
+            "expand": "renderedBody"
+        }
+
+        try:
+            response_data = await client.get(
+                session=None,
+                endpoint=url,
+                user_id=None,  # Không cần user_id khi sử dụng admin client
+                params=params,
+                error_msg=f"Error when getting comments for issue {issue_key}"
+            )
+
+            # Check if 'comments' key exists in response_data
+            if 'comments' in response_data:
+                # Convert to DTO
+                log.info(f"Response data for issue {issue_key}: {response_data}")
+                response_dto = [JiraIssueCommentAPIGetResponseDTO(**comment)
+                                for comment in response_data['comments']]
+
+                # Convert to domain models
+                comments = JiraIssueCommentMapper.response_to_domain_list(response_dto)
+            else:
+                log.warning(f"No comments found for issue {issue_key}")
+                return []
+
+            return comments
+
+        except Exception as e:
+            log.error(f"Error getting issue comments for {issue_key}: {str(e)}")
+            return []
+
+    async def create_issue_comment(self, session: AsyncSession, user_id: int, issue_key: str, comment: str) -> JiraIssueCommentModel:
+        """Create a comment for an issue using admin auth"""
+        client = self.admin_client or self.client
+
+        url = f"/rest/api/3/issue/{issue_key}/comment?expand=renderedBody"
+
+        payload = {
+            "body": convert_html_to_adf(comment)
+        }
+
+        response_data = await client.post(
+            session=session,
+            endpoint=url,
+            user_id=user_id,
+            data=payload,
+            error_msg=f"Error when creating comment for issue {issue_key}"
+        )
+
+        # Convert to DTO
+        response_dto = JiraIssueCommentAPIGetResponseDTO(**response_data)
+
+        # Convert to domain model
+        return JiraIssueCommentMapper.response_to_domain(response_dto)

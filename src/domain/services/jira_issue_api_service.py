@@ -10,6 +10,7 @@ from src.domain.models.jira.apis.responses.jira_changelog import (
     JiraIssueChangelogBulkFetchAPIGetResponseDTO,
 )
 from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_issue_comment import JiraIssueCommentModel
 from src.domain.models.jira_issue_link import JiraIssueLinkModel
 
 
@@ -102,4 +103,14 @@ class IJiraIssueAPIService(ABC):
         Returns:
             List of issue link models
         """
+        pass
+
+    @abstractmethod
+    async def get_issue_comments_with_admin_auth(self, issue_key: str) -> List[JiraIssueCommentModel]:
+        """Get comments for an issue"""
+        pass
+
+    @abstractmethod
+    async def create_issue_comment(self, session: AsyncSession, user_id: int, issue_key: str, comment: str) -> JiraIssueCommentModel:
+        """Create a comment for an issue using admin auth"""
         pass

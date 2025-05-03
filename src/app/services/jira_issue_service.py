@@ -3,13 +3,14 @@ from typing import List
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.app.schemas.responses.jira_issue import JiraIssueDescriptionDTO
+from src.app.schemas.responses.jira_issue import JiraIssueDescriptionAPIGetDTO
 from src.configs.logger import log
 from src.domain.constants.jira import JiraActionType, JiraIssueStatus, JiraIssueType
 from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.exceptions.jira_exceptions import JiraIssueNotFoundError
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
+from src.domain.models.jira_issue_comment import JiraIssueCommentModel
 from src.domain.models.nats.replies.jira_issue import JiraIssueSyncNATSReplyDTO
 from src.domain.models.nats.requests.jira_issue import (
     JiraIssueBatchLinkNATSRequestDTO,
@@ -439,7 +440,7 @@ class JiraIssueApplicationService:
 
             return False
 
-    async def get_issue_description_html(self, session: AsyncSession, issue_key: str) -> JiraIssueDescriptionDTO:
+    async def get_issue_description_html(self, session: AsyncSession, issue_key: str) -> JiraIssueDescriptionAPIGetDTO:
         """Lấy description dưới dạng HTML của một Jira issue
 
         Args:
@@ -459,7 +460,53 @@ class JiraIssueApplicationService:
 
         description_html = f"{issue.description}" if issue.description else None
 
-        return JiraIssueDescriptionDTO(
+        return JiraIssueDescriptionAPIGetDTO(
             key=issue_key,
             description=description_html
         )
+
+    async def get_issue_comments(self, session: AsyncSession, issue_key: str) -> List[JiraIssueCommentModel]:
+        """Lấy comments của một Jira Issue
+
+        Args:
+            session: AsyncSession
+            issue_key: Key của Jira Issue
+
+        Returns:
+            Comments của issue
+        """
+        try:
+            # Check if issue exists
+            issue = await self.jira_issue_repository.get_by_jira_issue_key(session=session, jira_issue_key=issue_key)
+            if not issue:
+                raise JiraIssueNotFoundError(f"Issue with key {issue_key} not found")
+
+            result = await self.jira_issue_api_service.get_issue_comments_with_admin_auth(issue_key)
+            return result
+        except Exception as e:
+            log.error(f"Error getting issue comments for issue {issue_key}: {str(e)}")
+            raise
+
+    async def create_issue_comment(self, session: AsyncSession, user_id: int, issue_key: str, comment: str) -> JiraIssueCommentModel:
+        """Tạo comment cho một Jira Issue
+
+        Args:
+            session: AsyncSession
+            user_id: ID của user
+            issue_key: Key của Jira Issue
+            comment: Comment cần tạo
+
+        Returns:
+            Comment đã tạo
+        """
+        try:
+            # Check if issue exists
+            issue = await self.jira_issue_repository.get_by_jira_issue_key(session=session, jira_issue_key=issue_key)
+            if not issue:
+                raise JiraIssueNotFoundError(f"Issue with key {issue_key} not found")
+
+            result = await self.jira_issue_api_service.create_issue_comment(session, user_id, issue_key, comment)
+            return result
+        except Exception as e:
+            log.error(f"Error creating issue comment for issue {issue_key}: {str(e)}")
+            raise
