@@ -13,10 +13,10 @@ from src.infrastructure.entities.refresh_token import RefreshTokenEntity
 
 
 class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
-    def __init__(self, session: AsyncSession):
-        self.session = session
+    def __init__(self):
+        pass
 
-    async def create_refresh_token(self, refresh_token_dto: RefreshTokenDBCreateDTO) -> RefreshTokenModel:
+    async def create_refresh_token(self, session: AsyncSession, refresh_token_dto: RefreshTokenDBCreateDTO) -> RefreshTokenModel:
         """Create new refresh token and revoke old ones"""
         try:
             # Convert to UTC then remove timezone info for database
@@ -35,7 +35,7 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
                 )
                 .values(is_revoked=True)
             )
-            await self.session.exec(revoke_stmt)  # type: ignore
+            await session.exec(revoke_stmt)  # type: ignore
 
             # Create new token
             db_token = RefreshTokenEntity(
@@ -45,38 +45,39 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
                 expires_at=expires_at_utc,
                 created_at=created_at_utc
             )
-            self.session.add(db_token)
+            session.add(db_token)
 
-            # Commit changes
-            await self.session.commit()
-            await self.session.refresh(db_token)
+            # Let the session manager handle the transaction
+            await session.flush()
+            await session.refresh(db_token)
 
             return self._to_domain(db_token)
 
         except Exception as e:
-            await self.session.rollback()
+            await session.rollback()
             log.error(f"Error creating refresh token: {str(e)}")
             raise
 
-    async def get_by_token(self, token: str) -> Optional[RefreshTokenModel]:
-        result = await self.session.exec(
+    async def get_by_token(self, session: AsyncSession, token: str) -> Optional[RefreshTokenModel]:
+        result = await session.exec(
             select(RefreshTokenEntity).where(col(RefreshTokenEntity.token) == token)
         )
         db_token = result.first()
         return self._to_domain(db_token) if db_token else None
 
-    async def revoke_token(self, token: str) -> None:
-        result = await self.session.exec(
+    async def revoke_token(self, session: AsyncSession, token: str) -> None:
+        result = await session.exec(
             select(RefreshTokenEntity).where(col(RefreshTokenEntity.token) == token)
         )
         db_token = result.first()
         if db_token:
             db_token.is_revoked = True
-            await self.session.commit()
+            # Let the session manager handle the transaction
+            await session.flush()
 
-    async def get_by_user_id_and_type(self, user_id: int, token_type: TokenType) -> Optional[RefreshTokenModel]:
+    async def get_by_user_id_and_type(self, session: AsyncSession, user_id: int, token_type: TokenType) -> Optional[RefreshTokenModel]:
         """Get refresh token by user id and token type by last created"""
-        result = await self.session.exec(
+        result = await session.exec(
             select(RefreshTokenEntity).where(
                 and_(
                     col(RefreshTokenEntity.user_id) == user_id,
@@ -87,7 +88,7 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
         db_token = result.first()
         return self._to_domain(db_token) if db_token else None
 
-    async def revoke_tokens_by_user_and_type(self, user_id: int, token_type: TokenType) -> None:
+    async def revoke_tokens_by_user_and_type(self, session: AsyncSession, user_id: int, token_type: TokenType) -> None:
         """Revoke all tokens of a specific type for a user"""
         stmt = (
             update(RefreshTokenEntity)
@@ -100,10 +101,11 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
             )
             .values(is_revoked=True)
         )
-        await self.session.exec(stmt)  # type: ignore
-        await self.session.commit()
+        await session.exec(stmt)  # type: ignore
+        # Let the session manager handle the transaction
+        await session.flush()
 
-    async def cleanup_expired_tokens(self) -> None:
+    async def cleanup_expired_tokens(self, session: AsyncSession) -> None:
         """Clean up expired tokens by marking them as revoked"""
         now_utc = datetime.now(timezone.utc).replace(tzinfo=None)  # Convert to naive UTC
         stmt = (
@@ -116,8 +118,9 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
             )
             .values(is_revoked=True)
         )
-        await self.session.exec(stmt)  # type: ignore
-        await self.session.commit()
+        await session.exec(stmt)  # type: ignore
+        # Let the session manager handle the transaction
+        await session.flush()
 
     def _to_domain(self, db_token: RefreshTokenEntity) -> RefreshTokenModel:
         # Add UTC timezone info when converting back to domain entity

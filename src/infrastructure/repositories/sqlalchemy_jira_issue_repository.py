@@ -18,49 +18,48 @@ from src.infrastructure.entities.jira_user import JiraUserEntity
 
 
 class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
-    def __init__(self, session: AsyncSession):
-        self.session = session
+    def __init__(self):
+        pass
 
-    async def get_by_jira_issue_id(self, jira_issue_id: str, include_deleted: bool = False) -> Optional[JiraIssueModel]:
+    async def get_by_jira_issue_id(self, session: AsyncSession, jira_issue_id: str, include_deleted: bool = False) -> Optional[JiraIssueModel]:
         query = select(JiraIssueEntity).where(col(JiraIssueEntity.jira_issue_id) == jira_issue_id)
 
         # Filter out deleted issues unless explicitly requested
         if not include_deleted:
             query = query.where(col(JiraIssueEntity.is_deleted) == False)  # noqa: E712
 
-        result = await self.session.exec(query)
+        result = await session.exec(query)
         entity = result.first()
         return self._to_domain(entity) if entity else None
 
-    async def get_by_user_id(self, user_id: int) -> List[JiraIssueModel]:
+    async def get_by_user_id(self, session: AsyncSession, user_id: int) -> List[JiraIssueModel]:
         query = (
             select(JiraIssueEntity)
             .join(JiraUserEntity, col(JiraIssueEntity.assignee_id) == col(JiraUserEntity.jira_account_id))
             .where(col(JiraUserEntity.user_id) == user_id)
         )
-        result = await self.session.exec(query)
+        result = await session.exec(query)
         entities = result.all()
         return [self._to_domain(entity) for entity in entities]
 
-    async def create(self, issue: JiraIssueDBCreateDTO) -> JiraIssueModel:
+    async def create(self, session: AsyncSession, issue: JiraIssueDBCreateDTO) -> JiraIssueModel:
         try:
             issue_model = JiraIssueDBCreateDTO._to_domain(issue)
 
             # Check if issue key is already exists
-            existing_issue = await self.get_by_jira_issue_key(issue_model.key)
+            existing_issue = await self.get_by_jira_issue_key(session, issue_model.key)
             if existing_issue:
                 raise ValueError(f"Issue with key {issue_model.key} already exists")
 
             # Create issue entity
             issue_entity = self._to_entity(issue_model)
-            self.session.add(issue_entity)
-            await self.session.flush()  # Flush to get the issue ID
+            session.add(issue_entity)
 
             # Create sprint relationships
             if issue_model.sprints:
                 for sprint in issue_model.sprints:
                     # Get or create sprint
-                    await self._get_or_create_sprint(sprint)
+                    await self._get_or_create_sprint(session, sprint)
 
                     # Create issue-sprint relationship
                     issue_sprint = JiraIssueSprintEntity(
@@ -68,25 +67,20 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                         jira_sprint_id=sprint.jira_sprint_id,
                         created_at=datetime.now(timezone.utc)
                     )
-                    self.session.add(issue_sprint)
+                    session.add(issue_sprint)
 
-            # Only commit if not in an existing transaction
-            if not self.session.in_transaction():
-                await self.session.commit()
-            await self.session.refresh(issue_entity)
+            await session.flush()
+            await session.refresh(issue_entity)
             return self._to_domain(issue_entity)
 
         except Exception as e:
-            # Only rollback if not in an existing transaction
-            if not self.session.in_transaction():
-                await self.session.rollback()
             log.error(f"Error creating issue: {str(e)}")
             raise
 
-    async def update(self, issue_id: str, issue_update: JiraIssueDBUpdateDTO) -> JiraIssueModel:
+    async def update(self, session: AsyncSession, issue_id: str, issue_update: JiraIssueDBUpdateDTO) -> JiraIssueModel:
         try:
             # Fetch existing issue
-            result = await self.session.exec(
+            result = await session.exec(
                 select(JiraIssueEntity).where(
                     col(JiraIssueEntity.jira_issue_id) == issue_id
                 )
@@ -108,12 +102,12 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                 if value is not None:  # Only update non-None values
                     setattr(issue_entity, key, value)
 
-            self.session.add(issue_entity)
+            session.add(issue_entity)
 
             # Handle sprint updates if present
             if issue_update.sprints is not None:
                 # Remove existing relationships
-                issue_sprints_result = await self.session.exec(
+                issue_sprints_result = await session.exec(
                     select(JiraIssueSprintEntity).where(
                         col(JiraIssueSprintEntity.jira_issue_id) == issue_id
                     )
@@ -122,28 +116,23 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
                 # Delete existing relationships
                 for issue_sprint in issue_sprints:
-                    await self.session.delete(issue_sprint)
+                    await session.delete(issue_sprint)
 
                 # Create new relationships
                 for sprint in issue_update.sprints:
-                    await self._get_or_create_sprint(sprint)
+                    await self._get_or_create_sprint(session, sprint)
                     issue_sprint = JiraIssueSprintEntity(
                         jira_issue_id=issue_id,
                         jira_sprint_id=sprint.jira_sprint_id,
                         created_at=datetime.now(timezone.utc)
                     )
-                    self.session.add(issue_sprint)
+                    session.add(issue_sprint)
 
-            # Only commit if not in an existing transaction
-            if not self.session.in_transaction():
-                await self.session.commit()
-            await self.session.refresh(issue_entity)
+            await session.flush()
+            await session.refresh(issue_entity)
             return self._to_domain(issue_entity)
 
         except Exception as e:
-            # Only rollback if not in an existing transaction
-            if not self.session.in_transaction():
-                await self.session.rollback()
             log.error(f"Error updating issue: {str(e)}")
             raise
 
@@ -173,9 +162,9 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         # Create new domain model with merged data
         return JiraIssueModel(**merged_data)
 
-    async def _get_or_create_sprint(self, sprint: JiraSprintModel) -> JiraSprintEntity:
+    async def _get_or_create_sprint(self, session: AsyncSession, sprint: JiraSprintModel) -> JiraSprintEntity:
         # Try to get existing sprint
-        result = await self.session.exec(
+        result = await session.exec(
             select(JiraSprintEntity).where(
                 col(JiraSprintEntity.jira_sprint_id) == sprint.jira_sprint_id
             )
@@ -196,12 +185,12 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                 created_at=sprint.created_at,
                 updated_at=sprint.updated_at
             )
-            self.session.add(sprint_entity)
-            await self.session.flush()
-
+            session.add(sprint_entity)
+            await session.flush()
+            await session.refresh(sprint_entity)
         return sprint_entity
 
-    async def get_all(self, include_deleted: bool = False) -> List[JiraIssueModel]:
+    async def get_all(self, session: AsyncSession, include_deleted: bool = False) -> List[JiraIssueModel]:
         """Get all issues, optionally including deleted ones"""
         query = select(JiraIssueEntity)
 
@@ -209,7 +198,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
         if not include_deleted:
             query = query.where(col(JiraIssueEntity.is_deleted) == False)  # noqa: E712
 
-        result = await self.session.exec(query)
+        result = await session.exec(query)
         entities = result.all()
         return [self._to_domain(entity) for entity in entities]
 
@@ -306,6 +295,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
     async def get_project_issues(
         self,
+        session: AsyncSession,
         project_key: str,
         sprint_id: Optional[int] = None,
         is_backlog: Optional[bool] = None,
@@ -383,7 +373,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             query = query.order_by(col(JiraIssueEntity.created_at).desc())
 
             # Execute query
-            result = await self.session.exec(query)
+            result = await session.exec(query)
             entities = result.all()
 
             # Convert to domain models with user info
@@ -393,17 +383,17 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             log.error(f"Error fetching project issues: {str(e)}")
             raise
 
-    async def get_by_jira_issue_key(self, jira_issue_key: str) -> Optional[JiraIssueModel]:
+    async def get_by_jira_issue_key(self, session: AsyncSession, jira_issue_key: str) -> Optional[JiraIssueModel]:
         """Get issue by key from database"""
         query = select(JiraIssueEntity).where(col(JiraIssueEntity.key) == jira_issue_key)
-        result = await self.session.exec(query)
+        result = await session.exec(query)
         entity = result.first()
         return self._to_domain(entity) if entity else None
 
-    async def update_by_key(self, jira_issue_key: str, issue_update: JiraIssueDBUpdateDTO) -> JiraIssueModel:
+    async def update_by_key(self, session: AsyncSession, jira_issue_key: str, issue_update: JiraIssueDBUpdateDTO) -> JiraIssueModel:
         """Update issue by key"""
         query = select(JiraIssueEntity).where(col(JiraIssueEntity.key) == jira_issue_key)
-        result = await self.session.exec(query)
+        result = await session.exec(query)
         entity = result.first()
         if not entity:
             raise ValueError(f"Issue with key {jira_issue_key} not found")
@@ -420,14 +410,12 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             if value is not None:  # Only update non-None values
                 setattr(entity, key, value)
 
-        self.session.add(entity)
-        # Only commit if not in an existing transaction
-        if not self.session.in_transaction():
-            await self.session.commit()
-        await self.session.refresh(entity)
+        session.add(entity)
+        await session.flush()
+        await session.refresh(entity)
         return self._to_domain(entity)
 
-    async def get_issues_by_keys(self, keys: List[str]) -> List[JiraIssueModel]:
+    async def get_issues_by_keys(self, session: AsyncSession, keys: List[str]) -> List[JiraIssueModel]:
         """Get multiple issues by their Jira keys"""
         try:
             log.debug(f"[REPO] Fetching {len(keys)} issues by keys: {keys}")
@@ -440,7 +428,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             )
 
             log.debug(f"[REPO] Executing query: {query}")
-            result = await self.session.exec(query)
+            result = await session.exec(query)
             entities = result.all()
             log.debug(f"[REPO] Found {len(entities)} issues in database")
 
@@ -451,13 +439,13 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             log.error(f"[REPO] Error getting issues by keys: {str(e)}", exc_info=True)
             raise
 
-    async def reset_system_linked_for_sprint(self, sprint_id: int) -> int:
+    async def reset_system_linked_for_sprint(self, session: AsyncSession, sprint_id: int) -> int:
         """Reset is_system_linked flag to False for all issues in a sprint"""
         try:
             log.info(f"[REPO] Resetting is_system_linked flag for issues in sprint {sprint_id}")
 
             # Get the sprint entity first
-            sprint_result = await self.session.exec(
+            sprint_result = await session.exec(
                 select(JiraSprintEntity).where(col(JiraSprintEntity.id) == sprint_id)
             )
             sprint_entity = sprint_result.first()
@@ -482,7 +470,7 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                 )
             )
 
-            result = await self.session.exec(query)
+            result = await session.exec(query)
             issues = result.all()
 
             if not issues:
@@ -494,18 +482,13 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             for issue in issues:
                 issue.is_system_linked = False
                 issue.updated_at = datetime.now(timezone.utc)
-                self.session.add(issue)
+                session.add(issue)
                 count += 1
 
-            # Only commit if not in an existing transaction
-            if not self.session.in_transaction():
-                await self.session.commit()
+            await session.flush()
             log.info(f"[REPO] Reset is_system_linked flag for {count} issues in sprint {sprint_id}")
             return count
 
         except Exception as e:
-            # Only rollback if not in an existing transaction
-            if not self.session.in_transaction():
-                await self.session.rollback()
             log.error(f"[REPO] Error resetting is_system_linked for sprint {sprint_id}: {str(e)}", exc_info=True)
             raise

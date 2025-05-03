@@ -1,6 +1,8 @@
 from datetime import time
 from typing import List, Optional, Union
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.database import log
 from src.domain.models.database.system_config import (
     ProjectConfigDBCreateDTO,
@@ -18,25 +20,26 @@ class SystemConfigApplicationService:
     def __init__(self, system_config_repository: ISystemConfigRepository):
         self.system_config_repository = system_config_repository
 
-    async def get_config(self, id: int) -> Optional[SystemConfigModel]:
+    async def get_config(self, session: AsyncSession, id: int) -> Optional[SystemConfigModel]:
         """Get a configuration by ID"""
-        return await self.system_config_repository.get(id)
+        return await self.system_config_repository.get(session=session, id=id)
 
-    async def get_config_by_key_and_project_key(self, key: str, project_key: str) -> Optional[SystemConfigModel]:
+    async def get_config_by_key_and_project_key(self, session: AsyncSession, key: str, project_key: str) -> Optional[SystemConfigModel]:
         """Get a configuration by key and project_key"""
-        return await self.system_config_repository.get_by_key_for_project(key, project_key)
+        return await self.system_config_repository.get_by_key_for_project(session=session, key=key, project_key=project_key)
 
-    async def get_config_by_key(self, key: str, scope: ConfigScope = ConfigScope.GENERAL) -> Optional[SystemConfigModel]:
+    async def get_config_by_key(self, session: AsyncSession, key: str, scope: ConfigScope = ConfigScope.GENERAL) -> Optional[SystemConfigModel]:
         """Get a configuration by key and scope"""
-        return await self.system_config_repository.get_by_key(key, scope)
+        return await self.system_config_repository.get_by_key(session=session, key=key, scope=scope)
 
-    async def list_configs(self, scope: Optional[ConfigScope] = None,
+    async def list_configs(self, session: AsyncSession, scope: Optional[ConfigScope] = None,
                            limit: int = 100, offset: int = 0,
                            search: Optional[str] = None,
                            sort_by: Optional[str] = None,
                            sort_order: Optional[str] = None) -> tuple[List[SystemConfigModel], int]:
         """List configurations with pagination, search, and sorting"""
         return await self.system_config_repository.list(
+            session=session,
             scope=scope,
             limit=limit,
             offset=offset,
@@ -45,16 +48,17 @@ class SystemConfigApplicationService:
             sort_order=sort_order
         )
 
-    async def list_project_configs(self, project_key: str,
+    async def list_project_configs(self, session: AsyncSession, project_key: str,
                                    limit: int = 100, offset: int = 0) -> tuple[List[SystemConfigModel], int]:
         """List configurations for a specific project"""
         return await self.system_config_repository.list_for_project(
+            session=session,
             project_key=project_key,
             limit=limit,
             offset=offset
         )
 
-    async def create_config(self, key: str, value: Union[int, float, str, bool, time],
+    async def create_config(self, session: AsyncSession, key: str, value: Union[int, float, str, bool, time],
                             scope: ConfigScope = ConfigScope.GENERAL,
                             description: Optional[str] = None) -> SystemConfigModel:
         """Create a new configuration"""
@@ -108,13 +112,13 @@ class SystemConfigApplicationService:
         else:
             raise ValueError(f"Unsupported value type: {type(value)}")
 
-        return await self.system_config_repository.create(dto)
+        return await self.system_config_repository.create(session=session, dto=dto)
 
-    async def create_project_config(self, system_config_id: int, project_key: str,
+    async def create_project_config(self, session: AsyncSession, system_config_id: int, project_key: str,
                                     value: Union[int, float, str, bool, time]) -> ProjectConfigModel:
         """Create a project-specific configuration"""
         # Get the system config to determine type
-        system_config = await self.get_config(system_config_id)
+        system_config = await self.get_config(session=session, id=system_config_id)
         if not system_config:
             raise ValueError(f"System config with ID {system_config_id} not found")
 
@@ -152,9 +156,9 @@ class SystemConfigApplicationService:
         else:
             raise ValueError(f"Value type doesn't match config type: {system_config.type}")
 
-        return await self.system_config_repository.create_project_config(dto)
+        return await self.system_config_repository.create_project_config(session=session, dto=dto)
 
-    async def update_config(self, id: int, type: Optional[ConfigType] = None,
+    async def update_config(self, session: AsyncSession, id: int, type: Optional[ConfigType] = None,
                             scope: Optional[ConfigScope] = None,
                             value: Optional[Union[int, float, str, bool, time]] = None,
                             description: Optional[str] = None) -> Optional[SystemConfigModel]:
@@ -173,7 +177,7 @@ class SystemConfigApplicationService:
 
             # If type is not provided, get it from the existing config
             if config_type is None:
-                existing = await self.get_config(id)
+                existing = await self.get_config(session=session, id=id)
                 if not existing:
                     return None
                 config_type = existing.type
@@ -192,14 +196,14 @@ class SystemConfigApplicationService:
             else:
                 raise ValueError(f"Value type doesn't match config type: {config_type}")
 
-        return await self.system_config_repository.update(id, dto)
+        return await self.system_config_repository.update(session=session, id=id, dto=dto)
 
-    async def update_project_config(self, id: int,
+    async def update_project_config(self, session: AsyncSession, id: int,
                                     value: Union[int, float, str, bool, time],
                                     value_type: ConfigType = ConfigType.STRING) -> Optional[ProjectConfigModel]:
         """Update a project-specific configuration"""
         # Get the existing project config to determine the system config type
-        project_config = await self.system_config_repository.get_project_config_by_id(id)
+        project_config = await self.system_config_repository.get_project_config_by_id(session=session, id=id)
         log.info(f"project_config: {project_config}")
         if not project_config:
             raise ValueError(f"Project config with ID {id} not found")
@@ -227,75 +231,75 @@ class SystemConfigApplicationService:
 
         log.info(f"dto: {dto}")
 
-        return await self.system_config_repository.update_project_config(id, dto)
+        return await self.system_config_repository.update_project_config(session=session, id=id, dto=dto)
 
-    async def delete_config(self, id: int) -> bool:
+    async def delete_config(self, session: AsyncSession, id: int) -> bool:
         """Delete a configuration"""
-        return await self.system_config_repository.delete(id)
+        return await self.system_config_repository.delete(session=session, id=id)
 
-    async def delete_project_config(self, id: int) -> bool:
+    async def delete_project_config(self, session: AsyncSession, id: int) -> bool:
         """Delete a project-specific configuration"""
-        return await self.system_config_repository.delete_project_config(id)
+        return await self.system_config_repository.delete_project_config(session=session, id=id)
 
-    async def get_working_hours_per_day(self) -> int:
+    async def get_working_hours_per_day(self, session: AsyncSession) -> int:
         """Get working_hours_per_day config with fallback to default value"""
         key = "working_hours_per_day"
-        config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
+        config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
         return config.value if config else 8  # Default: 8 hours
 
-    async def get_hours_per_point(self, project_key: Optional[str] = None) -> int:
+    async def get_hours_per_point(self, session: AsyncSession, project_key: Optional[str] = None) -> int:
         """Get hours_per_point config with fallback to default value"""
         key = "hours_per_point"
 
         if project_key:
             # Try to get project-specific value
-            config = await self.get_config_by_key_and_project_key(key, project_key)
+            config = await self.get_config_by_key_and_project_key(session=session, key=key, project_key=project_key)
         else:
             # Get general config
-            config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
+            config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
         return config.value if config else 4  # Default: 4 hours
 
-    async def get_lunch_break_minutes(self) -> int:
+    async def get_lunch_break_minutes(self, session: AsyncSession) -> int:
         """Get lunch_break_minutes config with fallback to default value"""
         key = "lunch_break_minutes"
-        config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
+        config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
         return config.value if config else 30  # Default: 30 minutes
 
-    async def get_include_weekends(self) -> bool:
+    async def get_include_weekends(self, session: AsyncSession) -> bool:
         """Get include_weekends config with fallback to default value"""
         key = "include_weekends"
-        config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
+        config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
         return config.value if config else False  # Default: False
 
-    async def get_start_work_hour(self) -> time:
+    async def get_start_work_hour(self, session: AsyncSession) -> time:
         """Get start_work_hour config with fallback to default value"""
         key = "start_work_hour"
-        config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
+        config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
         return config.value if config else time(9, 0)  # Default: 9:00 AM
 
-    async def get_end_work_hour(self) -> time:
+    async def get_end_work_hour(self, session: AsyncSession) -> time:
         """Get end_work_hour config with fallback to default value"""
         key = "end_work_hour"
-        config = await self.get_config_by_key(key, scope=ConfigScope.GENERAL)
+        config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
         return config.value if config else time(17, 30)  # Default: 5:30 PM
 
-    async def get_project_config(self, id: int) -> Optional[ProjectConfigModel]:
+    async def get_project_config(self, session: AsyncSession, id: int) -> Optional[ProjectConfigModel]:
         """Get a project-specific configuration by ID"""
         try:
-            return await self.system_config_repository.get_project_config_by_id(id)
+            return await self.system_config_repository.get_project_config_by_id(session=session, id=id)
         except Exception:
             # If the method doesn't exist in the repository, let's implement it here
             # This is temporary until we update the repository
             result = None
 
             # Get all configs and search for the project config with this ID
-            configs, _ = await self.list_configs()
+            configs, _ = await self.list_configs(session=session)
             for config in configs:
                 for pc in config.project_configs:
                     if pc.id == id:

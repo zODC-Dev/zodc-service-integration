@@ -2,6 +2,7 @@ from datetime import time
 from typing import List, Optional, Union
 
 from fastapi import HTTPException
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.app.schemas.requests.system_config import (
     SystemConfigCreateRequest,
@@ -25,7 +26,7 @@ class SystemConfigController:
     def __init__(self, system_config_service: SystemConfigApplicationService):
         self.system_config_service = system_config_service
 
-    async def list_scopes(self) -> StandardResponse[List[str]]:
+    async def list_scopes(self, session: AsyncSession) -> StandardResponse[List[str]]:
         """List all scopes"""
         scopes = [scope.value for scope in ConfigScope]
         return StandardResponse(
@@ -33,9 +34,9 @@ class SystemConfigController:
             message="Scopes retrieved successfully"
         )
 
-    async def get_config_by_key_and_project_key(self, key: str, project_key: str) -> StandardResponse[SystemConfigResponse]:
+    async def get_config_by_key_and_project_key(self, session: AsyncSession, key: str, project_key: str) -> StandardResponse[SystemConfigResponse]:
         """Get configuration by key and project key"""
-        config = await self.system_config_service.get_config_by_key_and_project_key(key, project_key)
+        config = await self.system_config_service.get_config_by_key_and_project_key(session=session, key=key, project_key=project_key)
         if not config:
             raise HTTPException(
                 status_code=404, detail=f"Config with key '{key}' and project key '{project_key}' not found")
@@ -68,10 +69,10 @@ class SystemConfigController:
             updated_at=project_config.updated_at
         )
 
-    async def get_config(self, id: int) -> StandardResponse[SystemConfigResponse]:
+    async def get_config(self, session: AsyncSession, id: int) -> StandardResponse[SystemConfigResponse]:
         """Get configuration by ID"""
         try:
-            config = await self.system_config_service.get_config(id)
+            config = await self.system_config_service.get_config(session=session, id=id)
             if not config:
                 raise HTTPException(status_code=404, detail=f"Config with ID {id} not found")
 
@@ -97,7 +98,7 @@ class SystemConfigController:
             log.error(f"Error getting config: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e)) from e
 
-    async def get_config_by_key(self, key: str, scope: str = "general",
+    async def get_config_by_key(self, session: AsyncSession, key: str, scope: str = "general",
                                 project_key: Optional[str] = None) -> StandardResponse[SystemConfigResponse]:
         """Get configuration by key, scope and optional project_key"""
         try:
@@ -106,10 +107,10 @@ class SystemConfigController:
 
             if project_key and scope_enum == ConfigScope.PROJECT:
                 # Get project-specific config
-                config = await self.system_config_service.get_config_by_key_and_project_key(key, project_key)
+                config = await self.system_config_service.get_config_by_key_and_project_key(session=session, key=key, project_key=project_key)
             else:
                 # Get general config
-                config = await self.system_config_service.get_config_by_key(key, scope_enum)
+                config = await self.system_config_service.get_config_by_key(session=session, key=key, scope=scope_enum)
 
             if not config:
                 raise HTTPException(status_code=404, detail=f"Config with key '{key}' not found")
@@ -139,7 +140,7 @@ class SystemConfigController:
             log.error(f"Error getting config by key: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e)) from e
 
-    async def list_configs(self, scope: Optional[str] = None, project_key: Optional[str] = None,
+    async def list_configs(self, session: AsyncSession, scope: Optional[str] = None, project_key: Optional[str] = None,
                            page: int = 1, page_size: int = 10, search: Optional[str] = None,
                            sort_by: Optional[str] = None,
                            sort_order: Optional[str] = None) -> StandardResponse[SystemConfigListResponse]:
@@ -157,12 +158,14 @@ class SystemConfigController:
             # Determine if we should use project-specific list
             if project_key:
                 configs, total_count = await self.system_config_service.list_project_configs(
+                    session=session,
                     project_key=project_key,
                     limit=limit,
                     offset=offset
                 )
             else:
                 configs, total_count = await self.system_config_service.list_configs(
+                    session=session,
                     scope=scope_enum,
                     limit=limit,
                     offset=offset,
@@ -208,7 +211,7 @@ class SystemConfigController:
             log.error(f"Error listing configs: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e)) from e
 
-    async def create_config(self, data: SystemConfigCreateRequest) -> StandardResponse[SystemConfigResponse]:
+    async def create_config(self, session: AsyncSession, data: SystemConfigCreateRequest) -> StandardResponse[SystemConfigResponse]:
         """Create a new system configuration"""
         try:
             # Get the value based on the type
@@ -235,6 +238,7 @@ class SystemConfigController:
 
             # First create the config
             config = await self.system_config_service.create_config(
+                session=session,
                 key=data.key,
                 value=value,
                 scope=data.scope,
@@ -245,12 +249,13 @@ class SystemConfigController:
             # If scope is PROJECT and project_key is provided, create project-specific value
             if data.scope == ConfigScope.PROJECT and data.project_key:
                 await self.system_config_service.create_project_config(
+                    session=session,
                     system_config_id=config.id,
                     project_key=data.project_key,
                     value=value
                 )
 
-            created_config = await self.system_config_service.get_config(config.id)
+            created_config = await self.system_config_service.get_config(session=session, id=config.id)
 
             if created_config is None:
                 raise HTTPException(status_code=500, detail="Failed to create config")
@@ -278,11 +283,11 @@ class SystemConfigController:
             log.error(f"Error creating config: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e)) from e
 
-    async def update_config(self, id: int, data: SystemConfigUpdateRequest) -> StandardResponse[SystemConfigResponse]:
+    async def update_config(self, session: AsyncSession, id: int, data: SystemConfigUpdateRequest) -> StandardResponse[SystemConfigResponse]:
         """Update an existing configuration"""
         try:
             # First check if config exists
-            existing = await self.system_config_service.get_config(id)
+            existing = await self.system_config_service.get_config(session=session, id=id)
             if not existing:
                 raise HTTPException(status_code=404, detail=f"Config with ID {id} not found")
 
@@ -307,6 +312,7 @@ class SystemConfigController:
 
             # Update the config
             updated_config = await self.system_config_service.update_config(
+                session=session,
                 id=id,
                 type=data.type,
                 scope=data.scope,
@@ -327,20 +333,22 @@ class SystemConfigController:
                     # Update existing project config
                     if value is not None:
                         await self.system_config_service.update_project_config(
-                            existing_project_config.id,
+                            session=session,
+                            id=existing_project_config.id,
                             value=value
                         )
                 else:
                     # Create new project config
                     if value is not None:
                         await self.system_config_service.create_project_config(
+                            session=session,
                             system_config_id=id,
                             project_key=data.project_key,
                             value=value
                         )
 
                 # Refresh config to include updated project configs
-                updated_config = await self.system_config_service.get_config(id)
+                updated_config = await self.system_config_service.get_config(session=session, id=id)
 
             result = SystemConfigResponse(
                 id=updated_config.id,
@@ -367,11 +375,11 @@ class SystemConfigController:
             log.error(f"Error updating config: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e)) from e
 
-    async def patch_config(self, id: int, data: SystemConfigPatchRequest) -> StandardResponse[SystemConfigResponse]:
+    async def patch_config(self, session: AsyncSession, id: int, data: SystemConfigPatchRequest) -> StandardResponse[SystemConfigResponse]:
         """Patch a system configuration with simpler value field"""
         try:
             # First check if config exists
-            existing = await self.system_config_service.get_config(id)
+            existing = await self.system_config_service.get_config(session=session, id=id)
             if not existing:
                 raise HTTPException(status_code=404, detail=f"Config with ID {id} not found")
 
@@ -388,6 +396,7 @@ class SystemConfigController:
             # Update the config with the new value
             if data.project_key and (data.scope == ConfigScope.PROJECT or existing.scope == ConfigScope.PROJECT):
                 updated_config = await self.system_config_service.update_config(
+                    session=session,
                     id=id,
                     description=data.description
                 )
@@ -401,20 +410,22 @@ class SystemConfigController:
                 if existing_project_config and existing_project_config.id is not None:
                     # Update existing project config
                     await self.system_config_service.update_project_config(
-                        existing_project_config.id,
+                        session=session,
+                        id=existing_project_config.id,
                         value=value,
                         value_type=data.type
                     )
                 else:
                     # Create new project config
                     await self.system_config_service.create_project_config(
+                        session=session,
                         system_config_id=id,
                         project_key=data.project_key,
                         value=value
                     )
 
                 # Refresh config with updated project configs
-                updated_config = await self.system_config_service.get_config(id)
+                updated_config = await self.system_config_service.get_config(session=session, id=id)
 
                 result = SystemConfigResponse(
                     id=updated_config.id,
@@ -429,6 +440,7 @@ class SystemConfigController:
                 )
             else:
                 updated_config = await self.system_config_service.update_config(
+                    session=session,
                     id=id,
                     description=data.description,
                     type=data.type,
@@ -458,15 +470,15 @@ class SystemConfigController:
             log.error(f"Error patching config: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e)) from e
 
-    async def delete_config(self, id: int) -> StandardResponse[bool]:
+    async def delete_config(self, session: AsyncSession, id: int) -> StandardResponse[bool]:
         """Delete a configuration"""
         try:
             # Check if config exists
-            existing = await self.system_config_service.get_config(id)
+            existing = await self.system_config_service.get_config(session=session, id=id)
             if not existing:
                 raise HTTPException(status_code=404, detail=f"Config with ID {id} not found")
 
-            result = await self.system_config_service.delete_config(id)
+            result = await self.system_config_service.delete_config(session=session, id=id)
 
             return StandardResponse(
                 data=result,
@@ -478,11 +490,14 @@ class SystemConfigController:
             log.error(f"Error deleting config: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e)) from e
 
-    async def get_project_configs(self, project_key: str) -> StandardResponse[SystemConfigListResponse]:
+    async def get_project_configs(self, session: AsyncSession, project_key: str) -> StandardResponse[SystemConfigListResponse]:
         """Get all configurations for a project"""
         try:
             # Get configs for the project
-            configs, total_count = await self.system_config_service.list_project_configs(project_key)
+            configs, total_count = await self.system_config_service.list_project_configs(
+                session=session,
+                project_key=project_key
+            )
 
             # Convert to response objects
             items = []

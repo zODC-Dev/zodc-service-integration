@@ -1,5 +1,7 @@
 from typing import Dict, List, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
 from src.domain.models.gantt_chart import (
@@ -12,7 +14,6 @@ from src.domain.models.gantt_chart import (
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
-from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
 from src.domain.services.gantt_chart_calculator_service import IGanttChartCalculatorService
 from src.domain.services.workflow_service_client import IWorkflowServiceClient
 
@@ -24,18 +25,17 @@ class GanttChartApplicationService:
         self,
         issue_repository: IJiraIssueRepository,
         sprint_repository: IJiraSprintRepository,
-        workflow_mapping_repository: IWorkflowMappingRepository,
         gantt_calculator_service: IGanttChartCalculatorService,
         workflow_service_client: IWorkflowServiceClient
     ):
         self.issue_repository = issue_repository
         self.sprint_repository = sprint_repository
-        self.workflow_mapping_repository = workflow_mapping_repository
         self.gantt_calculator_service = gantt_calculator_service
         self.workflow_service_client = workflow_service_client
 
     async def get_gantt_chart(
         self,
+        session: AsyncSession,
         project_key: str,
         sprint_id: int,
         config: Optional[ProjectConfigModel] = None,
@@ -57,7 +57,7 @@ class GanttChartApplicationService:
 
             # Get sprint information
             log.debug(f"[GANTT] Fetching sprint information for ID: {sprint_id}")
-            sprint = await self.sprint_repository.get_sprint_by_id(sprint_id)
+            sprint = await self.sprint_repository.get_sprint_by_id(session=session, sprint_id=sprint_id)
             if not sprint:
                 log.error(f"[GANTT] Sprint with ID {sprint_id} not found")
                 raise ValueError(f"Sprint with ID {sprint_id} not found")
@@ -76,7 +76,10 @@ class GanttChartApplicationService:
                 db_issues_map: Dict[str, JiraIssueModel] = {}
 
                 log.debug(f"[GANTT] Fetching {len(jira_keys)} issues from database")
-                db_issues = await self.issue_repository.get_issues_by_keys(jira_keys)
+                db_issues = await self.issue_repository.get_issues_by_keys(
+                    session=session,
+                    keys=jira_keys
+                )
                 log.debug(f"[GANTT] Found {len(db_issues)} issues in database")
                 db_issues_map = {issue.key: issue for issue in db_issues}
 
@@ -169,7 +172,11 @@ class GanttChartApplicationService:
                         planned_start_time=task.plan_start_time,
                         planned_end_time=task.plan_end_time
                     )
-                    await self.issue_repository.update_by_key(jira_issue_key=task.jira_key, issue_update=update_dto)
+                    await self.issue_repository.update_by_key(
+                        session=session,
+                        jira_issue_key=task.jira_key,
+                        issue_update=update_dto
+                    )
 
             # Check if schedule is feasible
             is_feasible = self.gantt_calculator_service.is_schedule_feasible(
@@ -327,19 +334,7 @@ class GanttChartApplicationService:
                 connections = await self.workflow_service_client.get_workflow_connections(workflow_id)
                 if connections:
                     return connections
-
-            # Otherwise, get all active workflows for this sprint and get connections
-            workflow_mappings = await self.workflow_mapping_repository.get_by_sprint(sprint_id)
-
-            all_connections = []
-            for mapping in workflow_mappings:
-                if mapping.status == "active":
-                    connections = await self.workflow_service_client.get_workflow_connections(
-                        mapping.workflow_id
-                    )
-                    all_connections.extend(connections)
-
-            return all_connections
+            return []
 
         except Exception as e:
             log.error(f"Error getting connections: {str(e)}")

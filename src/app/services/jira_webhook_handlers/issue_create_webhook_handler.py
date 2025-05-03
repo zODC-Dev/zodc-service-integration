@@ -1,5 +1,7 @@
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
@@ -35,8 +37,16 @@ class IssueCreateWebhookHandler(JiraWebhookHandler):
         """Check if this handler can process the given webhook event"""
         return webhook_event == JiraWebhookEvent.ISSUE_CREATED
 
-    async def handle(self, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:
-        """Handle the issue creation webhook"""
+    async def handle(self, session: AsyncSession, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:
+        """Handle the issue creation webhook
+
+        Args:
+            session: The database session to use for database operations
+            webhook_data: The webhook data to process
+
+        Returns:
+            A dictionary with the result of the operation
+        """
         issue_id = webhook_data.issue.id
 
         # Get latest issue data from Jira API
@@ -53,16 +63,17 @@ class IssueCreateWebhookHandler(JiraWebhookHandler):
             create_dto.is_system_linked = True
 
         # Check if project key is exists in database
-        project = await self.jira_project_repository.get_project_by_key(create_dto.project_key)
+        project = await self.jira_project_repository.get_project_by_key(session=session, key=create_dto.project_key)
         if not project:
             log.warning(f"Project not found, project_key: {create_dto.project_key}")
             return {"error": "Project not found", "project_key": create_dto.project_key}
 
-        await self.jira_issue_repository.create(create_dto)
+        await self.jira_issue_repository.create(session=session, issue=create_dto)
 
         # Log sync
         await self.sync_log_repository.create_sync_log(
-            SyncLogDBCreateDTO(
+            session=session,
+            sync_log=SyncLogDBCreateDTO(
                 entity_type=EntityType.ISSUE,
                 entity_id=issue_id,
                 operation=OperationType.SYNC,

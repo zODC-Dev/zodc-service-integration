@@ -35,17 +35,6 @@ class JiraWebhookController:
             except ValueError as ve:
                 # Lỗi khi parse webhook, không thêm vào queue
                 log.error(f"Error parsing webhook: {str(ve)}")
-
-                # Vẫn cố thêm vào queue dù bị lỗi parse
-                # try:
-                #     # Chỉ thêm payload gốc nếu có event type
-                #     if "webhookEvent" in payload:
-                #         log.warning(f"Attempting to queue unparsed webhook with event {payload['webhookEvent']}")
-                #         await self.jira_webhook_queue_service.add_webhook_to_queue(payload)
-                #         return {"status": "queued_raw", "event_type": payload['webhookEvent']}
-                # except Exception as inner_e:
-                #     log.error(f"Failed to queue raw webhook: {str(inner_e)}")
-
                 raise HTTPException(status_code=400, detail=f"Invalid webhook format: {str(ve)}") from ve
 
         except HTTPException:

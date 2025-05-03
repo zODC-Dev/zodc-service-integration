@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Tuple
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.models.jira_issue import JiraIssueModel
@@ -32,6 +34,7 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
 
     async def get_user_performance_summary(
         self,
+        session: AsyncSession,
         user_id: int,
         quarter: int,
         year: int
@@ -39,7 +42,7 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
         """Lấy thông tin hiệu suất của người dùng trong một quý"""
         try:
             # Lấy thông tin người dùng
-            user = await self.jira_user_db_service.get_user_by_id(user_id)
+            user = await self.jira_user_db_service.get_user_by_id(session, user_id)
             if not user:
                 log.error(f"User {user_id} not found")
                 raise ValueError(f"User {user_id} not found")
@@ -48,14 +51,14 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
             start_date, end_date = self._get_quarter_date_range(quarter, year)
 
             # Lấy danh sách sprints trong quý
-            sprints = await self._get_sprints_in_date_range(start_date, end_date)
+            sprints = await self._get_sprints_in_date_range(session, start_date, end_date)
 
             # Lấy danh sách issues của người dùng trong quý
-            issues = await self._get_user_issues_in_date_range(user_id, start_date, end_date)
+            issues = await self._get_user_issues_in_date_range(session, user_id, start_date, end_date)
 
             # Tính toán các chỉ số hiệu suất
             performance_data = await self._calculate_performance_metrics(
-                user, issues, sprints, start_date, end_date
+                session, user, issues, sprints, start_date, end_date
             )
             # Tạo model kết quả
             return UserPerformanceSummaryModel(
@@ -88,6 +91,7 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
 
     async def _get_sprints_in_date_range(
         self,
+        session: AsyncSession,
         start_date: datetime,
         end_date: datetime
     ) -> List[JiraSprintModel]:
@@ -99,7 +103,7 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
             end_date = end_date.replace(tzinfo=timezone.utc)
 
         # Lấy tất cả sprints của project ZODC
-        all_sprints = await self.jira_sprint_db_service.get_all_sprints()
+        all_sprints = await self.jira_sprint_db_service.get_all_sprints(session)
 
         # Lọc sprints trong khoảng thời gian
         sprints_in_range = []
@@ -118,6 +122,7 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
 
     async def _get_user_issues_in_date_range(
         self,
+        session: AsyncSession,
         user_id: int,
         start_date: datetime,
         end_date: datetime
@@ -130,7 +135,7 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
             end_date = end_date.replace(tzinfo=timezone.utc)
 
         # Lấy tất cả issues
-        all_issues = await self.jira_issue_db_service.get_issues_by_user_id(user_id)
+        all_issues = await self.jira_issue_db_service.get_issues_by_user_id(session, user_id)
 
         # Lọc issues của người dùng trong khoảng thời gian
         user_issues = []
@@ -148,23 +153,24 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
 
     async def _calculate_performance_metrics(
         self,
+        session: AsyncSession,
         user: JiraUserModel,
         issues: List[JiraIssueModel],
         sprints: List[JiraSprintModel],
         start_date: datetime,
         end_date: datetime
-    ) -> Dict:
+    ) -> Dict[str, Any]:
         """Tính toán các chỉ số hiệu suất"""
         # Khởi tạo các biến đếm
-        total_tasks = len(issues)
-        completed_tasks = 0
-        total_story_points = 0
-        completed_story_points = 0
-        total_completion_time = 0
-        on_time_completions = 0
-        bug_fixes = 0
-        successful_bug_fixes = 0
-        reworks = 0
+        total_tasks: int = len(issues)
+        completed_tasks: int = 0
+        total_story_points: float = 0
+        completed_story_points: float = 0
+        total_completion_time: float = 0
+        on_time_completions: int = 0
+        bug_fixes: int = 0
+        successful_bug_fixes: int = 0
+        reworks: int = 0
 
         # Khởi tạo các dictionary đếm theo loại và độ ưu tiên
         task_by_type: Dict[str, int] = {}
@@ -177,12 +183,12 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
         # Lấy lịch sử thay đổi trạng thái của tất cả issues
         issue_ids = [issue.jira_issue_id for issue in issues]
         status_history_by_issue = await self.jira_issue_history_db_service.get_issues_field_history(
-            issue_ids, "status"
+            session, issue_ids, "status"
         )
 
         # Lấy lịch sử thay đổi story points của tất cả issues
         _ = await self.jira_issue_history_db_service.get_issues_field_history(
-            issue_ids, "story_points"
+            session, issue_ids, "story_points"
         )
 
         # Duyệt qua từng issue để tính toán các chỉ số

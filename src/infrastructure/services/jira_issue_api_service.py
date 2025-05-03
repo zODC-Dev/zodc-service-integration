@@ -1,5 +1,8 @@
+
 import asyncio
 from typing import Any, Dict, List, Optional, Union
+
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
@@ -47,8 +50,9 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         for attempt in range(self.retry_attempts):
             try:
                 response_data = await client_to_use.get(
-                    f"/rest/api/3/issue/{issue_id}",
-                    None,  # Không cần user_id
+                    session=None,
+                    endpoint=f"/rest/api/3/issue/{issue_id}",
+                    user_id=None,  # Không cần user_id
                     params={"expand": "renderedFields,transitions,changelog,names"},
                     error_msg=f"Error fetching issue {issue_id}"
                 )
@@ -80,13 +84,14 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         return None
 
-    async def get_issue(self, user_id: int, issue_id: str) -> Optional[JiraIssueModel]:
+    async def get_issue(self, session: AsyncSession, user_id: int, issue_id: str) -> Optional[JiraIssueModel]:
         """Get issue from Jira API with retry logic"""
         for attempt in range(self.retry_attempts):
             try:
                 response_data = await self.client.get(
-                    f"/rest/api/3/issue/{issue_id}",
-                    user_id,
+                    session=session,
+                    endpoint=f"/rest/api/3/issue/{issue_id}",
+                    user_id=user_id,
                     params={
                         "expand": "renderedFields",
                         "fields": [
@@ -137,7 +142,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         return None
 
-    async def create_issue(self, user_id: int, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
+    async def create_issue(self, session: AsyncSession, user_id: int, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
         """Create new issue in Jira"""
         log.info(f"Creating issue with data: {issue_data}")
 
@@ -163,7 +168,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         # Add optional fields
         if issue_data.assignee_id:
             log.info(f"Updating assignee_id: {issue_data.assignee_id}")
-            jira_user = await self.user_repository.get_user_by_id(int(issue_data.assignee_id))
+            jira_user = await self.user_repository.get_user_by_id(session=session, user_id=int(issue_data.assignee_id))
             if jira_user and jira_user.jira_account_id:
                 payload["fields"]["assignee"] = {"id": jira_user.jira_account_id}
 
@@ -172,9 +177,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         log.info(f"Creating issue with payload: {payload}")
         response_data = await self.client.post(
-            "/rest/api/3/issue",
-            user_id,
-            payload,
+            session=session,
+            endpoint="/rest/api/3/issue",
+            user_id=user_id,
+            data=payload,
             error_msg="Error when creating issue"
         )
 
@@ -185,13 +191,13 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         # Get new created issue
         created_issue_id: str = response_data.get("id")
-        created_issue = await self.get_issue(user_id, created_issue_id)
+        created_issue = await self.get_issue(session=session, user_id=user_id, issue_id=created_issue_id)
 
         # Handle initial status if specified
         if issue_data.status:
             log.info(f"Setting initial status to {issue_data.status}")
-            await self.transition_issue(user_id, created_issue_id, issue_data.status)
-            created_issue = await self.get_issue(user_id, created_issue_id)
+            await self.transition_issue(session=session, user_id=user_id, issue_id=created_issue_id, status=issue_data.status)
+            created_issue = await self.get_issue(session=session, user_id=user_id, issue_id=created_issue_id)
 
         if created_issue:
             return created_issue
@@ -220,7 +226,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         # Using name
         return {"name": converted_issue_type.value}
 
-    async def update_issue(self, user_id: int, issue_id: str, update: JiraIssueAPIUpdateRequestDTO) -> JiraIssueModel:
+    async def update_issue(self, session: AsyncSession, user_id: int, issue_id: str, update: JiraIssueAPIUpdateRequestDTO) -> JiraIssueModel:
         """Update issue in Jira"""
         # Prepare payload for fields
         payload: Dict[str, Any] = {"fields": {}}
@@ -241,7 +247,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         if update.assignee_id is not None:
             log.info(f"Updating assignee_id: {update.assignee_id}")
-            jira_user = await self.user_repository.get_user_by_id(int(update.assignee_id))
+            jira_user = await self.user_repository.get_user_by_id(session=session, user_id=int(update.assignee_id))
             if jira_user and jira_user.jira_account_id:
                 payload["fields"]["assignee"] = {"id": jira_user.jira_account_id}
 
@@ -254,9 +260,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         if payload["fields"]:
             try:
                 await self.client.put(
-                    f"/rest/api/3/issue/{issue_id}",
-                    user_id,
-                    payload,
+                    session=session,
+                    endpoint=f"/rest/api/3/issue/{issue_id}",
+                    user_id=user_id,
+                    data=payload,
                     error_msg=f"Error when updating issue {issue_id}"
                 )
                 update_result["messages"].append("Updated issue fields successfully")
@@ -268,7 +275,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         # Update status if provided
         if status_to_update is not None:
             log.info(f"Attempting to update status to {status_to_update}")
-            status_success = await self.transition_issue(user_id, issue_id, status_to_update)
+            status_success = await self.transition_issue(session=session, user_id=user_id, issue_id=issue_id, status=status_to_update)
             if status_success:
                 update_result["messages"].append(f"Successfully transitioned to {status_to_update}")
             else:
@@ -279,7 +286,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         log.info(f"Update result for issue {issue_id}: {update_result}")
 
         # Return issue after update
-        updated_issue = await self.get_issue(user_id, issue_id)
+        updated_issue = await self.get_issue(session=session, user_id=user_id, issue_id=issue_id)
         if updated_issue:
             return updated_issue
         else:
@@ -288,6 +295,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
     async def search_issues(
         self,
+        session: AsyncSession,
         user_id: int,
         jql: str,
         start_at: int = 0,
@@ -299,9 +307,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             fields = ["summary", "description", "status", "assignee", "issuetype", "created", "updated"]
 
         response_data = await self.client.post(
-            "/rest/api/3/search",
-            user_id,
-            {
+            session=session,
+            endpoint="/rest/api/3/search",
+            user_id=user_id,
+            data={
                 "jql": jql,
                 "startAt": start_at,
                 "maxResults": max_results,
@@ -321,20 +330,22 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         return issues
 
-    async def get_issue_transitions(self, user_id: int, issue_id: str) -> List[Dict[str, Any]]:
+    async def get_issue_transitions(self, session: AsyncSession, user_id: int, issue_id: str) -> List[Dict[str, Any]]:
         """Get list of possible transitions for issue"""
-        response_data = await self.client.get(
-            f"/rest/api/3/issue/{issue_id}/transitions",
-            user_id,
+        response_data: Dict[str, List[Dict[str, Any]]] = await self.client.get(
+            session=session,
+            endpoint=f"/rest/api/3/issue/{issue_id}/transitions",
+            user_id=user_id,
             error_msg=f"Error when getting list of transitions for issue {issue_id}"
         )
 
         return response_data.get("transitions", [])
 
-    async def transition_issue(self, user_id: int, issue_id: str, status: Union[JiraIssueStatus, str]) -> bool:
+    async def transition_issue(self, session: AsyncSession, user_id: int, issue_id: str, status: Union[JiraIssueStatus, str]) -> bool:
         """Chuyển trạng thái của issue
 
         Args:
+            session: AsyncSession
             user_id: ID của người dùng thực hiện hành động
             issue_id: ID của issue cần chuyển trạng thái
             status: Trạng thái mới (JiraIssueStatus enum hoặc string)
@@ -357,7 +368,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         # 1. Lấy danh sách transitions có thể thực hiện
         log.info(f"Getting transitions for issue {issue_id}")
-        transitions = await self.get_issue_transitions(user_id, issue_id)
+        transitions = await self.get_issue_transitions(session=session, user_id=user_id, issue_id=issue_id)
 
         # 2. Tìm transition ID tương ứng với status mong muốn
         transition_id = None
@@ -386,7 +397,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             log.warning(f"No transition found for status {status_value} of issue {issue_id}")
 
             # 3.1. Kiểm tra xem issue có đã ở trạng thái mong muốn chưa
-            current_issue = await self.get_issue(user_id, issue_id)
+            current_issue = await self.get_issue(session=session, user_id=user_id, issue_id=issue_id)
             if not current_issue:
                 log.error(f"Issue {issue_id} not found")
                 return False
@@ -405,14 +416,15 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         try:
             log.info(f"Transitioning issue {issue_id} to {status_value} using transition ID {transition_id}")
             await self.client.post(
-                f"/rest/api/3/issue/{issue_id}/transitions",
-                user_id,
-                {"transition": {"id": transition_id}},
+                session=session,
+                endpoint=f"/rest/api/3/issue/{issue_id}/transitions",
+                user_id=user_id,
+                data={"transition": {"id": transition_id}},
                 error_msg=f"Error when transitioning issue {issue_id} to {status_value}"
             )
 
             # 5. Kiểm tra lại trạng thái sau khi transition
-            updated_issue = await self.get_issue(user_id, issue_id)
+            updated_issue = await self.get_issue(session=session, user_id=user_id, issue_id=issue_id)
             log.info(f"After transition, issue {issue_id} is in status {updated_issue.status.value}")
 
             return updated_issue.status == status_enum or updated_issue.status.value == status_value
@@ -452,7 +464,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         # Mặc định trả về rỗng nếu không tìm thấy đường dẫn
         return []
 
-    async def add_comment(self, user_id: int, issue_id: str, comment: str) -> Dict[str, Any]:
+    async def add_comment(self, session: AsyncSession, user_id: int, issue_id: str, comment: str) -> Dict[str, Any]:
         """Add comment to issue"""
         payload = {
             "body": {
@@ -473,17 +485,19 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         }
 
         return await self.client.post(
-            f"/rest/api/3/issue/{issue_id}/comment",
-            user_id,
-            payload,
+            session=session,
+            endpoint=f"/rest/api/3/issue/{issue_id}/comment",
+            user_id=user_id,
+            data=payload,
             error_msg=f"Error when adding comment to issue {issue_id}"
         )
 
-    async def get_issue_history(self, user_id: int, issue_id: str) -> List[Dict[str, Any]]:
+    async def get_issue_history(self, session: AsyncSession, user_id: int, issue_id: str) -> List[Dict[str, Any]]:
         """Get issue history"""
         response_data = await self.client.get(
-            f"/rest/api/3/issue/{issue_id}/changelog",
-            user_id,
+            session=session,
+            endpoint=f"/rest/api/3/issue/{issue_id}/changelog",
+            user_id=user_id,
             error_msg=f"Error when getting issue history for issue {issue_id}"
         )
 
@@ -507,10 +521,11 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             ]
         }
 
-    async def create_issue_link(self, user_id: int, source_issue_id: str, target_issue_id: str, relationship: str) -> bool:
+    async def create_issue_link(self, session: AsyncSession, user_id: int, source_issue_id: str, target_issue_id: str, relationship: str) -> bool:
         """Create link between two issues in Jira
 
         Args:
+            session: AsyncSession
             user_id: ID of the user performing the action
             source_issue_id: ID of the source issue
             target_issue_id: ID of the target issue
@@ -537,9 +552,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
             # Call Jira API to create link
             await self.client.post(
-                "/rest/api/3/issueLink",
-                user_id,
-                payload,
+                session=session,
+                endpoint="/rest/api/3/issueLink",
+                user_id=user_id,
+                data=payload,
                 error_msg=f"Error creating link between {source_issue_id} and {target_issue_id}"
             )
 
@@ -550,11 +566,11 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             log.error(f"Error creating issue link: {str(e)}")
             return False
 
-    async def get_issue_changelog(self, issue_id: str) -> JiraIssueChangelogAPIGetResponseDTO:
+    async def get_issue_changelog(self, session: AsyncSession, issue_id: str) -> JiraIssueChangelogAPIGetResponseDTO:
         """Lấy lịch sử thay đổi của issue từ Jira API"""
         try:
             # Endpoint cho changelog
-            url = f"/rest/api/3/issue/{issue_id}/changelog"
+            endpoint = f"/rest/api/3/issue/{issue_id}/changelog"
 
             client_to_use = self.admin_client or self.client
 
@@ -575,8 +591,9 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 params["maxResults"] = max_results
 
                 response_data = await client_to_use.get(
-                    url,
-                    None,  # Không cần user_id
+                    session=session,
+                    endpoint=endpoint,
+                    user_id=None,  # Không cần user_id
                     params=params,
                     error_msg=f"Error getting changelog for issue {issue_id}"
                 )
@@ -630,7 +647,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             # Trả về DTO rỗng
             return JiraIssueChangelogAPIGetResponseDTO(values=[], startAt=0, maxResults=0, total=0, isLast=True)
 
-    async def create_issue_with_admin_auth(self, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
+    async def create_issue_with_admin_auth(self, session: AsyncSession, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
         """Create new issue in Jira using admin auth"""
         log.info(f"Creating issue with admin auth: {issue_data}")
 
@@ -659,7 +676,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         # Add optional fields
         if issue_data.assignee_id:
             log.info(f"Updating assignee_id: {issue_data.assignee_id}")
-            jira_user = await self.user_repository.get_user_by_id(int(issue_data.assignee_id))
+            jira_user = await self.user_repository.get_user_by_id(session=session, user_id=int(issue_data.assignee_id))
             if jira_user and jira_user.jira_account_id:
                 payload["fields"]["assignee"] = {"id": jira_user.jira_account_id}
 
@@ -668,9 +685,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         log.info(f"Creating issue with admin auth and payload: {payload}")
         response_data = await client_to_use.post(
-            "/rest/api/3/issue",
-            None,  # Không cần user_id
-            payload,
+            session=None,
+            endpoint="/rest/api/3/issue",
+            user_id=None,  # Không cần user_id
+            data=payload,
             error_msg="Error when creating issue"
         )
 
@@ -695,7 +713,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             log.error(f"Failed to get issue {created_issue_id} after create")
             raise Exception(f"Failed to get issue {created_issue_id} after create")
 
-    async def update_issue_with_admin_auth(self, issue_id: str, update: JiraIssueAPIUpdateRequestDTO) -> JiraIssueModel:
+    async def update_issue_with_admin_auth(self, session: AsyncSession, issue_id: str, update: JiraIssueAPIUpdateRequestDTO) -> JiraIssueModel:
         """Update issue in Jira using admin auth"""
         # Sử dụng admin client
         client_to_use = self.admin_client or self.client
@@ -719,7 +737,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         if update.assignee_id is not None:
             log.info(f"Updating assignee_id: {update.assignee_id}")
-            jira_user = await self.user_repository.get_user_by_id(int(update.assignee_id))
+            jira_user = await self.user_repository.get_user_by_id(session=session, user_id=int(update.assignee_id))
             if jira_user and jira_user.jira_account_id:
                 payload["fields"]["assignee"] = {"id": jira_user.jira_account_id}
 
@@ -735,9 +753,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         if payload["fields"]:
             try:
                 await client_to_use.put(
-                    f"/rest/api/3/issue/{issue_id}",
-                    None,  # Không cần user_id
-                    payload,
+                    session=None,
+                    endpoint=f"/rest/api/3/issue/{issue_id}",
+                    user_id=None,  # Không cần user_id
+                    data=payload,
                     error_msg=f"Error when updating issue {issue_id}"
                 )
                 update_result["messages"].append("Updated issue fields successfully")
@@ -790,9 +809,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
             # Call Jira API to create link
             await client_to_use.post(
-                "/rest/api/3/issueLink",
-                None,  # Không cần user_id
-                payload,
+                session=None,
+                endpoint="/rest/api/3/issueLink",
+                user_id=None,  # Không cần user_id
+                data=payload,
                 error_msg=f"Error creating link between {source_issue_id} and {target_issue_id}"
             )
 
@@ -872,9 +892,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             log.info(
                 f"Transitioning issue {issue_id} to {status_value} using transition ID {transition_id} with admin auth")
             await client_to_use.post(
-                f"/rest/api/3/issue/{issue_id}/transitions",
-                None,  # Không cần user_id
-                {"transition": {"id": transition_id}},
+                session=None,
+                endpoint=f"/rest/api/3/issue/{issue_id}/transitions",
+                user_id=None,  # Không cần user_id
+                data={"transition": {"id": transition_id}},
                 error_msg=f"Error when transitioning issue {issue_id} to {status_value}"
             )
 
@@ -894,8 +915,9 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         client_to_use = self.admin_client or self.client
 
         response_data = await client_to_use.get(
-            f"/rest/api/3/issue/{issue_id}/transitions",
-            None,  # Không cần user_id
+            session=None,
+            endpoint=f"/rest/api/3/issue/{issue_id}/transitions",
+            user_id=None,  # Không cần user_id
             error_msg=f"Error when getting list of transitions for issue {issue_id}"
         )
 
@@ -909,8 +931,9 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
             # Delete link bằng ID
             await client_to_use.delete(
-                f"/rest/api/3/issueLink/{link_id}",
-                None,  # Không cần user_id khi sử dụng admin auth
+                session=None,
+                endpoint=f"/rest/api/3/issueLink/{link_id}",
+                user_id=None,  # Không cần user_id khi sử dụng admin auth
                 error_msg=f"Error deleting issue link with ID {link_id}"
             )
 
@@ -924,15 +947,11 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         """Get changelog for multiple issues"""
         client_to_use = self.admin_client or self.client
 
-        # body = JiraIssueHistoryBulkFetchRequestDTO(
-        #     issue_ids_or_keys=issue_ids
-        # )
-
         response_data = await client_to_use.post(
-            "/rest/api/3/changelog/bulkfetch",
-            None,  # Không cần user_id
-            # body.model_dump_json(by_alias=True, exclude_none=True),
-            {"issueIdsOrKeys": issue_ids},
+            session=None,
+            endpoint="/rest/api/3/changelog/bulkfetch",
+            user_id=None,  # Không cần user_id
+            data={"issueIdsOrKeys": issue_ids},
             error_msg=f"Error when getting changelog for issues {issue_ids}"
         )
 
@@ -943,9 +962,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         client_to_use = self.admin_client or self.client
 
         response_data = await client_to_use.post(
-            "/rest/api/3/issue/bulkfetch",
-            None,  # Không cần user_id
-            {"issueIdsOrKeys": issue_ids},
+            session=None,
+            endpoint="/rest/api/3/issue/bulkfetch",
+            user_id=None,  # Không cần user_id
+            data={"issueIdsOrKeys": issue_ids},
             error_msg=f"Error when getting issues {issue_ids}"
         )
 
@@ -970,7 +990,9 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             }
 
             await self.client.put(
+                session=None,
                 endpoint=url,
+                user_id=None,
                 data=payload,
                 error_msg=f"Error updating issue assignee {issue_key}"
             )
@@ -997,8 +1019,9 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         try:
             response_data = await client.get(
-                url,
-                None,  # Không cần user_id khi sử dụng admin client
+                session=None,
+                endpoint=url,
+                user_id=None,  # Không cần user_id khi sử dụng admin client
                 params=params,
                 error_msg=f"Error when getting links for issue {issue_key}"
             )

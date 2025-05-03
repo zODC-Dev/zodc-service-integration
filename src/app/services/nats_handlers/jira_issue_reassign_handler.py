@@ -1,5 +1,7 @@
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.configs.logger import log
 from src.domain.exceptions.jira_exceptions import JiraRequestError
@@ -18,13 +20,13 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
         self.jira_issue_service = jira_issue_service
         self.jira_user_repository = jira_user_repository
 
-    async def handle(self, subject: str, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle(self, subject: str, message: Dict[str, Any], session: AsyncSession) -> Dict[str, Any]:
         """Handle Jira issue reassign request
 
         Args:
             subject: Subject of the NATS message
             message: Request data from NATS
-
+            session: AsyncSession
         Returns:
             dict: Response data to be sent back through NATS
         """
@@ -35,8 +37,8 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
             request = JiraIssueReassignNATSRequestDTO(**message)
 
             # Find Jira account IDs for the users
-            old_user = await self.jira_user_repository.get_user_by_id(request.old_user_id)
-            new_user = await self.jira_user_repository.get_user_by_id(request.new_user_id)
+            old_user = await self.jira_user_repository.get_user_by_id(session=session, user_id=request.old_user_id)
+            new_user = await self.jira_user_repository.get_user_by_id(session=session, user_id=request.new_user_id)
 
             if not new_user or not new_user.jira_account_id:
                 error_msg = f"New user with ID {request.new_user_id} not found or has no Jira account ID"
@@ -59,6 +61,7 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
 
             # Update assignee in Jira
             success = await self.jira_issue_service.update_issue_assignee(
+                session=session,
                 user_id=user_id,
                 issue_key=request.jira_key,
                 assignee_account_id=new_user.jira_account_id

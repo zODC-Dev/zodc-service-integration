@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
 from src.domain.models.database.jira_user import JiraUserDBCreateDTO, JiraUserDBUpdateDTO
@@ -24,12 +26,12 @@ class JiraLoginMessageHandler(INATSMessageHandler):
         self.refresh_token_repository = refresh_token_repository
         self.redis_service = redis_service
 
-    async def handle(self, subject: str, message: Dict[str, Any]) -> None:
+    async def handle(self, subject: str, message: Dict[str, Any], session: AsyncSession) -> None:
         try:
             event = JiraUserLoginNATSSubscribeDTO.model_validate(message)
 
             # Check if user exists
-            user = await self.user_repository.get_user_by_id(event.user_id)
+            user = await self.user_repository.get_user_by_id(session=session, user_id=event.user_id)
 
             if user:
                 # Update Jira info if user exists
@@ -40,7 +42,7 @@ class JiraLoginMessageHandler(INATSMessageHandler):
                     avatar_url=event.avatar_url
                 )
                 assert user.user_id is not None, "User ID is required"
-                await self.user_repository.update_user(user.user_id, user_update)
+                await self.user_repository.update_user(session=session, user_id=user.user_id, user_data=user_update)
                 log.info(f"Updated Jira link for existing user {user.jira_account_id}")
 
             else:
@@ -53,7 +55,7 @@ class JiraLoginMessageHandler(INATSMessageHandler):
                     is_active=True,
                     name=''
                 )
-                await self.user_repository.create_user(new_user)
+                await self.user_repository.create_user(session=session, user_data=new_user)
                 log.info(f"Created new user with Jira link for user {event.user_id}")
 
             # Store refresh token
@@ -65,7 +67,7 @@ class JiraLoginMessageHandler(INATSMessageHandler):
                 token_type=TokenType.JIRA,
                 expires_at=expires_at
             )
-            await self.refresh_token_repository.create_refresh_token(refresh_token)
+            await self.refresh_token_repository.create_refresh_token(session=session, refresh_token_dto=refresh_token)
 
             # Cache access token
             await self.redis_service.cache_jira_token(

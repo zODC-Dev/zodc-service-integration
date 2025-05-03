@@ -1,6 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, Path
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.app.controllers.jira_sprint_analytics_controller import JiraSprintAnalyticsController
 from src.app.dependencies.auth import get_jwt_claims
@@ -15,6 +16,7 @@ from src.app.schemas.responses.jira_sprint_analytics import (
     SprintGoalResponse,
     WorkloadResponse,
 )
+from src.configs.database import get_db
 
 router = APIRouter()
 
@@ -29,10 +31,12 @@ async def get_sprint_burndown_chart(
     project_key: str = Path(..., description="Project key"),
     sprint_id: int = Path(..., description="Sprint ID"),
     claims: JWTClaims = Depends(get_jwt_claims),
-    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller)
+    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller),
+    session: AsyncSession = Depends(get_db)
 ):
     """Get burndown chart data for a sprint"""
     return await controller.get_sprint_burndown_chart(
+        session=session,
         user_id=int(claims.sub),
         project_key=project_key,
         sprint_id=sprint_id
@@ -49,10 +53,12 @@ async def get_sprint_burnup_chart(
     project_key: str = Path(..., description="Project key"),
     sprint_id: int = Path(..., description="Sprint ID"),
     claims: JWTClaims = Depends(get_jwt_claims),
-    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller)
+    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller),
+    session: AsyncSession = Depends(get_db)
 ):
     """Get burnup chart data for a sprint"""
     return await controller.get_sprint_burnup_chart(
+        session=session,
         user_id=int(claims.sub),
         project_key=project_key,
         sprint_id=sprint_id
@@ -69,10 +75,12 @@ async def get_sprint_goal(
     project_key: str = Path(..., description="Project key"),
     sprint_id: int = Path(..., description="Sprint ID"),
     claims: JWTClaims = Depends(get_jwt_claims),
-    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller)
+    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller),
+    session: AsyncSession = Depends(get_db)
 ):
     """Get sprint goal data for a sprint"""
     return await controller.get_sprint_goal(
+        session=session,
         user_id=int(claims.sub),
         project_key=project_key,
         sprint_id=sprint_id
@@ -89,10 +97,12 @@ async def get_bug_report(
     project_key: str = Path(..., description="Project key"),
     sprint_id: int = Path(..., description="Sprint ID"),
     claims: JWTClaims = Depends(get_jwt_claims),
-    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller)
+    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller),
+    session: AsyncSession = Depends(get_db)
 ):
     """Get bug report data for a sprint"""
     return await controller.get_bug_report(
+        session=session,
         user_id=int(claims.sub),
         project_key=project_key,
         sprint_id=sprint_id
@@ -109,10 +119,12 @@ async def get_team_workload(
     project_key: str = Path(..., description="Project key"),
     sprint_id: int = Path(..., description="Sprint ID"),
     claims: JWTClaims = Depends(get_jwt_claims),
-    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller)
+    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller),
+    session: AsyncSession = Depends(get_db)
 ):
     """Get workload data for team members in a sprint"""
     return await controller.get_team_workload(
+        session=session,
         user_id=int(claims.sub),
         project_key=project_key,
         sprint_id=sprint_id
@@ -129,10 +141,12 @@ async def get_gantt_chart_data(
     project_key: str = Path(..., description="Project key"),
     sprint_id: int = Path(..., description="Sprint ID"),
     claims: JWTClaims = Depends(get_jwt_claims),
-    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller)
+    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller),
+    session: AsyncSession = Depends(get_db)
 ):
     """Get Gantt chart data for a sprint"""
     return await controller.get_gantt_chart_data(
+        session=session,
         user_id=int(claims.sub),
         project_key=project_key,
         sprint_id=sprint_id

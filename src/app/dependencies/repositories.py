@@ -1,7 +1,6 @@
 from fastapi import Depends
 
 from src.app.dependencies.container import DependencyContainer
-from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
 from src.infrastructure.repositories.sqlalchemy_jira_issue_history_repository import (
     SQLAlchemyJiraIssueHistoryRepository,
 )
@@ -13,7 +12,6 @@ from src.infrastructure.repositories.sqlalchemy_media_repository import SQLAlche
 from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
 from src.infrastructure.repositories.sqlalchemy_system_config_repository import SQLAlchemySystemConfigRepository
-from src.infrastructure.repositories.sqlalchemy_workflow_mapping_repository import SQLAlchemyWorkflowMappingRepository
 
 # Repositories dependencies
 
@@ -60,12 +58,6 @@ def get_jira_issue_history_repository() -> SQLAlchemyJiraIssueHistoryRepository:
     return container.issue_history_repository
 
 
-def get_workflow_mapping_repository() -> SQLAlchemyWorkflowMappingRepository:
-    """Get Workflow Mapping repository from container"""
-    container = DependencyContainer.get_instance()
-    return container.workflow_mapping_repository
-
-
 def get_media_repository() -> SQLAlchemyMediaRepository:
     """Get Media repository from container"""
     container = DependencyContainer.get_instance()
@@ -76,14 +68,6 @@ def get_system_config_repository() -> SQLAlchemySystemConfigRepository:
     """Get System Config repository from container"""
     container = DependencyContainer.get_instance()
     return container.system_config_repository
-
-
-def get_sqlalchemy_jira_sync_session() -> IJiraSyncSession:
-    """Get SQLAlchemy Jira Sync Session from container"""
-    container = DependencyContainer.get_instance()
-    return container.sync_session
-
-# Grouped dependencies
 
 
 def get_jira_repositories(

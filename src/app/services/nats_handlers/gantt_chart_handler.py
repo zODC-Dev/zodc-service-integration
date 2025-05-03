@@ -1,5 +1,7 @@
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.configs.logger import log
 from src.domain.models.gantt_chart import ProjectConfigModel
@@ -18,7 +20,7 @@ class GanttChartRequestHandler(INATSRequestHandler):
     def __init__(self, gantt_chart_service: GanttChartApplicationService):
         self.gantt_chart_service = gantt_chart_service
 
-    async def handle(self, subject: str, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle(self, subject: str, message: Dict[str, Any], session: AsyncSession) -> Dict[str, Any]:
         """Handle Gantt chart calculation requests"""
         try:
             log.info(f"[GANTT-NATS] Received Gantt chart calculation request for subject: {subject}")
@@ -37,6 +39,7 @@ class GanttChartRequestHandler(INATSRequestHandler):
             # Get Gantt chart with properly typed models
             log.info("[GANTT-NATS] Calling application service to calculate Gantt chart")
             gantt_chart = await self.gantt_chart_service.get_gantt_chart(
+                session=session,
                 project_key=request.project_key,
                 sprint_id=request.sprint_id,
                 config=config,

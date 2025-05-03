@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import List
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.schemas.responses.gantt_chart import GanttTaskResponse
 from src.app.schemas.responses.jira_sprint_analytics import (
     BugChartResponse,
@@ -34,6 +36,7 @@ class JiraSprintAnalyticsApplicationService:
 
     async def get_sprint_burndown_chart(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -41,7 +44,10 @@ class JiraSprintAnalyticsApplicationService:
         """Lấy dữ liệu cho biểu đồ burndown của một sprint"""
         try:
             burndown_data = await self.sprint_analytics_service.get_sprint_burndown_data(
-                user_id, project_key, sprint_id
+                session=session,
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
             )
 
             # Get current date
@@ -87,6 +93,7 @@ class JiraSprintAnalyticsApplicationService:
 
     async def get_sprint_burnup_chart(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -94,7 +101,10 @@ class JiraSprintAnalyticsApplicationService:
         """Lấy dữ liệu cho biểu đồ burnup của một sprint"""
         try:
             burnup_data = await self.sprint_analytics_service.get_sprint_burnup_data(
-                user_id, project_key, sprint_id
+                session=session,
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
             )
 
             # Tính toán ideal burnup line
@@ -153,6 +163,7 @@ class JiraSprintAnalyticsApplicationService:
 
     async def get_sprint_goal(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -160,7 +171,10 @@ class JiraSprintAnalyticsApplicationService:
         """Lấy dữ liệu sprint goal cho một sprint"""
         try:
             goal_data = await self.sprint_analytics_service.get_sprint_goal_data(
-                user_id, project_key, sprint_id
+                session=session,
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
             )
 
             # Chuyển đổi domain model sang response DTO
@@ -191,6 +205,7 @@ class JiraSprintAnalyticsApplicationService:
 
     async def get_bug_report(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -198,7 +213,10 @@ class JiraSprintAnalyticsApplicationService:
         """Lấy dữ liệu báo cáo bug cho một sprint"""
         try:
             bug_data = await self.sprint_analytics_service.get_bug_report_data(
-                user_id, project_key, sprint_id
+                session=session,
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
             )
 
             # Chuyển đổi domain model sang response DTO
@@ -254,6 +272,7 @@ class JiraSprintAnalyticsApplicationService:
 
     async def get_team_workload(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -261,7 +280,10 @@ class JiraSprintAnalyticsApplicationService:
         """Lấy dữ liệu workload của các thành viên trong sprint"""
         try:
             workload_data = await self.sprint_analytics_service.get_team_workload_data(
-                user_id, project_key, sprint_id
+                session=session,
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
             )
 
             # Chuyển đổi domain model sang response DTO
@@ -279,6 +301,7 @@ class JiraSprintAnalyticsApplicationService:
 
     async def get_gantt_chart_data(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -286,12 +309,12 @@ class JiraSprintAnalyticsApplicationService:
         """Get Gantt chart data for a sprint"""
         try:
             # Get sprint data
-            sprint = await self.jira_sprint_repository.get_sprint_by_id(sprint_id)
+            sprint = await self.jira_sprint_repository.get_sprint_by_id(session=session, sprint_id=sprint_id)
             if not sprint:
                 raise ValueError(f"Sprint with ID {sprint_id} not found")
 
             # Get all issues in the sprint
-            issues = await self.jira_issue_repository.get_project_issues(project_key=project_key, sprint_id=sprint_id)
+            issues = await self.jira_issue_repository.get_project_issues(session=session, project_key=project_key, sprint_id=sprint_id)
 
             # Convert issues to GanttTaskResponse
             tasks: List[GanttTaskResponse] = []
@@ -302,7 +325,7 @@ class JiraSprintAnalyticsApplicationService:
                     assignee=issue.assignee.name if issue.assignee else None,
                     type=issue.type,
                     status=issue.status,
-                    dependencies=issue.story_id,
+                    # dependencies=issue.story_id,
                     plan_start=issue.planned_start_time,
                     plan_end=issue.planned_end_time,
                     actual_start=issue.actual_start_time,

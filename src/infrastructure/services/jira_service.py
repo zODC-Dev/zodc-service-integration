@@ -4,6 +4,7 @@ import json
 from typing import Any, Dict, List, Optional, Type, TypeVar
 
 import aiohttp
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
 from src.configs.settings import settings
@@ -35,10 +36,10 @@ class JiraAPIClient:
         self.base_url = settings.JIRA_BASE_URL
         self.use_admin_auth = use_admin_auth
 
-    async def _get_token(self, user_id: int) -> str:
+    async def _get_token(self, session: AsyncSession, user_id: int) -> str:
         """Get Jira token from cache or refresh"""
         # Schedule token refresh check
-        await self.token_scheduler_service.schedule_token_refresh(user_id)
+        await self.token_scheduler_service.schedule_token_refresh(session=session, user_id=user_id)
 
         # Try to get token from cache first
         token = await self.redis_service.get_cached_jira_token(user_id)
@@ -46,7 +47,7 @@ class JiraAPIClient:
             return token
 
         # If not in cache, using refresh token to get new access token
-        await self.token_scheduler_service.refresh_token_chain(user_id, TokenType.JIRA)
+        await self.token_scheduler_service.refresh_token_chain(session=session, user_id=user_id, token_type=TokenType.JIRA)
 
         # Try to get token from cache again
         token = await self.redis_service.get_cached_jira_token(user_id)
@@ -75,12 +76,13 @@ class JiraAPIClient:
             "Content-Type": "application/json"
         }
 
-    async def _get_headers_for_request(self, user_id: Optional[int] = None) -> Dict[str, str]:
+    async def _get_headers_for_request(self, session: Optional[AsyncSession], user_id: Optional[int] = None) -> Dict[str, str]:
         """Lấy headers cho request - hoặc từ admin hoặc từ user token"""
         if user_id is None:
             return self._get_admin_headers()
         else:
-            token = await self._get_token(user_id)
+            assert session is not None, "Session is required for user token"
+            token = await self._get_token(session=session, user_id=user_id)
             return self._get_headers(token)
 
     async def _handle_response(self, response: aiohttp.ClientResponse, error_msg: str = "Jira API error") -> Dict[str, Any]:
@@ -107,6 +109,7 @@ class JiraAPIClient:
 
     async def request_with_retry(
         self,
+        session: Optional[AsyncSession],
         method: str,
         url: str,
         user_id: Optional[int] = None,  # Đổi thành optional
@@ -115,15 +118,15 @@ class JiraAPIClient:
         error_msg: str = "Jira API error"
     ) -> Dict[str, Any]:
         """Perform HTTP request with retry mechanism"""
-        headers = await self._get_headers_for_request(user_id)
+        headers = await self._get_headers_for_request(session=session, user_id=user_id)
 
         retry_count = 0
         # last_error = None
 
         while retry_count < self.max_retries:
             try:
-                async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                    request_method = getattr(session, method.lower())
+                async with aiohttp.ClientSession(timeout=self.timeout) as http_session:
+                    request_method = getattr(http_session, method.lower())
                     request_kwargs = {"headers": headers, "params": params}
 
                     if json_data is not None and method.lower() in ['post', 'put', 'patch']:
@@ -152,25 +155,25 @@ class JiraAPIClient:
 
         raise JiraRequestError(500, "Error fetching data from Jira")
 
-    async def get(self, endpoint: str, user_id: Optional[int] = None, params: Optional[Dict[str, Any]] = None, error_msg: str = "Error fetching data from Jira") -> Dict[str, Any]:
+    async def get(self, session: Optional[AsyncSession], endpoint: str, user_id: Optional[int] = None, params: Optional[Dict[str, Any]] = None, error_msg: str = "Error fetching data from Jira") -> Dict[str, Any]:
         """Perform HTTP GET request"""
         url = f"{self.base_url}{endpoint}"
-        return await self.request_with_retry("GET", url, user_id, params=params, error_msg=error_msg)
+        return await self.request_with_retry(session=session, method="GET", url=url, user_id=user_id, params=params, error_msg=error_msg)
 
-    async def post(self, endpoint: str, user_id: Optional[int] = None, data: Dict[str, Any] = None, error_msg: str = "Error creating new data on Jira") -> Dict[str, Any]:
+    async def post(self, session: Optional[AsyncSession], endpoint: str, user_id: Optional[int] = None, data: Dict[str, Any] = None, error_msg: str = "Error creating new data on Jira") -> Dict[str, Any]:
         """Perform HTTP POST request"""
         url = f"{self.base_url}{endpoint}"
-        return await self.request_with_retry("POST", url, user_id, json_data=data, error_msg=error_msg)
+        return await self.request_with_retry(session=session, method="POST", url=url, user_id=user_id, json_data=data, error_msg=error_msg)
 
-    async def put(self, endpoint: str, user_id: Optional[int] = None, data: Dict[str, Any] = None, error_msg: str = "Error updating data on Jira") -> Dict[str, Any]:
+    async def put(self, session: Optional[AsyncSession], endpoint: str, user_id: Optional[int] = None, data: Dict[str, Any] = None, error_msg: str = "Error updating data on Jira") -> Dict[str, Any]:
         """Perform HTTP PUT request"""
         url = f"{self.base_url}{endpoint}"
-        return await self.request_with_retry("PUT", url, user_id, json_data=data, error_msg=error_msg)
+        return await self.request_with_retry(session=session, method="PUT", url=url, user_id=user_id, json_data=data, error_msg=error_msg)
 
-    async def delete(self, endpoint: str, user_id: Optional[int] = None, error_msg: str = "Error deleting data on Jira") -> Dict[str, Any]:
+    async def delete(self, session: Optional[AsyncSession], endpoint: str, user_id: Optional[int] = None, error_msg: str = "Error deleting data on Jira") -> Dict[str, Any]:
         """Perform HTTP DELETE request"""
         url = f"{self.base_url}{endpoint}"
-        return await self.request_with_retry("DELETE", url, user_id, error_msg=error_msg)
+        return await self.request_with_retry(session=session, method="DELETE", url=url, user_id=user_id, error_msg=error_msg)
 
     # Các phương thức tiện ích
 

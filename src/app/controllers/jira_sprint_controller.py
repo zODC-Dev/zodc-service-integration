@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.app.schemas.requests.jira_sprint import SprintStartRequest
 from src.app.schemas.responses.base import StandardResponse
@@ -7,17 +8,19 @@ from src.app.services.jira_sprint_service import JiraSprintApplicationService
 from src.configs.logger import log
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 
-router = APIRouter(prefix="/api/v1/sprints", tags=["sprints"])
-
 
 class JiraSprintController:
     def __init__(self, sprint_service: JiraSprintApplicationService):
         self.sprint_service = sprint_service
 
-    async def get_sprint_by_id(self, sprint_id: int) -> StandardResponse[GetJiraSprintDetailsResponse]:
+    async def get_sprint_by_id(
+        self,
+        session: AsyncSession,
+        sprint_id: int
+    ) -> StandardResponse[GetJiraSprintDetailsResponse]:
         """Get sprint details by ID with task counts by status"""
         try:
-            sprint, task_count_by_status = await self.sprint_service.get_sprint_details(sprint_id=sprint_id)
+            sprint, task_count_by_status = await self.sprint_service.get_sprint_details(session=session, sprint_id=sprint_id)
 
             if sprint is None:
                 raise HTTPException(status_code=404, detail="Sprint not found")
@@ -30,10 +33,14 @@ class JiraSprintController:
             log.error(f"Unexpected error when getting sprint {sprint_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e
 
-    async def get_current_sprint(self, project_key: str) -> StandardResponse[GetJiraSprintResponse]:
+    async def get_current_sprint(
+        self,
+        session: AsyncSession,
+        project_key: str
+    ) -> StandardResponse[GetJiraSprintResponse]:
         """Get the current sprint in Jira"""
         try:
-            current_sprint = await self.sprint_service.get_current_sprint(project_key=project_key)
+            current_sprint = await self.sprint_service.get_current_sprint(session=session, project_key=project_key)
 
             if current_sprint is None:
                 raise HTTPException(status_code=404, detail="No current sprint found")
@@ -49,19 +56,20 @@ class JiraSprintController:
 
     async def start_sprint(
         self,
+        session: AsyncSession,
         sprint_id: int,
         sprint_data: SprintStartRequest
     ) -> StandardResponse[GetJiraSprintResponse]:
         """Start a sprint in Jira using admin account with optional parameters"""
         try:
             updated_sprint = await self.sprint_service.start_sprint(
+                session=session,
                 sprint_id=sprint_id,
                 start_date=sprint_data.start_date,
                 end_date=sprint_data.end_date,
                 goal=sprint_data.goal
             )
 
-            log.info(f"Updated sprint: {updated_sprint}")
             if updated_sprint is None:
                 raise HTTPException(status_code=404, detail="Sprint not found")
 
@@ -82,11 +90,14 @@ class JiraSprintController:
             log.error(f"Unexpected error when starting sprint {sprint_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e
 
-    async def end_sprint(self, sprint_id: int) -> StandardResponse[GetJiraSprintResponse]:
+    async def end_sprint(
+        self,
+        session: AsyncSession,
+        sprint_id: int
+    ) -> StandardResponse[GetJiraSprintResponse]:
         """End a sprint in Jira using admin account"""
         try:
-            updated_sprint = await self.sprint_service.end_sprint(sprint_id=sprint_id)
-            log.info(f"Updated sprint: {updated_sprint}")
+            updated_sprint = await self.sprint_service.end_sprint(session=session, sprint_id=sprint_id)
             if updated_sprint is None:
                 raise HTTPException(status_code=404, detail="Sprint not found")
             return StandardResponse(

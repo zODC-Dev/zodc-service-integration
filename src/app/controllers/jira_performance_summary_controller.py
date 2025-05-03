@@ -1,4 +1,4 @@
-
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.app.schemas.requests.jira_performance_summary import PerformanceSummaryRequest
 from src.app.schemas.responses.jira_performance_summary import UserPerformanceSummaryResponse
@@ -17,11 +17,16 @@ class JiraPerformanceSummaryController:
 
     async def get_user_performance_summary(
         self,
-        request: PerformanceSummaryRequest
+        request: PerformanceSummaryRequest,
+        session: AsyncSession
     ) -> UserPerformanceSummaryResponse:
         """Lấy thông tin hiệu suất của người dùng trong một quý"""
         # Lấy thông tin hiệu suất từ service
+
+        assert request.user_id is not None, "User ID is required"
+
         performance_summary = await self.jira_performance_summary_service.get_user_performance_summary(
+            session=session,
             user_id=request.user_id,
             quarter=request.quarter,
             year=request.year

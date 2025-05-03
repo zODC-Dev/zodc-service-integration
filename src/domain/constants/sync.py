@@ -19,3 +19,4 @@ class SourceType(str, Enum):
     NATS = "NATS"
     WEBHOOK = "WEBHOOK"
     MANUAL = "MANUAL"
+    ZODC = "ZODC"

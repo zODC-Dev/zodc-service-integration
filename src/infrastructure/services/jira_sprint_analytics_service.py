@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.models.apis.jira_user import JiraAssigneeResponse
@@ -45,13 +47,14 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
     async def get_sprint_burndown_data(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
-        sprint_id: int
+        sprint_id: int,
     ) -> SprintBurndownModel:
         """Lấy dữ liệu burndown chart cho một sprint"""
         # Lấy thông tin sprint
-        sprint = await self._get_sprint_details(sprint_id)
+        sprint = await self._get_sprint_details(session=session, sprint_id=sprint_id)
         if not sprint:
             log.error(f"Sprint {sprint_id} not found")
             raise ValueError(f"Sprint {sprint_id} not found")
@@ -62,11 +65,16 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         #     raise ValueError(f"Sprint {sprint.name} is not active")
 
         # Lấy danh sách issues trong sprint
-        issues = await self._get_sprint_issues(user_id, project_key, sprint_id)
+        issues = await self._get_sprint_issues(session=session, user_id=user_id, project_key=project_key, sprint_id=sprint_id)
         log.debug(f"Issues count: {len(issues)}")
 
         # Tính toán dữ liệu burndown
-        base_model = await self._calculate_sprint_analytics(sprint, issues, project_key)
+        base_model = await self._calculate_sprint_analytics(
+            session=session,
+            sprint=sprint,
+            issues=issues,
+            project_key=project_key
+        )
         # Chuyển đổi sang model burndown
         return SprintBurndownModel(
             id=sprint.id,
@@ -82,22 +90,28 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
     async def get_sprint_burnup_data(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
     ) -> SprintBurnupModel:
         """Lấy dữ liệu burnup chart cho một sprint"""
         # Lấy thông tin sprint
-        sprint = await self._get_sprint_details(sprint_id)
+        sprint = await self._get_sprint_details(session=session, sprint_id=sprint_id)
         if not sprint:
             log.error(f"Không tìm thấy sprint {sprint_id}")
             raise ValueError(f"Sprint {sprint_id} not found")
 
         # Lấy danh sách issues trong sprint
-        issues = await self._get_sprint_issues(user_id, project_key, sprint_id)
+        issues = await self._get_sprint_issues(session=session, user_id=user_id, project_key=project_key, sprint_id=sprint_id)
 
         # Tính toán dữ liệu
-        base_model = await self._calculate_sprint_analytics(sprint, issues, project_key)
+        base_model = await self._calculate_sprint_analytics(
+            session=session,
+            sprint=sprint,
+            issues=issues,
+            project_key=project_key
+        )
 
         # Chuyển đổi sang model burnup
         return SprintBurnupModel(
@@ -114,19 +128,20 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
     async def get_sprint_goal_data(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
     ) -> SprintGoalModel:
         """Lấy dữ liệu sprint goal cho một sprint"""
         # Lấy thông tin sprint
-        sprint = await self._get_sprint_details(sprint_id)
+        sprint = await self._get_sprint_details(session=session, sprint_id=sprint_id)
         if not sprint:
             log.error(f"Không tìm thấy sprint {sprint_id}")
             raise ValueError(f"Sprint {sprint_id} not found")
 
         # Lấy danh sách issues trong sprint
-        issues = await self._get_sprint_issues(user_id, project_key, sprint_id)
+        issues = await self._get_sprint_issues(session=session, user_id=user_id, project_key=project_key, sprint_id=sprint_id)
 
         # Phân loại issues theo trạng thái
         completed_issues = []
@@ -196,19 +211,20 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
     async def get_bug_report_data(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
     ) -> BugReportDataModel:
         """Lấy dữ liệu báo cáo bug cho một sprint"""
         # Lấy thông tin sprint
-        sprint = await self._get_sprint_details(sprint_id)
+        sprint = await self._get_sprint_details(session=session, sprint_id=sprint_id)
         if not sprint:
             log.error(f"Không tìm thấy sprint {sprint_id}")
             raise ValueError(f"Sprint {sprint_id} not found")
 
         # Lấy danh sách issues trong sprint
-        issues = await self._get_sprint_issues(user_id, project_key, sprint_id)
+        issues = await self._get_sprint_issues(session=session, user_id=user_id, project_key=project_key, sprint_id=sprint_id)
 
         # Lọc các issues là bug
         bug_issues = [issue for issue in issues if issue.type == JiraIssueType.BUG]
@@ -268,14 +284,15 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
             bugs_chart=[bug_chart]  # For now, we only have one chart
         )
 
-    async def _get_sprint_details(self, sprint_id: int) -> Optional[JiraSprintModel]:
+    async def _get_sprint_details(self, session: AsyncSession, sprint_id: int) -> Optional[JiraSprintModel]:
         """Lấy thông tin chi tiết của sprint bằng id"""
-        return await self.jira_sprint_db_service.get_sprint_by_id(sprint_id)
+        return await self.jira_sprint_db_service.get_sprint_by_id(session=session, sprint_id=sprint_id)
 
-    async def _get_sprint_issues(self, user_id: int, project_key: str, sprint_id: int) -> List[JiraIssueModel]:
+    async def _get_sprint_issues(self, session: AsyncSession, user_id: int, project_key: str, sprint_id: int) -> List[JiraIssueModel]:
         """Lấy danh sách issues trong sprint"""
         # Sử dụng service có sẵn để lấy issues từ database
         return await self.jira_issue_db_service.get_project_issues(
+            session=session,
             user_id=user_id,
             project_key=project_key,
             sprint_id=sprint_id
@@ -283,6 +300,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
     async def _calculate_sprint_analytics(
         self,
+        session: AsyncSession,
         sprint: JiraSprintModel,
         issues: List[JiraIssueModel],
         project_key: str
@@ -304,17 +322,23 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
         # Lấy tất cả sprint histories trong một lần truy vấn
         sprint_history_by_issue = await self.jira_issue_history_db_service.get_issues_field_history(
-            all_issue_ids, "sprint"
+            session=session,
+            issue_ids=all_issue_ids,
+            field_name="sprint"
         )
 
         # Lấy tất cả story points histories trong một lần truy vấn
         points_history_by_issue = await self.jira_issue_history_db_service.get_issues_field_history(
-            all_issue_ids, "story_points"
+            session=session,
+            issue_ids=all_issue_ids,
+            field_name="story_points"
         )
 
         # Lấy tất cả status histories trong một lần truy vấn
         status_history_by_issue = await self.jira_issue_history_db_service.get_issues_field_history(
-            all_issue_ids, "status"
+            session=session,
+            issue_ids=all_issue_ids,
+            field_name="status"
         )
 
         # Tìm các initial issues (issues có trong sprint tại thời điểm sprint bắt đầu)
@@ -708,19 +732,20 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
     async def get_team_workload_data(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
     ) -> List[WorkloadModel]:
         """Get workload data of members in sprint"""
         # Get sprint details
-        sprint = await self._get_sprint_details(sprint_id)
+        sprint = await self._get_sprint_details(session=session, sprint_id=sprint_id)
         if not sprint:
             log.error(f"Sprint {sprint_id} not found")
             raise ValueError(f"Sprint {sprint_id} not found")
 
         # Lấy danh sách issues trong sprint
-        issues = await self._get_sprint_issues(user_id, project_key, sprint_id)
+        issues = await self._get_sprint_issues(session=session, user_id=user_id, project_key=project_key, sprint_id=sprint_id)
 
         # Lưu trữ workload theo thành viên
         workload_by_member: Dict[str, Dict[str, float]] = {}

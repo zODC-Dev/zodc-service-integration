@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.app.services.nats_application_service import NATSApplicationService
@@ -41,13 +43,14 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         """Check if this handler can process the given webhook event"""
         return webhook_event == JiraWebhookEvent.ISSUE_UPDATED
 
-    async def handle(self, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:
+    async def handle(self, session: AsyncSession, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:
         """Handle the issue update webhook"""
         issue_id = webhook_data.issue.id
 
         # Log the webhook sync
         await self.sync_log_repository.create_sync_log(
-            SyncLogDBCreateDTO(
+            session=session,
+            sync_log=SyncLogDBCreateDTO(
                 entity_type=EntityType.ISSUE,
                 entity_id=issue_id,
                 operation=OperationType.SYNC,
@@ -60,7 +63,7 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         )
 
         # Lấy issue hiện tại từ database để so sánh thay đổi
-        current_issue = await self.jira_issue_repository.get_by_jira_issue_id(issue_id)
+        current_issue = await self.jira_issue_repository.get_by_jira_issue_id(session=session, jira_issue_id=issue_id)
         if not current_issue:
             return {"error": "Issue not found", "issue_id": issue_id}
 
@@ -72,7 +75,7 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         # Thay vì lưu history trực tiếp từ webhook, gọi service đồng bộ history từ API
         if self.issue_history_sync_service:
             try:
-                await self.issue_history_sync_service.sync_issue_history(issue_id)
+                await self.issue_history_sync_service.sync_issue_history(session=session, issue_id=issue_id)
                 log.info(f"Successfully synced history for issue {issue_id} from Jira API")
             except Exception as e:
                 log.error(f"Error syncing history for issue {issue_id}: {str(e)}")
@@ -86,12 +89,12 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         elif update_dto.status == JiraIssueStatus.IN_PROGRESS.value:
             update_dto.actual_start_time = datetime.now()
 
-        updated_issue = await self.jira_issue_repository.update(issue_id, update_dto)
+        updated_issue = await self.jira_issue_repository.update(session=session, issue_id=issue_id, issue_update=update_dto)
 
         # Publish issue update to NATS for masterflow service
         if updated_issue:
             try:
-                await self._publish_issue_update_event(issue_data, current_issue)
+                await self._publish_issue_update_event(session=session, issue_data=issue_data, old_issue=current_issue)
                 log.info(f"Published issue update event for issue {issue_id} to NATS")
             except Exception as e:
                 log.error(f"Error publishing issue update event for issue {issue_id}: {str(e)}")
@@ -101,7 +104,7 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
             "updated": updated_issue is not None
         }
 
-    async def _publish_issue_update_event(self, issue_data: JiraIssueModel, old_issue: JiraIssueModel) -> None:
+    async def _publish_issue_update_event(self, session: AsyncSession, issue_data: JiraIssueModel, old_issue: JiraIssueModel) -> None:
         """Publish issue update event to NATS for masterflow service"""
         # Extract required data from issue_data
         jira_key = issue_data.key
@@ -125,7 +128,7 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
             for sprint in issue_data.sprints:
                 if sprint.state == "active":
                     jira_sprint_id = sprint.jira_sprint_id
-                    current_sprint = await self.jira_sprint_repository.get_sprint_by_jira_sprint_id(jira_sprint_id)
+                    current_sprint = await self.jira_sprint_repository.get_sprint_by_jira_sprint_id(session=session, jira_sprint_id=jira_sprint_id)
                     if current_sprint:
                         sprint_id = current_sprint.id
                         break

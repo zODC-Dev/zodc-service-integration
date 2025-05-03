@@ -1,5 +1,7 @@
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_project_service import JiraProjectApplicationService
 from src.configs.logger import log
 from src.domain.models.nats.requests.jira_project import JiraProjectSyncNATSRequestDTO
@@ -16,16 +18,15 @@ class JiraProjectSyncRequestHandler(INATSRequestHandler):
         self.jira_project_service = jira_project_service
         self.sync_log_repository = sync_log_repository
 
-    async def handle(self, subject: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle(self, subject: str, message: Dict[str, Any], session: AsyncSession) -> Dict[str, Any]:
         # Parse request data
-        request = JiraProjectSyncNATSRequestDTO.model_validate(data)
+        request = JiraProjectSyncNATSRequestDTO.model_validate(message)
 
         log.info(f"[NATS] Starting project sync for {request.project_key}")
 
         try:
-            # Call service to handle sync - we don't need to manage logs here
-            # since all logging happens within the sync_project method now
-            result = await self.jira_project_service.sync_project(request)
+            # Call service to handle sync - passing the session parameter
+            result = await self.jira_project_service.sync_project(session, request)
 
             log.info(f"[NATS] Completed project sync for {request.project_key}")
 

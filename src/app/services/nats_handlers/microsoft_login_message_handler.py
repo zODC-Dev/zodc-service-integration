@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.domain.constants.refresh_tokens import TokenType
 from src.domain.models.database.jira_user import JiraUserDBCreateDTO
@@ -23,12 +25,12 @@ class MicrosoftLoginMessageHandler(INATSMessageHandler):
         self.user_repository = user_repository
         self.refresh_token_repository = refresh_token_repository
 
-    async def handle(self, subject: str, message: Dict[str, Any]) -> None:
+    async def handle(self, subject: str, message: Dict[str, Any], session: AsyncSession) -> None:
         try:
             event = MicrosoftUserLoginNATSSubscribeDTO(**message)
 
             # Check if user exists
-            user = await self.user_repository.get_user_by_id(event.user_id)
+            user = await self.user_repository.get_user_by_id(session, event.user_id)
             if not user:
                 new_user = JiraUserDBCreateDTO(
                     email=event.email,
@@ -37,7 +39,7 @@ class MicrosoftLoginMessageHandler(INATSMessageHandler):
                     is_active=True,
                     name=event.name
                 )
-                user = await self.user_repository.create_user(new_user)
+                user = await self.user_repository.create_user(session, new_user)
                 # log.warning(f"User not found for Microsoft login for user {event.user_id}")
                 # return
 
@@ -49,7 +51,7 @@ class MicrosoftLoginMessageHandler(INATSMessageHandler):
                 token_type=TokenType.MICROSOFT,
                 expires_at=expires_at
             )
-            await self.refresh_token_repository.create_refresh_token(refresh_token)
+            await self.refresh_token_repository.create_refresh_token(session, refresh_token)
 
             # Cache access token
             await self.redis_service.cache_microsoft_token(

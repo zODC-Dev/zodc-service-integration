@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
@@ -31,7 +33,7 @@ class UserUpdateWebhookHandler(JiraWebhookHandler):
         """Check if this handler can process the given webhook event"""
         return webhook_event in [JiraWebhookEvent.USER_UPDATED, "jira:user_updated"]
 
-    async def handle(self, webhook_data: JiraUserWebhookDTO) -> Dict[str, Any]:
+    async def handle(self, session: AsyncSession, webhook_data: JiraUserWebhookDTO) -> Dict[str, Any]:
         """Handle the user update webhook"""
         account_id = webhook_data.user.account_id
         log.info(f"Processing user update webhook for user {account_id}")
@@ -41,7 +43,7 @@ class UserUpdateWebhookHandler(JiraWebhookHandler):
 
         try:
             # Check if user exists
-            existing_user = await self.user_database_service.get_user_by_jira_account_id(account_id)
+            existing_user = await self.user_database_service.get_user_by_jira_account_id(session=session, jira_account_id=account_id)
 
             if not existing_user:
                 # If we couldn't get data from API, use the webhook data
@@ -61,7 +63,7 @@ class UserUpdateWebhookHandler(JiraWebhookHandler):
                     )
 
                 # Create new user
-                created_user = await self.user_database_service.create_user(create_dto)
+                created_user = await self.user_database_service.create_user(session=session, user_data=create_dto)
                 operation_type = OperationType.CREATE
                 success = created_user is not None
 
@@ -84,7 +86,7 @@ class UserUpdateWebhookHandler(JiraWebhookHandler):
                         updated_at=datetime.now(timezone.utc)
                     )
 
-                updated_user = await self.user_database_service.update_user_by_jira_account_id(account_id, update_dto)
+                updated_user = await self.user_database_service.update_user_by_jira_account_id(session=session, jira_account_id=account_id, user_data=update_dto)
                 operation_type = OperationType.UPDATE
                 success = updated_user is not None
 
@@ -92,7 +94,8 @@ class UserUpdateWebhookHandler(JiraWebhookHandler):
 
             # Log sync event
             await self.sync_log_repository.create_sync_log(
-                SyncLogDBCreateDTO(
+                session=session,
+                sync_log=SyncLogDBCreateDTO(
                     entity_type=EntityType.USER,
                     entity_id=account_id,
                     operation=operation_type,

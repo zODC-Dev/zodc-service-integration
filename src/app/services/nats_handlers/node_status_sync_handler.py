@@ -1,5 +1,7 @@
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
@@ -32,10 +34,11 @@ class NodeStatusSyncHandler(INATSRequestHandler):
         except ValueError as e:
             raise ValueError(f"Invalid status: {status}") from e
 
-    async def handle(self, subject: str, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle(self, subject: str, message: Dict[str, Any], session: AsyncSession) -> Dict[str, Any]:
         """Xử lý message đồng bộ trạng thái node
 
         Args:
+            session: AsyncSession
             subject: Tên subject của message
             message: Dữ liệu của message
 

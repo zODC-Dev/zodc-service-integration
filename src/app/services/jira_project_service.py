@@ -2,6 +2,8 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueType
@@ -23,13 +25,17 @@ from src.domain.models.nats.replies.jira_project import (
     SyncedJiraUserDTO,
 )
 from src.domain.models.nats.requests.jira_project import JiraProjectSyncNATSRequestDTO
+from src.domain.repositories.jira_issue_history_repository import IJiraIssueHistoryRepository
+from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
+from src.domain.repositories.jira_project_repository import IJiraProjectRepository
+from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
+from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
 from src.domain.services.jira_project_database_service import IJiraProjectDatabaseService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
-from src.domain.unit_of_works.jira_sync_session import IJiraSyncSession
 
 T = TypeVar('T')
 
@@ -41,22 +47,31 @@ class JiraProjectApplicationService:
         jira_project_db_service: IJiraProjectDatabaseService,
         jira_issue_db_service: IJiraIssueDatabaseService,
         jira_sprint_db_service: IJiraSprintDatabaseService,
-        sync_session: IJiraSyncSession,
         jira_issue_api_service: IJiraIssueAPIService,
         jira_issue_history_service: JiraIssueHistoryApplicationService,
         sync_log_repository: ISyncLogRepository,
+        jira_project_repository: IJiraProjectRepository,
+        jira_issue_repository: IJiraIssueRepository,
+        jira_sprint_repository: IJiraSprintRepository,
+        jira_user_repository: IJiraUserRepository,
+        jira_issue_history_repository: IJiraIssueHistoryRepository
     ):
         self.jira_project_api_service = jira_project_api_service
         self.jira_project_db_service = jira_project_db_service
         self.jira_issue_db_service = jira_issue_db_service
         self.jira_sprint_db_service = jira_sprint_db_service
-        self.sync_session = sync_session
         self.sync_log_repository = sync_log_repository
         self.jira_issue_api_service = jira_issue_api_service
         self.jira_issue_history_service = jira_issue_history_service
+        self.jira_project_repository = jira_project_repository
+        self.jira_issue_repository = jira_issue_repository
+        self.jira_sprint_repository = jira_sprint_repository
+        self.jira_user_repository = jira_user_repository
+        self.jira_issue_history_repository = jira_issue_history_repository
 
     async def get_project_issues(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: Optional[int] = None,
@@ -66,6 +81,7 @@ class JiraProjectApplicationService:
         limit: int = 50
     ) -> List[JiraIssueModel]:
         return await self.jira_issue_db_service.get_project_issues(
+            session=session,
             user_id=user_id,
             project_key=project_key,
             sprint_id=sprint_id,
@@ -75,15 +91,18 @@ class JiraProjectApplicationService:
             limit=limit
         )
 
-    async def get_accessible_projects(self, user_id: int) -> List[JiraProjectModel]:
+    async def get_accessible_projects(self, session: AsyncSession, user_id: int) -> List[JiraProjectModel]:
         """Get projects from Jira API and merge with database data"""
         try:
             # Get projects from database first
-            db_projects = await self.jira_project_db_service.get_all_projects()
+            db_projects = await self.jira_project_db_service.get_all_projects(session=session)
             db_projects_dict = {project.key: project for project in db_projects}
 
             # Get projects from Jira API
-            jira_projects = await self.jira_project_api_service.get_accessible_projects(user_id)
+            jira_projects = await self.jira_project_api_service.get_accessible_projects(
+                session=session,
+                user_id=user_id
+            )
 
             # Merge data
             merged_projects = []
@@ -107,27 +126,30 @@ class JiraProjectApplicationService:
 
     async def get_project_sprints(
         self,
+        session: AsyncSession,
         project_key: str,
     ) -> List[JiraSprintModel]:
         # Sprints are always fetched from database as they already synced
         sprints = await self.jira_sprint_db_service.get_project_sprints(
+            session=session,
             project_key=project_key
         )
         return sprints
 
-    async def get_project_by_key(self, key: str) -> Optional[JiraProjectModel]:
+    async def get_project_by_key(self, session: AsyncSession, key: str) -> Optional[JiraProjectModel]:
         """Get project from database by key"""
-        return await self.jira_project_db_service.get_project_by_key(key)
+        return await self.jira_project_db_service.get_project_by_key(session=session, key=key)
 
     async def update_project(
         self,
+        session: AsyncSession,
         project_id: int,
         project_data: JiraProjectDBUpdateDTO
     ) -> JiraProjectModel:
         """Update project in database"""
-        return await self.jira_project_db_service.update_project(project_id, project_data)
+        return await self.jira_project_db_service.update_project(session=session, project_id=project_id, project_data=project_data)
 
-    async def sync_project(self, request: JiraProjectSyncNATSRequestDTO) -> JiraProjectSyncNATSReplyDTO:
+    async def sync_project(self, session: AsyncSession, request: JiraProjectSyncNATSRequestDTO) -> JiraProjectSyncNATSReplyDTO:
         try:
             log.info(f"Starting sync for project {request.project_key}")
             started_at = datetime.now(timezone.utc)
@@ -143,92 +165,64 @@ class JiraProjectApplicationService:
                 sender=request.user_id,
                 request_payload={"project_key": request.project_key,
                                  "user_id": request.user_id, "project_id": request.project_id},
-                created_at=datetime.now(timezone.utc),
-                status="PROCESSING"
             )
 
-            # Use a dedicated session/unit of work for the entire sync operation
-            async with self.sync_session as session:
-                try:
-                    # Create the initial log within the session context
-                    if initial_log_data:
-                        await session.sync_log_repository.create_sync_log(initial_log_data)
+            try:
+                # Create the initial log within the session context
+                if initial_log_data:
+                    await self.sync_log_repository.create_sync_log(session, initial_log_data)
 
-                    # Sync project details
-                    log.info("Syncing project details...")
-                    project = await self._sync_project_details(request.user_id, request.project_key, request.project_id, session)
+                # Sync project details
+                log.info("Syncing project details...")
+                project = await self._sync_project_details(session, request.user_id, request.project_key, request.project_id)
 
-                    # Sync project users
-                    log.info("Syncing project users...")
-                    users = await self._sync_project_users(request.user_id, request.project_key, session)
-                    log.info(f"Successfully synced {len(users)} users")
+                # Sync project users
+                log.info("Syncing project users...")
+                users = await self._sync_project_users(session, request.user_id, request.project_key)
+                log.info(f"Successfully synced {len(users)} users")
 
-                    # Prepare synced users for response
-                    synced_users = [
-                        SyncedJiraUserDTO(
-                            id=user.id,
-                            jira_account_id=user.jira_account_id,
-                            name=user.name,
-                            email=user.email,
-                            is_active=user.is_active,
-                            avatar_url=user.avatar_url
-                        ) for user in users
-                    ]
+                # Prepare synced users for response
+                synced_users = [
+                    SyncedJiraUserDTO(
+                        id=user.id,
+                        jira_account_id=user.jira_account_id,
+                        name=user.name,
+                        email=user.email,
+                        is_active=user.is_active,
+                        avatar_url=user.avatar_url
+                    ) for user in users
+                ]
 
-                    # Sync sprints
-                    log.info("Syncing project sprints...")
-                    sprint_id_mapping = await self._sync_project_sprints(request.user_id, request.project_key, session)
-                    log.info(f"Successfully synced {len(sprint_id_mapping)} sprints")
+                # Sync sprints
+                log.info("Syncing project sprints...")
+                sprint_id_mapping = await self._sync_project_sprints(session, request.user_id, request.project_key)
+                log.info(f"Successfully synced {len(sprint_id_mapping)} sprints")
 
-                    # Sync issues
-                    log.info("Syncing project issues...")
-                    issues = await self._sync_project_issues(request.user_id, request.project_key, session)
-                    log.info(f"Successfully synced {len(issues)} issues")
+                # Sync issues
+                log.info("Syncing project issues...")
+                issues = await self._sync_project_issues(session, request.user_id, request.project_key)
+                log.info(f"Successfully synced {len(issues)} issues")
 
-                    # Sync changelog
-                    log.info("Syncing project changelog...")
-                    issue_ids = [issue.jira_issue_id for issue in issues]
-                    log.info(f"Syncing changelog for {len(issue_ids)} issues")
-                    # issue_ids = ['10383', '10382', '10381', '10380', '10379']
-                    await self._sync_project_changelog(issue_ids, session)
+                # Sync changelog
+                log.info("Syncing project changelog...")
+                issue_ids = [issue.jira_issue_id for issue in issues]
+                log.info(f"Syncing changelog for {len(issue_ids)} issues")
+                # issue_ids = ['10383', '10382', '10381', '10380', '10379']
+                await self._sync_project_changelog(session, issue_ids)
 
-                    # Create success log within session context
-                    success_log_data = SyncLogDBCreateDTO(
-                        entity_type=EntityType.PROJECT,
-                        entity_id=project.key,
-                        operation=OperationType.SYNC,
-                        source=SourceType.NATS,
-                        sender=request.user_id,
-                        request_payload={"project_key": project.key, "project_id": project.id},
-                        response_status=200,
-                        response_body={"project_id": project.id, "project_key": project.key},
-                        created_at=datetime.now(timezone.utc),
-                        completed_at=datetime.now(timezone.utc),
-                        status="SUCCESS"
-                    )
-                    await session.sync_log_repository.create_sync_log(success_log_data)
-                    log.info(f"Successfully completed sync for project {request.project_key}")
-                except Exception as e:
-                    log.error(f"Error during sync operations: {str(e)}")
-                    # Create error log within session context before raising
-                    try:
-                        error_log_data = SyncLogDBCreateDTO(
-                            entity_type=EntityType.PROJECT,
-                            entity_id=request.project_key,
-                            operation=OperationType.SYNC,
-                            source=SourceType.NATS,
-                            sender=request.user_id,
-                            request_payload={"project_key": request.project_key, "user_id": request.user_id},
-                            error_message=str(e),
-                            created_at=datetime.now(timezone.utc),
-                            completed_at=datetime.now(timezone.utc),
-                            status="ERROR"
-                        )
-                        await session.sync_log_repository.create_sync_log(error_log_data)
-                    except Exception as log_error:
-                        log.error(f"Failed to create error log: {str(log_error)}")
-                    # This will trigger a rollback via the unit of work
-                    raise
+                # Create success log
+                success_log_data = SyncLogDBCreateDTO(
+                    entity_type=EntityType.PROJECT,
+                    entity_id=project.key,
+                    operation=OperationType.SYNC,
+                    source=SourceType.NATS,
+                    sender=request.user_id,
+                    request_payload={"project_key": project.key, "project_id": project.id},
+                    response_status=200,
+                    response_body={"project_id": project.id, "project_key": project.key},
+                )
+                await self.sync_log_repository.create_sync_log(session, success_log_data)
+                log.info(f"Successfully completed sync for project {request.project_key}")
 
                 return JiraProjectSyncNATSReplyDTO(
                     success=True,
@@ -244,26 +238,51 @@ class JiraProjectApplicationService:
                     synced_users=synced_users
                 )
 
+            except Exception as e:
+                log.error(f"Error during sync operations: {str(e)}")
+                # Create error log
+                try:
+                    error_log_data = SyncLogDBCreateDTO(
+                        entity_type=EntityType.PROJECT,
+                        entity_id=request.project_key,
+                        operation=OperationType.SYNC,
+                        source=SourceType.NATS,
+                        sender=request.user_id,
+                        request_payload={"project_key": request.project_key, "user_id": request.user_id},
+                        error_message=str(e),
+                    )
+                    await self.sync_log_repository.create_sync_log(session, error_log_data)
+                except Exception as log_error:
+                    log.error(f"Failed to create error log: {str(log_error)}")
+
+                # Propagate the original error - but don't manage the transaction here,
+                # let the caller handle it
+                raise
+
         except Exception as e:
             log.error(f"Error during project sync: {str(e)}")
             raise
 
     async def _sync_project_details(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
-        project_id: int,
-        session: IJiraSyncSession
+        project_id: int
     ) -> JiraProjectModel:
         try:
             # Fetch from Jira API
             project_details = await self.jira_project_api_service.get_project_details(
+                session=session,
                 user_id=user_id,
                 project_key=project_key
             )
 
             # Check if project exists
-            existing_project = await session.project_repository.get_project_by_key(project_key)
+            existing_project = await self.jira_project_repository.get_project_by_key(
+                session=session,
+                key=project_key
+            )
 
             if existing_project and existing_project.id:
                 # Update existing project
@@ -274,9 +293,10 @@ class JiraProjectApplicationService:
                     description=project_details.description,
                     is_system_linked=True
                 )
-                return await session.project_repository.update_project(
-                    existing_project.id,
-                    update_dto
+                return await self.jira_project_repository.update_project(
+                    session=session,
+                    project_id=existing_project.id,
+                    project_data=update_dto
                 )
             else:
                 # Create new project
@@ -290,7 +310,10 @@ class JiraProjectApplicationService:
                     is_system_linked=True,
                     user_id=user_id
                 )
-                return await session.project_repository.create_project(create_dto)
+                return await self.jira_project_repository.create_project(
+                    session=session,
+                    project_data=create_dto
+                )
 
         except Exception as e:
             log.error(f"Error syncing project details: {str(e)}", exc_info=True)
@@ -298,14 +321,15 @@ class JiraProjectApplicationService:
 
     async def _sync_project_users(
         self,
+        session: AsyncSession,
         user_id: int,
-        project_key: str,
-        session: IJiraSyncSession
+        project_key: str
     ) -> List[JiraUserModel]:
         """Sync project users from Jira API to database"""
         try:
             # Fetch users from Jira API
             jira_users = await self.jira_project_api_service.get_project_users(
+                session=session,
                 user_id=user_id,
                 project_key=project_key
             )
@@ -315,8 +339,9 @@ class JiraProjectApplicationService:
                 try:
                     assert jira_user.jira_account_id is not None, "Jira account ID is required"
                     # Check if user exists by jira_account_id
-                    existing_user = await session.user_repository.get_user_by_jira_account_id(
-                        jira_user.jira_account_id
+                    existing_user = await self.jira_user_repository.get_user_by_jira_account_id(
+                        session=session,
+                        jira_account_id=jira_user.jira_account_id
                     )
 
                     if existing_user and existing_user.jira_account_id:
@@ -326,9 +351,10 @@ class JiraProjectApplicationService:
                             avatar_url=jira_user.avatar_url,
                             is_active=jira_user.is_active,
                         )
-                        await session.user_repository.update_user_by_jira_account_id(
-                            existing_user.jira_account_id,
-                            update_dto
+                        await self.jira_user_repository.update_user_by_jira_account_id(
+                            session=session,
+                            jira_account_id=existing_user.jira_account_id,
+                            user_data=update_dto
                         )
                         synced_users.append(existing_user)
                     else:
@@ -341,7 +367,10 @@ class JiraProjectApplicationService:
                             avatar_url=jira_user.avatar_url,
                             is_system_user=False
                         )
-                        new_user = await session.user_repository.create_user(create_dto)
+                        new_user = await self.jira_user_repository.create_user(
+                            session=session,
+                            user_data=create_dto
+                        )
                         synced_users.append(new_user)
 
                 except Exception as e:
@@ -357,17 +386,24 @@ class JiraProjectApplicationService:
 
     async def _sync_project_sprints(
         self,
+        session: AsyncSession,
         user_id: int,
-        project_key: str,
-        session: IJiraSyncSession
+        project_key: str
     ) -> dict[int, int]:
         sprint_id_mapping: Dict[int, int] = {}
-        sprints = await self.jira_project_api_service.get_project_sprints(user_id, project_key)
+        sprints = await self.jira_project_api_service.get_project_sprints(
+            session=session,
+            user_id=user_id,
+            project_key=project_key
+        )
 
         for sprint in sprints:
             try:
                 # Check if sprint exists by jira_sprint_id
-                existing_sprint = await session.sprint_repository.get_sprint_by_jira_sprint_id(sprint.jira_sprint_id)
+                existing_sprint = await self.jira_sprint_repository.get_sprint_by_jira_sprint_id(
+                    session=session,
+                    jira_sprint_id=sprint.jira_sprint_id
+                )
 
                 sprint_data = JiraSprintDBCreateDTO(
                     jira_sprint_id=sprint.jira_sprint_id,
@@ -383,15 +419,19 @@ class JiraProjectApplicationService:
 
                 if existing_sprint and existing_sprint.id:
                     # Update if exists
-                    updated_sprint = await session.sprint_repository.update_sprint(
-                        existing_sprint.id,
-                        JiraSprintDBUpdateDTO(**sprint_data.model_dump())
+                    updated_sprint = await self.jira_sprint_repository.update_sprint(
+                        session=session,
+                        sprint_id=existing_sprint.id,
+                        sprint_data=JiraSprintDBUpdateDTO(**sprint_data.model_dump())
                     )
                     if updated_sprint and updated_sprint.id:
                         sprint_id_mapping[sprint.jira_sprint_id] = updated_sprint.id
                 else:
                     # Create new if not exists
-                    new_sprint = await session.sprint_repository.create_sprint(sprint_data)
+                    new_sprint = await self.jira_sprint_repository.create_sprint(
+                        session=session,
+                        sprint_data=sprint_data
+                    )
                     if new_sprint and new_sprint.id:
                         sprint_id_mapping[sprint.jira_sprint_id] = new_sprint.id
 
@@ -403,13 +443,14 @@ class JiraProjectApplicationService:
 
     async def _sync_project_issues(
         self,
+        session: AsyncSession,
         user_id: int,
-        project_key: str,
-        session: IJiraSyncSession
+        project_key: str
     ) -> List[JiraIssueModel]:
         """Sync all project issues from Jira API to database"""
         try:
             jira_issues = await self.jira_project_api_service.get_project_issues(
+                session=session,
                 user_id=user_id,
                 project_key=project_key,
                 limit=1000
@@ -422,27 +463,32 @@ class JiraProjectApplicationService:
                     # mapped_issue = JiraIssueMapper.to_domain_issue(jira_issue)
 
                     # Check if issue exists
-                    existing_issue = await session.issue_repository.get_by_jira_issue_id(
-                        jira_issue.jira_issue_id
+                    existing_issue = await self.jira_issue_repository.get_by_jira_issue_id(
+                        session=session,
+                        jira_issue_id=jira_issue.jira_issue_id
                     )
 
                     if existing_issue:
                         if jira_issue.updated_at > existing_issue.last_synced_at:
                             # Update existing issue with new data
-                            updated_issue = await session.issue_repository.update(
-                                existing_issue.jira_issue_id,
-                                JiraIssueDBUpdateDTO._from_domain(jira_issue)
+                            updated_issue = await self.jira_issue_repository.update(
+                                session=session,
+                                issue_id=existing_issue.jira_issue_id,
+                                issue_update=JiraIssueDBUpdateDTO._from_domain(jira_issue)
                             )
                             synced_issues.append(updated_issue)
                     else:
                         # Create new issue
                         issue_create_dto = JiraIssueDBCreateDTO._from_domain(jira_issue)
-                        new_issue = await session.issue_repository.create(issue_create_dto)
+                        new_issue = await self.jira_issue_repository.create(
+                            session=session,
+                            issue=issue_create_dto
+                        )
                         synced_issues.append(new_issue)
 
                 except Exception as e:
                     log.error(f"Error syncing issue {jira_issue.key}: {str(e)}")
-                    await session.abort()
+                    # Don't abort the whole transaction if one issue fails
                     continue
 
             return synced_issues
@@ -504,31 +550,36 @@ class JiraProjectApplicationService:
         # This should never be reached due to the raise in the loop
         raise last_exception if last_exception else RuntimeError("Retry loop exited unexpectedly")
 
-    async def _sync_project_changelog(self, issue_ids: List[str], session: IJiraSyncSession) -> None:
+    async def _sync_project_changelog(self, session: AsyncSession, issue_ids: List[str]) -> None:
         """Sync issues changelog from Jira API to database"""
         try:
             if len(issue_ids) == 0:
                 return
 
+            # Fetch all changelog data with admin auth (single API call)
             changelog_response = await self.jira_issue_api_service.bulk_get_issue_changelog_with_admin_auth(issue_ids)
 
-            # Xử lý và lưu từng changelog
+            # Process each changelog individually
             for issue_changelog in changelog_response.issue_changelogs:
                 for changelog in issue_changelog.change_histories:
-                    changes = await self.jira_issue_history_service.convert_api_changelog_to_db_changelog(issue_changelog.issue_id, changelog)
-                    # Tạo event và lưu vào database
+                    # Convert changelog to database format
+                    changes = await self.jira_issue_history_service.convert_api_changelog_to_db_changelog(
+                        issue_changelog.issue_id,
+                        changelog
+                    )
+
+                    # Create and save the event if we have changes
                     if changes:
                         event = JiraIssueHistoryDBCreateDTO(
                             jira_issue_id=issue_changelog.issue_id,
                             jira_change_id=changelog.id,
                             author_id=changelog.author.id,
-                            created_at=changelog.created,  # Giữ nguyên datetime với timezone
+                            created_at=changelog.created,
                             changes=changes
                         )
 
-                        # Lưu vào database
-                        await session.issue_history_repository.create(event)
+                        # Lưu vào database - ensure we're passing the session
+                        await self.jira_issue_history_repository.create(session, event)
         except Exception as e:
             log.error(f"Error syncing project changelog: {str(e)}")
-            await session.abort()
             raise

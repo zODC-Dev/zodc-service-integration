@@ -1,6 +1,7 @@
 from typing import List
 
 from fastapi import HTTPException
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.gantt_chart import GanttTaskResponse
@@ -25,6 +26,7 @@ class JiraSprintAnalyticsController:
 
     async def get_sprint_burndown_chart(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int,
@@ -32,6 +34,7 @@ class JiraSprintAnalyticsController:
         """Get burndown chart data for a sprint"""
         try:
             result = await self.sprint_analytics_service.get_sprint_burndown_chart(
+                session=session,
                 user_id=user_id,
                 project_key=project_key,
                 sprint_id=sprint_id
@@ -49,6 +52,7 @@ class JiraSprintAnalyticsController:
 
     async def get_sprint_burnup_chart(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int,
@@ -56,6 +60,7 @@ class JiraSprintAnalyticsController:
         """Get burnup chart data for a sprint"""
         try:
             result = await self.sprint_analytics_service.get_sprint_burnup_chart(
+                session=session,
                 user_id=user_id,
                 project_key=project_key,
                 sprint_id=sprint_id
@@ -73,6 +78,7 @@ class JiraSprintAnalyticsController:
 
     async def get_sprint_goal(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int,
@@ -80,6 +86,7 @@ class JiraSprintAnalyticsController:
         """Get sprint goal data for a sprint"""
         try:
             result = await self.sprint_analytics_service.get_sprint_goal(
+                session=session,
                 user_id=user_id,
                 project_key=project_key,
                 sprint_id=sprint_id
@@ -97,6 +104,7 @@ class JiraSprintAnalyticsController:
 
     async def get_bug_report(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int,
@@ -104,6 +112,7 @@ class JiraSprintAnalyticsController:
         """Get bug report data for a sprint"""
         try:
             result = await self.sprint_analytics_service.get_bug_report(
+                session=session,
                 user_id=user_id,
                 project_key=project_key,
                 sprint_id=sprint_id
@@ -121,6 +130,7 @@ class JiraSprintAnalyticsController:
 
     async def get_team_workload(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -128,6 +138,7 @@ class JiraSprintAnalyticsController:
         """Get workload data for team members in a sprint"""
         try:
             result = await self.sprint_analytics_service.get_team_workload(
+                session=session,
                 user_id=user_id,
                 project_key=project_key,
                 sprint_id=sprint_id
@@ -145,6 +156,7 @@ class JiraSprintAnalyticsController:
 
     async def get_gantt_chart_data(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -152,6 +164,7 @@ class JiraSprintAnalyticsController:
         """Get Gantt chart data for a sprint"""
         try:
             result = await self.sprint_analytics_service.get_gantt_chart_data(
+                session=session,
                 user_id=user_id,
                 project_key=project_key,
                 sprint_id=sprint_id

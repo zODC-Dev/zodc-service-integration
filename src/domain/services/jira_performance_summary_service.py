@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.domain.models.jira_performance_summary import UserPerformanceSummaryModel
 
 
@@ -9,6 +11,7 @@ class IJiraPerformanceSummaryService(ABC):
     @abstractmethod
     async def get_user_performance_summary(
         self,
+        session: AsyncSession,
         user_id: int,
         quarter: int,
         year: int

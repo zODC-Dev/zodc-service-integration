@@ -24,4 +24,4 @@ class GanttChartCalculationResponse(BaseModel):
 
     def model_dump_json(self, **kwargs) -> str:
         """Override to handle datetime serialization"""
-        return super().model_dump_json(encoder=datetime_encoder, **kwargs)
+        return super().model_dump_json(**kwargs)
