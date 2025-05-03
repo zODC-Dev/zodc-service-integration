@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlmodel import and_, col, select
+from sqlmodel import and_, col, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
@@ -335,17 +335,22 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                         col(JiraIssueSprintEntity.jira_sprint_id) == col(JiraSprintEntity.jira_sprint_id)
                     ).where(col(JiraSprintEntity.id) == sprint_id)
                 elif is_backlog:
-                    # Issues with has no sprints or all sprints are closed but task is not done yet, are backlog
-                    subquery = select(JiraIssueEntity.jira_issue_id).join(
+                    # Issues with no sprints or all sprints are closed but task is not done yet, are backlog
+                    subquery = select(JiraIssueEntity.jira_issue_id).outerjoin(
                         JiraIssueSprintEntity,
                         col(JiraIssueEntity.jira_issue_id) == col(JiraIssueSprintEntity.jira_issue_id)
-                    ).join(
+                    ).outerjoin(
                         JiraSprintEntity,
                         col(JiraIssueSprintEntity.jira_sprint_id) == col(JiraSprintEntity.jira_sprint_id)
                     ).where(
-                        and_(
-                            col(JiraSprintEntity.state).not_in(['active', 'future']),
-                            col(JiraIssueEntity.status) != JiraIssueStatus.DONE.value
+                        or_(
+                            # No sprints
+                            JiraIssueSprintEntity.jira_sprint_id.is_(None),
+                            # All sprints are closed but task not done
+                            and_(
+                                col(JiraSprintEntity.state).not_in(['active', 'future']),
+                                col(JiraIssueEntity.status) != JiraIssueStatus.DONE.value
+                            )
                         )
                     )
 
