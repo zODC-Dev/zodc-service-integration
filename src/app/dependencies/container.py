@@ -26,7 +26,7 @@ from src.app.services.nats_handlers.user_message_handler import UserMessageHandl
 from src.app.services.nats_handlers.workflow_edit_handler import WorkflowEditRequestHandler
 from src.app.services.nats_handlers.workflow_sync_handler import WorkflowSyncRequestHandler
 from src.app.services.system_config_service import SystemConfigApplicationService
-from src.configs.database import get_db
+from src.configs.database import get_db, create_session
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.nats_events import NATSSubscribeTopic
@@ -353,12 +353,10 @@ class DependencyContainer:
     @classmethod
     async def get_db_for_job(cls) -> AsyncSession:
         """Get a new DB session for background jobs"""
-        db_generator = get_db()
-        db = await anext(db_generator)
-        try:
-            return db
-        finally:
-            await db.close()
+        # Instead of using get_db() which uses context manager,
+        # we use create_session() which gives us a session without context manager
+        # that we can properly close manually after use
+        return await create_session()
 
     @classmethod
     async def create_webhook_handlers(cls) -> Tuple[List[JiraWebhookHandler], Dict[str, Any]]:

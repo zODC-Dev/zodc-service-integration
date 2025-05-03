@@ -45,10 +45,7 @@ class MediaController:
         media_id: UUID
     ) -> StreamingResponse:
         try:
-            log.info(f"Media ID: {media_id}")
             media, file_stream, _ = await self.media_service.get_media(session=session, media_id=media_id)
-
-            log.info(f"Media: {media}")
 
             # Properly encode the filename for Content-Disposition header
             encoded_filename = urllib.parse.quote(media.filename)

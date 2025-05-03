@@ -19,9 +19,12 @@ class RedisService(IRedisService):
             return value.decode('utf-8') if isinstance(value, bytes) else value
         return None
 
-    async def set(self, key: str, value: str, expiry: int) -> None:
+    async def set(self, key: str, value: str, expiry: Optional[int] = None) -> None:
         """Set a value in Redis with an expiry time."""
-        await self.redis.setex(key, expiry, value)
+        if expiry is None:
+            await self.redis.set(key, value)
+        else:
+            await self.redis.setex(key, expiry, value)
 
     async def delete(self, key: str) -> None:
         """Delete a key from Redis."""
