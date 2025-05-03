@@ -1,13 +1,16 @@
 from datetime import datetime
 from typing import List
 
-from src.app.schemas.responses.jira_issue import JiraIssueDescriptionDTO
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from src.app.schemas.responses.jira_issue import JiraIssueDescriptionAPIGetDTO
 from src.configs.logger import log
 from src.domain.constants.jira import JiraActionType, JiraIssueStatus, JiraIssueType
 from src.domain.constants.sync import EntityType, OperationType, SourceType
 from src.domain.exceptions.jira_exceptions import JiraIssueNotFoundError
 from src.domain.models.database.sync_log import SyncLogDBCreateDTO
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
+from src.domain.models.jira_issue_comment import JiraIssueCommentModel
 from src.domain.models.nats.replies.jira_issue import JiraIssueSyncNATSReplyDTO
 from src.domain.models.nats.requests.jira_issue import (
     JiraIssueBatchLinkNATSRequestDTO,
@@ -41,28 +44,30 @@ class JiraIssueApplicationService:
 
     async def handle_sync_request(
         self,
+        session: AsyncSession,
         request: JiraIssueBatchSyncNATSRequestDTO
     ) -> List[JiraIssueSyncNATSReplyDTO]:
         """Handle batch sync request"""
         results = []
 
         for issue_request in request.issues:
-            result = await self._process_sync_issue(issue_request)
+            result = await self._process_sync_issue(session, issue_request)
             results.append(result)
 
         return results
 
     async def _process_sync_issue(
         self,
+        session: AsyncSession,
         request: JiraIssueSyncNATSRequestDTO
     ) -> JiraIssueSyncNATSReplyDTO:
         """Process single issue sync"""
         try:
             log.info(f"Processing issue sync request: {request.action_type}")
             if request.action_type == JiraActionType.CREATE:
-                return await self._handle_create_issue(request)
+                return await self._handle_create_issue(session, request)
             elif request.action_type == JiraActionType.UPDATE:
-                return await self._handle_update_issue(request)
+                return await self._handle_update_issue(session, request)
 
         except Exception as e:
             log.error(f"Error processing issue: {str(e)}")
@@ -73,7 +78,7 @@ class JiraIssueApplicationService:
                 error_message=str(e)
             )
 
-    async def _handle_create_issue(self, request: JiraIssueSyncNATSRequestDTO) -> JiraIssueSyncNATSReplyDTO:
+    async def _handle_create_issue(self, session: AsyncSession, request: JiraIssueSyncNATSRequestDTO) -> JiraIssueSyncNATSReplyDTO:
         try:
             # Validate required fields
             if not request.project_key:
@@ -101,6 +106,7 @@ class JiraIssueApplicationService:
             log.info(f"Creating issue with status: {status}")
 
             issue = await self.jira_issue_api_service.create_issue(
+                session=session,
                 user_id=request.user_id,
                 issue_data=JiraIssueAPICreateRequestDTO(
                     jira_issue_id="",
@@ -116,6 +122,22 @@ class JiraIssueApplicationService:
                     sprint_id=request.sprint_id,
                 )
             )
+
+            # Create sync log with the session
+            await self.sync_log_repository.create_sync_log(
+                session=session,
+                sync_log=SyncLogDBCreateDTO(
+                    entity_type=EntityType.ISSUE,
+                    entity_id=str(issue.jira_issue_id),
+                    operation=OperationType.CREATE,
+                    request_payload=request.json(),
+                    response_status=200,
+                    response_body=issue.json(),
+                    source=SourceType.ZODC,
+                    sender="JiraIssueApplicationService",
+                    error_message=None,
+                )
+            )
             return JiraIssueSyncNATSReplyDTO(
                 success=True,
                 action_type=JiraActionType.CREATE,
@@ -123,18 +145,34 @@ class JiraIssueApplicationService:
             )
         except Exception as e:
             log.error(f"Error creating issue: {str(e)}")
+            # Log error with session
+            await self.sync_log_repository.create_sync_log(
+                session=session,
+                sync_log=SyncLogDBCreateDTO(
+                    entity_type=EntityType.ISSUE,
+                    entity_id=str(request.issue_id) if request.issue_id else "unknown",
+                    operation=OperationType.CREATE,
+                    request_payload=request.json(),
+                    response_status=500,
+                    response_body=None,
+                    source=SourceType.ZODC,
+                    sender="JiraIssueApplicationService",
+                    error_message=str(e),
+                )
+            )
             return JiraIssueSyncNATSReplyDTO(
                 success=False,
                 action_type=JiraActionType.CREATE,
                 error_message=str(e)
             )
 
-    async def _handle_update_issue(self, request: JiraIssueSyncNATSRequestDTO) -> JiraIssueSyncNATSReplyDTO:
+    async def _handle_update_issue(self, session: AsyncSession, request: JiraIssueSyncNATSRequestDTO) -> JiraIssueSyncNATSReplyDTO:
         try:
             if not request.issue_id:
                 raise ValueError("issue_id is required for update")
 
             issue = await self.jira_issue_api_service.update_issue(
+                session=session,
                 user_id=request.user_id,
                 issue_id=request.issue_id,
                 update=JiraIssueAPIUpdateRequestDTO(
@@ -146,12 +184,44 @@ class JiraIssueApplicationService:
                     actual_point=request.actual_point
                 )
             )
+
+            # Create sync log with the session
+            await self.sync_log_repository.create_sync_log(
+                session=session,
+                sync_log=SyncLogDBCreateDTO(
+                    entity_type=EntityType.ISSUE,
+                    entity_id=str(issue.jira_issue_id),
+                    operation=OperationType.UPDATE,
+                    request_payload=request.json(),
+                    response_status=200,
+                    response_body=issue.json(),
+                    source=SourceType.ZODC,
+                    sender="JiraIssueApplicationService",
+                    error_message=None,
+                )
+            )
+
             return JiraIssueSyncNATSReplyDTO(
                 success=True,
                 action_type=JiraActionType.UPDATE,
                 issue_id=issue.jira_issue_id
             )
         except Exception as e:
+            # Log error with session
+            await self.sync_log_repository.create_sync_log(
+                session=session,
+                sync_log=SyncLogDBCreateDTO(
+                    entity_type=EntityType.ISSUE,
+                    entity_id=str(request.issue_id) if request.issue_id else "unknown",
+                    operation=OperationType.UPDATE,
+                    request_payload=request.json(),
+                    response_status=500,
+                    response_body=None,
+                    source=SourceType.ZODC,
+                    sender="JiraIssueApplicationService",
+                    error_message=str(e),
+                )
+            )
             return JiraIssueSyncNATSReplyDTO(
                 success=False,
                 action_type=JiraActionType.UPDATE,
@@ -161,6 +231,7 @@ class JiraIssueApplicationService:
 
     async def handle_link_request(
         self,
+        session: AsyncSession,
         request: JiraIssueBatchLinkNATSRequestDTO
     ) -> List[JiraIssueSyncNATSReplyDTO]:
         """Handle multiple issue link request"""
@@ -170,6 +241,7 @@ class JiraIssueApplicationService:
             try:
                 # Create link between two issues
                 success = await self.jira_issue_api_service.create_issue_link(
+                    session=session,
                     user_id=request.user_id,
                     source_issue_id=link.source_issue_id,
                     target_issue_id=link.target_issue_id,
@@ -177,12 +249,44 @@ class JiraIssueApplicationService:
                 )
 
                 if success:
+                    # Log success with session
+                    await self.sync_log_repository.create_sync_log(
+                        session=session,
+                        sync_log=SyncLogDBCreateDTO(
+                            entity_type=EntityType.ISSUE,
+                            entity_id=str(link.source_issue_id),
+                            operation=OperationType.CREATE,
+                            request_payload=request.model_dump(exclude={"links"}),
+                            response_status=200,
+                            response_body=None,
+                            source=SourceType.ZODC,
+                            sender="JiraIssueApplicationService",
+                            error_message=None,
+                        )
+                    )
+
                     results.append(JiraIssueSyncNATSReplyDTO(
                         success=True,
                         action_type=JiraActionType.UPDATE,
                         issue_id=link.source_issue_id
                     ))
                 else:
+                    # Log failure with session
+                    await self.sync_log_repository.create_sync_log(
+                        session=session,
+                        sync_log=SyncLogDBCreateDTO(
+                            entity_type=EntityType.ISSUE,
+                            entity_id=str(link.source_issue_id),
+                            operation=OperationType.CREATE,
+                            request_payload=request.model_dump(exclude={"links"}),
+                            response_status=400,
+                            response_body=None,
+                            source=SourceType.ZODC,
+                            sender="JiraIssueApplicationService",
+                            error_message="Cannot create link",
+                        )
+                    )
+
                     results.append(JiraIssueSyncNATSReplyDTO(
                         success=False,
                         action_type=JiraActionType.UPDATE,
@@ -191,6 +295,23 @@ class JiraIssueApplicationService:
                     ))
             except Exception as e:
                 log.error(f"Error linking issue {link.source_issue_id} with {link.target_issue_id}: {str(e)}")
+
+                # Log exception with session
+                await self.sync_log_repository.create_sync_log(
+                    session=session,
+                    sync_log=SyncLogDBCreateDTO(
+                        entity_type=EntityType.ISSUE,
+                        entity_id=str(link.source_issue_id),
+                        operation=OperationType.CREATE,
+                        request_payload=request.model_dump(exclude={"links"}),
+                        response_status=500,
+                        response_body=None,
+                        source=SourceType.ZODC,
+                        sender="JiraIssueApplicationService",
+                        error_message=str(e),
+                    )
+                )
+
                 results.append(JiraIssueSyncNATSReplyDTO(
                     success=False,
                     action_type=JiraActionType.UPDATE,
@@ -200,10 +321,11 @@ class JiraIssueApplicationService:
 
         return results
 
-    async def update_issue_assignee(self, user_id: int, issue_key: str, assignee_account_id: str) -> bool:
+    async def update_issue_assignee(self, session: AsyncSession, user_id: int, issue_key: str, assignee_account_id: str) -> bool:
         """Update the assignee of a Jira issue
 
         Args:
+            session: AsyncSession
             user_id: ID of the user performing the action
             issue_key: The Jira issue key
             assignee_account_id: The Jira account ID of the new assignee
@@ -220,7 +342,8 @@ class JiraIssueApplicationService:
 
             # Create sync log entry
             await self.sync_log_repository.create_sync_log(
-                SyncLogDBCreateDTO(
+                session=session,
+                sync_log=SyncLogDBCreateDTO(
                     entity_type=EntityType.ISSUE,
                     entity_id=issue_key,
                     operation=OperationType.UPDATE,
@@ -245,7 +368,8 @@ class JiraIssueApplicationService:
 
             # Record failed sync attempt
             await self.sync_log_repository.create_sync_log(
-                SyncLogDBCreateDTO(
+                session=session,
+                sync_log=SyncLogDBCreateDTO(
                     entity_type=EntityType.ISSUE,
                     entity_id=issue_key,
                     operation=OperationType.UPDATE,
@@ -262,10 +386,11 @@ class JiraIssueApplicationService:
 
             raise
 
-    async def remove_issue_link(self, link_id: str) -> bool:
+    async def remove_issue_link(self, session: AsyncSession, link_id: str) -> bool:
         """Remove a link between two issues
 
         Args:
+            session: The database session
             link_id: ID of the link to remove
 
         Returns:
@@ -276,22 +401,57 @@ class JiraIssueApplicationService:
             result = await self.jira_issue_api_service.delete_issue_link_with_admin_auth(
                 link_id=link_id
             )
+
+            # Log the operation
+            await self.sync_log_repository.create_sync_log(
+                session=session,
+                sync_log=SyncLogDBCreateDTO(
+                    entity_type=EntityType.ISSUE,
+                    entity_id=link_id,
+                    operation=OperationType.DELETE,
+                    request_payload={"link_id": link_id},
+                    response_status=200 if result else 500,
+                    response_body={"success": result},
+                    source=SourceType.NATS,
+                    sender="JiraIssueApplicationService",
+                    error_message=None if result else "Failed to remove link"
+                )
+            )
+
             return result
         except Exception as e:
             log.error(f"Error removing link for issue {link_id}: {str(e)}")
+
+            # Log the error
+            await self.sync_log_repository.create_sync_log(
+                session=session,
+                sync_log=SyncLogDBCreateDTO(
+                    entity_type=EntityType.ISSUE,
+                    entity_id=link_id,
+                    operation=OperationType.DELETE,
+                    request_payload={"link_id": link_id},
+                    response_status=500,
+                    response_body=None,
+                    source=SourceType.NATS,
+                    sender="JiraIssueApplicationService",
+                    error_message=str(e)
+                )
+            )
+
             return False
 
-    async def get_issue_description_html(self, issue_key: str) -> JiraIssueDescriptionDTO:
+    async def get_issue_description_html(self, session: AsyncSession, issue_key: str) -> JiraIssueDescriptionAPIGetDTO:
         """Lấy description dưới dạng HTML của một Jira issue
 
         Args:
+            session: AsyncSession
             issue_key: Key của Jira issue
 
         Returns:
             DTO chứa key và HTML description
         """
         # Lấy issue từ database
-        issue = await self.jira_issue_repository.get_by_jira_issue_key(issue_key)
+        issue = await self.jira_issue_repository.get_by_jira_issue_key(session=session, jira_issue_key=issue_key)
 
         if not issue:
             raise JiraIssueNotFoundError(f"Issue with key {issue_key} not found")
@@ -300,7 +460,53 @@ class JiraIssueApplicationService:
 
         description_html = f"{issue.description}" if issue.description else None
 
-        return JiraIssueDescriptionDTO(
+        return JiraIssueDescriptionAPIGetDTO(
             key=issue_key,
             description=description_html
         )
+
+    async def get_issue_comments(self, session: AsyncSession, issue_key: str) -> List[JiraIssueCommentModel]:
+        """Lấy comments của một Jira Issue
+
+        Args:
+            session: AsyncSession
+            issue_key: Key của Jira Issue
+
+        Returns:
+            Comments của issue
+        """
+        try:
+            # Check if issue exists
+            issue = await self.jira_issue_repository.get_by_jira_issue_key(session=session, jira_issue_key=issue_key)
+            if not issue:
+                raise JiraIssueNotFoundError(f"Issue with key {issue_key} not found")
+
+            result = await self.jira_issue_api_service.get_issue_comments_with_admin_auth(issue_key)
+            return result
+        except Exception as e:
+            log.error(f"Error getting issue comments for issue {issue_key}: {str(e)}")
+            raise
+
+    async def create_issue_comment(self, session: AsyncSession, user_id: int, issue_key: str, comment: str) -> JiraIssueCommentModel:
+        """Tạo comment cho một Jira Issue
+
+        Args:
+            session: AsyncSession
+            user_id: ID của user
+            issue_key: Key của Jira Issue
+            comment: Comment cần tạo
+
+        Returns:
+            Comment đã tạo
+        """
+        try:
+            # Check if issue exists
+            issue = await self.jira_issue_repository.get_by_jira_issue_key(session=session, jira_issue_key=issue_key)
+            if not issue:
+                raise JiraIssueNotFoundError(f"Issue with key {issue_key} not found")
+
+            result = await self.jira_issue_api_service.create_issue_comment(session, user_id, issue_key, comment)
+            return result
+        except Exception as e:
+            log.error(f"Error creating issue comment for issue {issue_key}: {str(e)}")
+            raise

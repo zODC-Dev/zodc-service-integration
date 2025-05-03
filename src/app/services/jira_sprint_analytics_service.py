@@ -1,6 +1,9 @@
 from datetime import datetime
-from typing import List
+from typing import Dict, List
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from src.app.schemas.responses.gantt_chart import GanttTaskResponse
 from src.app.schemas.responses.jira_sprint_analytics import (
     BugChartResponse,
     BugPriorityCountResponse,
@@ -14,14 +17,18 @@ from src.app.schemas.responses.jira_sprint_analytics import (
 )
 from src.configs.logger import log
 from src.domain.models.apis.jira_user import JiraAssigneeResponse
+from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
+from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.services.jira_sprint_analytics_service import IJiraSprintAnalyticsService
 
 
 class JiraSprintAnalyticsApplicationService:
     """Application service cho các sprint analytics charts"""
 
-    def __init__(self, sprint_analytics_service: IJiraSprintAnalyticsService):
+    def __init__(self, sprint_analytics_service: IJiraSprintAnalyticsService, jira_sprint_repository: IJiraSprintRepository, jira_issue_repository: IJiraIssueRepository):
         self.sprint_analytics_service = sprint_analytics_service
+        self.jira_sprint_repository = jira_sprint_repository
+        self.jira_issue_repository = jira_issue_repository
 
     def _round_float_list(self, float_list: List[float]) -> List[float]:
         """Làm tròn danh sách các số thập phân đến 2 chữ số"""
@@ -29,6 +36,7 @@ class JiraSprintAnalyticsApplicationService:
 
     async def get_sprint_burndown_chart(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -36,7 +44,10 @@ class JiraSprintAnalyticsApplicationService:
         """Lấy dữ liệu cho biểu đồ burndown của một sprint"""
         try:
             burndown_data = await self.sprint_analytics_service.get_sprint_burndown_data(
-                user_id, project_key, sprint_id
+                session=session,
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
             )
 
             # Get current date
@@ -82,6 +93,7 @@ class JiraSprintAnalyticsApplicationService:
 
     async def get_sprint_burnup_chart(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -89,7 +101,10 @@ class JiraSprintAnalyticsApplicationService:
         """Lấy dữ liệu cho biểu đồ burnup của một sprint"""
         try:
             burnup_data = await self.sprint_analytics_service.get_sprint_burnup_data(
-                user_id, project_key, sprint_id
+                session=session,
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
             )
 
             # Tính toán ideal burnup line
@@ -148,6 +163,7 @@ class JiraSprintAnalyticsApplicationService:
 
     async def get_sprint_goal(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -155,7 +171,10 @@ class JiraSprintAnalyticsApplicationService:
         """Lấy dữ liệu sprint goal cho một sprint"""
         try:
             goal_data = await self.sprint_analytics_service.get_sprint_goal_data(
-                user_id, project_key, sprint_id
+                session=session,
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
             )
 
             # Chuyển đổi domain model sang response DTO
@@ -186,6 +205,7 @@ class JiraSprintAnalyticsApplicationService:
 
     async def get_bug_report(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -193,7 +213,10 @@ class JiraSprintAnalyticsApplicationService:
         """Lấy dữ liệu báo cáo bug cho một sprint"""
         try:
             bug_data = await self.sprint_analytics_service.get_bug_report_data(
-                user_id, project_key, sprint_id
+                session=session,
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
             )
 
             # Chuyển đổi domain model sang response DTO
@@ -249,6 +272,7 @@ class JiraSprintAnalyticsApplicationService:
 
     async def get_team_workload(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: int
@@ -256,7 +280,10 @@ class JiraSprintAnalyticsApplicationService:
         """Lấy dữ liệu workload của các thành viên trong sprint"""
         try:
             workload_data = await self.sprint_analytics_service.get_team_workload_data(
-                user_id, project_key, sprint_id
+                session=session,
+                user_id=user_id,
+                project_key=project_key,
+                sprint_id=sprint_id
             )
 
             # Chuyển đổi domain model sang response DTO
@@ -270,4 +297,85 @@ class JiraSprintAnalyticsApplicationService:
             ]
         except Exception as e:
             log.error(f"Error getting team workload: {str(e)}")
+            raise
+
+    async def get_gantt_chart_data(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        project_key: str,
+        sprint_id: int
+    ) -> List[GanttTaskResponse]:
+        """Get Gantt chart data for a sprint"""
+        try:
+            # Get sprint data
+            sprint = await self.jira_sprint_repository.get_sprint_by_id(session=session, sprint_id=sprint_id)
+            if not sprint:
+                raise ValueError(f"Sprint with ID {sprint_id} not found")
+
+            # Get all issues in the sprint
+            issues = await self.jira_issue_repository.get_project_issues(session=session, project_key=project_key, sprint_id=sprint_id)
+
+            # Group tasks by their story_id for progress calculation
+            story_tasks: Dict[str, int] = {}
+            story_completed_tasks: Dict[str, int] = {}
+
+            # Set of completed statuses
+            completed_statuses = {
+                "done", "closed", "resolved", "completed"
+            }
+
+            # Set of story-like issue types
+            story_types = {
+                "story", "epic"
+            }
+
+            # First pass: identify stories and group tasks by story_id
+            for issue in issues:
+                # Add to story tasks count if it has a story_id
+                if issue.story_id:
+                    if issue.story_id not in story_tasks:
+                        story_tasks[issue.story_id] = 0
+                        story_completed_tasks[issue.story_id] = 0
+
+                    story_tasks[issue.story_id] += 1
+
+                    # Count completed tasks
+                    if issue.status.value.lower() in completed_statuses:
+                        story_completed_tasks[issue.story_id] += 1
+
+            # Convert issues to GanttTaskResponse
+            tasks: List[GanttTaskResponse] = []
+            for issue in issues:
+                progress = None
+
+                # Calculate progress for stories
+                if issue.type.value.lower() in story_types and issue.jira_issue_id in story_tasks:
+                    total_tasks = story_tasks[issue.jira_issue_id]
+                    completed_tasks = story_completed_tasks[issue.jira_issue_id]
+
+                    if total_tasks > 0:
+                        progress = (completed_tasks / total_tasks) * 100
+                        log.debug(
+                            f"Calculated progress for story {issue.key}: {progress}% ({completed_tasks}/{total_tasks} tasks)")
+
+                task = GanttTaskResponse(
+                    id=issue.jira_issue_id,
+                    name=issue.summary,
+                    assignee=issue.assignee.name if issue.assignee else None,
+                    type=issue.type,
+                    status=issue.status,
+                    dependencies=issue.story_id,
+                    plan_start=issue.planned_start_time,
+                    plan_end=issue.planned_end_time,
+                    actual_start=issue.actual_start_time,
+                    actual_end=issue.actual_end_time,
+                    progress=progress
+                )
+                tasks.append(task)
+
+            return tasks
+
+        except Exception as e:
+            log.error(f"Error getting Gantt chart data: {str(e)}")
             raise

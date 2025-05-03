@@ -14,4 +14,4 @@ async def jira_webhook(
     controller: JiraWebhookController = Depends(get_webhook_controller)
 ) -> Dict[str, str]:
     """Handle Jira webhook events"""
-    return await controller.handle_webhook(payload)
+    return await controller.handle_webhook(payload=payload)

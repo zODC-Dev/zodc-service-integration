@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
@@ -27,13 +29,13 @@ class UserDeleteWebhookHandler(JiraWebhookHandler):
         """Check if this handler can process the given webhook event"""
         return webhook_event in [JiraWebhookEvent.USER_DELETED, "jira:user_deleted"]
 
-    async def handle(self, webhook_data: JiraUserWebhookDTO) -> Dict[str, Any]:
+    async def handle(self, session: AsyncSession, webhook_data: JiraUserWebhookDTO) -> Dict[str, Any]:
         """Handle the user delete webhook"""
         account_id = webhook_data.user.account_id
 
         try:
             # Check if user exists
-            existing_user = await self.user_database_service.get_user_by_jira_account_id(account_id)
+            existing_user = await self.user_database_service.get_user_by_jira_account_id(session=session, jira_account_id=account_id)
 
             if not existing_user:
                 log.warning(f"User {account_id} not found in database, nothing to delete")
@@ -45,12 +47,13 @@ class UserDeleteWebhookHandler(JiraWebhookHandler):
                 updated_at=datetime.now(timezone.utc)
             )
 
-            updated_user = await self.user_database_service.update_user_by_jira_account_id(account_id, update_dto)
+            updated_user = await self.user_database_service.update_user_by_jira_account_id(session=session, jira_account_id=account_id, user_data=update_dto)
             success = updated_user is not None
 
             # Log sync event
             await self.sync_log_repository.create_sync_log(
-                SyncLogDBCreateDTO(
+                session=session,
+                sync_log=SyncLogDBCreateDTO(
                     entity_type=EntityType.USER,
                     entity_id=account_id,
                     operation=OperationType.DELETE,

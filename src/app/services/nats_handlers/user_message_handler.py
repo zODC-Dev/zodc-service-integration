@@ -1,5 +1,7 @@
 from typing import Any, Dict, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.domain.models.nats.subscribes.jira_user import JiraUserChangeNATSSubscribeDTO
 from src.domain.services.nats_message_handler import INATSMessageHandler
@@ -10,7 +12,7 @@ class UserMessageHandler(INATSMessageHandler):
     def __init__(self, redis_service: IRedisService):
         self.redis_service = redis_service
 
-    async def handle(self, subject: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def handle(self, subject: str, message: Dict[str, Any], session: AsyncSession) -> Optional[Dict[str, Any]]:
         """Handle user events and clear related caches"""
         try:
             # Parse the event

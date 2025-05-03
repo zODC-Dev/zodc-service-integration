@@ -2,6 +2,8 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.jira.apis.mappers.jira_board import JiraBoardMapper
@@ -32,8 +34,9 @@ class JiraSprintAPIService(IJiraSprintAPIService):
         for attempt in range(self.retry_attempts):
             try:
                 response_data = await client_to_use.get(
-                    f"/rest/agile/1.0/sprint/{sprint_id}",
-                    None,  # Không cần user_id
+                    session=None,
+                    endpoint=f"/rest/agile/1.0/sprint/{sprint_id}",
+                    user_id=None,  # Không cần user_id
                     error_msg=f"Error fetching sprint {sprint_id}"
                 )
 
@@ -67,13 +70,19 @@ class JiraSprintAPIService(IJiraSprintAPIService):
 
         return None
 
-    async def get_sprint_by_id(self, user_id: int, sprint_id: int) -> Optional[JiraSprintModel]:
+    async def get_sprint_by_id(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        sprint_id: int
+    ) -> Optional[JiraSprintModel]:
         """Get sprint from Jira API with retry logic"""
         for attempt in range(self.retry_attempts):
             try:
                 response_data = await self.client.get(
-                    f"/rest/agile/1.0/sprint/{sprint_id}",
-                    user_id,
+                    session=session,
+                    endpoint=f"/rest/agile/1.0/sprint/{sprint_id}",
+                    user_id=user_id,
                     error_msg=f"Error fetching sprint {sprint_id}"
                 )
 
@@ -106,13 +115,19 @@ class JiraSprintAPIService(IJiraSprintAPIService):
 
         return None
 
-    async def get_project_sprints(self, user_id: int, project_key: str) -> List[JiraSprintModel]:
+    async def get_project_sprints(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        project_key: str
+    ) -> List[JiraSprintModel]:
         """Get all sprints for a project"""
         try:
             # First get the board id for the project
             boards_response = await self.client.get(
-                "/rest/agile/1.0/board",
-                user_id,
+                session=session,
+                endpoint="/rest/agile/1.0/board",
+                user_id=user_id,
                 params={"projectKeyOrId": project_key},
                 error_msg=f"Error fetching boards for project {project_key}"
             )
@@ -127,8 +142,9 @@ class JiraSprintAPIService(IJiraSprintAPIService):
 
             # Get all sprints for the board
             sprints_response = await self.client.get(
-                f"/rest/agile/1.0/board/{board_id}/sprint",
-                user_id,
+                session=session,
+                endpoint=f"/rest/agile/1.0/board/{board_id}/sprint",
+                user_id=user_id,
                 error_msg=f"Error fetching sprints for board {board_id}"
             )
 
@@ -147,19 +163,18 @@ class JiraSprintAPIService(IJiraSprintAPIService):
             log.error(f"Error fetching sprints for project {project_key}: {str(e)}")
             return []
 
-    async def get_board_by_id(self, board_id: int) -> Optional[JiraBoardModel]:
+    async def get_board_by_id_with_admin_auth(self, board_id: int) -> Optional[JiraBoardModel]:
         """Get board information by ID"""
         try:
             # Sử dụng admin client thay vì system user ID
             client_to_use = self.admin_client or self.client
 
             response_data = await client_to_use.get(
-                f"/rest/agile/1.0/board/{board_id}",
-                None,  # Không cần user_id khi sử dụng admin auth
+                session=None,
+                endpoint=f"/rest/agile/1.0/board/{board_id}",
+                user_id=None,  # Không cần user_id khi sử dụng admin auth
                 error_msg=f"Error fetching board {board_id}"
             )
-
-            log.info(f"Response data when get board: {response_data}")
 
             # Method 1: Using DTO and mapper
             try:
@@ -176,7 +191,7 @@ class JiraSprintAPIService(IJiraSprintAPIService):
             log.error(f"Error fetching board {board_id}: {str(e)}")
             return None
 
-    async def start_sprint(
+    async def start_sprint_with_admin_auth(
         self,
         sprint_id: int,
         start_date: Optional[datetime] = None,
@@ -210,8 +225,9 @@ class JiraSprintAPIService(IJiraSprintAPIService):
 
                 # Call Jira API to start the sprint
                 await self.client.post(
-                    f"/rest/agile/1.0/sprint/{sprint_id}",
-                    None,
+                    session=None,
+                    endpoint=f"/rest/agile/1.0/sprint/{sprint_id}",
+                    user_id=None,
                     data=payload,
                     error_msg=f"Error starting sprint {sprint_id}"
                 )
@@ -237,7 +253,7 @@ class JiraSprintAPIService(IJiraSprintAPIService):
 
         return None
 
-    async def end_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
+    async def end_sprint_with_admin_auth(self, sprint_id: int) -> Optional[JiraSprintModel]:
         """End a sprint in Jira"""
         log.info(f"Ending sprint {sprint_id}")
 
@@ -248,8 +264,9 @@ class JiraSprintAPIService(IJiraSprintAPIService):
                     "state": "closed"
                 }
                 await self.client.post(
-                    f"/rest/agile/1.0/sprint/{sprint_id}",
-                    None,
+                    session=None,
+                    endpoint=f"/rest/agile/1.0/sprint/{sprint_id}",
+                    user_id=None,
                     data=payload,
                     error_msg=f"Error ending sprint {sprint_id}"
                 )
@@ -275,7 +292,7 @@ class JiraSprintAPIService(IJiraSprintAPIService):
 
         return None
 
-    async def create_sprint(self, name: str, board_id: int, project_key: str) -> int:
+    async def create_sprint_with_admin_auth(self, name: str, board_id: int, project_key: str) -> int:
         """Create a new sprint in Jira
 
         Args:
@@ -297,8 +314,9 @@ class JiraSprintAPIService(IJiraSprintAPIService):
                 }
 
                 response = await self.client.post(
-                    "/rest/agile/1.0/sprint",
-                    None,  # Use admin auth
+                    session=None,
+                    endpoint="/rest/agile/1.0/sprint",
+                    user_id=None,  # Use admin auth
                     data=payload,
                     error_msg=f"Error creating sprint '{name}' for board {board_id}"
                 )

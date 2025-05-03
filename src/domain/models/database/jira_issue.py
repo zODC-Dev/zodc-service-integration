@@ -26,6 +26,11 @@ class JiraIssueDBCreateDTO(BaseModel):
     sprints: List[JiraSprintModel] = Field(default_factory=list)
     link_url: Optional[str] = None
     is_system_linked: bool = False
+    planned_start_time: Optional[datetime] = None
+    planned_end_time: Optional[datetime] = None
+    actual_start_time: Optional[datetime] = None
+    actual_end_time: Optional[datetime] = None
+    story_id: Optional[str] = None
 
     @classmethod
     def _to_domain(cls, entity: 'JiraIssueDBCreateDTO') -> "JiraIssueModel":
@@ -49,6 +54,11 @@ class JiraIssueDBCreateDTO(BaseModel):
             link_url=entity.link_url,
             sprints=entity.sprints,
             priority=entity.priority,
+            planned_start_time=entity.planned_start_time,
+            planned_end_time=entity.planned_end_time,
+            actual_start_time=entity.actual_start_time,
+            actual_end_time=entity.actual_end_time,
+            story_id=entity.story_id,
         )
 
     @classmethod
@@ -68,6 +78,12 @@ class JiraIssueDBCreateDTO(BaseModel):
             updated_at=domain.updated_at,
             link_url=domain.link_url,
             sprints=domain.sprints,
+            priority=domain.priority,
+            planned_start_time=domain.planned_start_time,
+            planned_end_time=domain.planned_end_time,
+            actual_start_time=domain.actual_start_time,
+            actual_end_time=domain.actual_end_time,
+            story_id=domain.story_id,
         )
 
     @field_validator('status')
@@ -113,6 +129,11 @@ class JiraIssueDBUpdateDTO(BaseModel):
     type: Optional[Union[JiraIssueType, str]] = None
     link_url: Optional[str] = None
     updated_at: Optional[datetime] = None
+    planned_start_time: Optional[datetime] = None
+    planned_end_time: Optional[datetime] = None
+    actual_start_time: Optional[datetime] = None
+    actual_end_time: Optional[datetime] = None
+    story_id: Optional[str] = None
 
     @field_validator('status')
     @classmethod
@@ -155,4 +176,9 @@ class JiraIssueDBUpdateDTO(BaseModel):
             type=domain.type,
             sprints=domain.sprints,
             priority=domain.priority,
+            planned_start_time=domain.planned_start_time,
+            planned_end_time=domain.planned_end_time,
+            actual_start_time=domain.actual_start_time,
+            actual_end_time=domain.actual_end_time,
+            story_id=domain.story_id,
         )

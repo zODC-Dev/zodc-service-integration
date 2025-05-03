@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.app.controllers.jira_project_controller import JiraProjectController
 from src.app.dependencies.auth import get_jwt_claims
@@ -14,6 +15,7 @@ from src.app.schemas.responses.jira_project import (
     GetJiraProjectResponse,
     GetJiraSprintResponse,
 )
+from src.configs.database import get_db
 from src.domain.constants.jira import JiraIssueType
 
 router = APIRouter()
@@ -30,6 +32,7 @@ async def get_project_issues(
     search: Optional[str] = Query(None, alias="search", description="Search in issue summary and description"),
     limit: int = Query(50, ge=1, le=100),
     controller: JiraProjectController = Depends(get_jira_project_controller),
+    session: AsyncSession = Depends(get_db)
 ) -> StandardResponse[List[GetJiraIssueResponse]]:
     """Get issues from a specific Jira project"""
     is_backlog: bool = False
@@ -41,6 +44,7 @@ async def get_project_issues(
         sprint_number = int(sprint_id)
 
     return await controller.get_project_issues(
+        session=session,
         user_id=int(claims.sub),
         project_key=project_key,
         sprint_id=sprint_number,
@@ -54,11 +58,12 @@ async def get_project_issues(
 @router.get("", response_model=StandardResponse[List[GetJiraProjectResponse]])
 async def get_projects(
     claims: JWTClaims = Depends(get_jwt_claims),
-    controller: JiraProjectController = Depends(get_jira_project_controller)
+    controller: JiraProjectController = Depends(get_jira_project_controller),
+    session: AsyncSession = Depends(get_db)
 ) -> StandardResponse[List[GetJiraProjectResponse]]:
     """Get all Jira projects that the user has access to"""
     user_id = int(claims.sub)
-    return await controller.get_projects(user_id)
+    return await controller.get_projects(session=session, user_id=user_id)
 
 
 @router.get("/{project_key}/sprints", response_model=StandardResponse[List[GetJiraSprintResponse]])
@@ -66,6 +71,7 @@ async def get_project_sprints(
     project_key: str,
     claims: JWTClaims = Depends(get_jwt_claims),
     controller: JiraProjectController = Depends(get_jira_project_controller),
+    session: AsyncSession = Depends(get_db)
 ) -> StandardResponse[List[GetJiraSprintResponse]]:
     """Get all sprints from a specific Jira project
 
@@ -75,4 +81,4 @@ async def get_project_sprints(
     2. If no active sprint exists but there are future sprints, the earliest created future sprint is current
     3. If no active or future sprints exist, the most recently completed sprint is current
     """
-    return await controller.get_project_sprints(project_key=project_key)
+    return await controller.get_project_sprints(session=session, project_key=project_key)

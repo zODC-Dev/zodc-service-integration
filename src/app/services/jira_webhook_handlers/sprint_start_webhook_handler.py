@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.logger import log
 from src.domain.constants.jira import JiraSprintState, JiraWebhookEvent
@@ -30,7 +32,7 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
         """Check if this handler can process the given webhook event"""
         return webhook_event in [JiraWebhookEvent.SPRINT_STARTED, "jira:sprint_started"]
 
-    async def handle(self, webhook_data: JiraSprintWebhookDTO) -> Dict[str, Any]:
+    async def handle(self, session: AsyncSession, webhook_data: JiraSprintWebhookDTO) -> Dict[str, Any]:
         """Handle the sprint start webhook"""
         sprint_id = webhook_data.sprint.id
 
@@ -41,7 +43,7 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
             return {"error": f"Failed to fetch sprint {sprint_id}"}
 
         # Check if sprint exists in database
-        existing_sprint = await self.sprint_database_service.get_sprint_by_jira_sprint_id(sprint_id)
+        existing_sprint = await self.sprint_database_service.get_sprint_by_jira_sprint_id(session=session, jira_sprint_id=sprint_id)
 
         try:
             if not existing_sprint:
@@ -65,7 +67,7 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
                     created_at=datetime.now(timezone.utc),
                     updated_at=datetime.now(timezone.utc)
                 )
-                created_sprint = await self.sprint_database_service.create_sprint(create_dto)
+                created_sprint = await self.sprint_database_service.create_sprint(session=session, sprint_data=create_dto)
                 if not created_sprint:
                     return {"error": f"Failed to create sprint {sprint_id}"}
 
@@ -81,7 +83,7 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
                     updated_at=datetime.now(timezone.utc),
                     board_id=sprint_data.board_id
                 )
-                updated_sprint = await self.sprint_database_service.update_sprint_by_jira_sprint_id(sprint_id, update_dto)
+                updated_sprint = await self.sprint_database_service.update_sprint_by_jira_sprint_id(session=session, jira_sprint_id=sprint_id, sprint_data=update_dto)
                 if not updated_sprint:
                     return {"error": f"Failed to update sprint {sprint_id}"}
 
@@ -89,7 +91,8 @@ class SprintStartWebhookHandler(JiraWebhookHandler):
 
             # Log sync event
             await self.sync_log_repository.create_sync_log(
-                SyncLogDBCreateDTO(
+                session=session,
+                sync_log=SyncLogDBCreateDTO(
                     entity_type=EntityType.SPRINT.value,
                     entity_id=str(sprint_id),
                     operation=operation_type,

@@ -7,11 +7,12 @@ from src.infrastructure.entities.sync_log import SyncLogEntity
 
 
 class SQLAlchemySyncLogRepository(ISyncLogRepository):
-    def __init__(self, session: AsyncSession):
-        self.session = session
+    def __init__(self):
+        pass
 
     async def create_sync_log(
         self,
+        session: AsyncSession,
         sync_log: SyncLogDBCreateDTO
     ) -> SyncLogModel:
         sync_log_entity = SyncLogEntity(
@@ -25,13 +26,12 @@ class SQLAlchemySyncLogRepository(ISyncLogRepository):
             sender=sync_log.sender,
             error_message=sync_log.error_message,
         )
-        self.session.add(sync_log_entity)
-        # Remove the commit from here - let the calling service manage the transaction
-        # await self.session.commit()
+        session.add(sync_log_entity)
+        # Let the session manager handle the transaction
+        await session.flush()
+        await session.refresh(sync_log_entity)
 
-        # Still need to flush to ensure the entity has an ID
-        await self.session.flush()
         return SyncLogModel.from_entity(sync_log_entity)
 
-    async def update_sync_log(self, sync_log_id: int, **kwargs) -> None:
+    async def update_sync_log(self, session: AsyncSession, sync_log_id: int, **kwargs) -> None:
         pass

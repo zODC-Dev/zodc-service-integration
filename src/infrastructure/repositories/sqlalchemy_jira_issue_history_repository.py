@@ -16,11 +16,12 @@ from src.infrastructure.entities.jira_issue_sprint import JiraIssueSprintEntity
 class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
     """Repository cho Jira issue history sử dụng SQLAlchemy"""
 
-    def __init__(self, session: AsyncSession):
-        self.session = session
+    def __init__(self):
+        pass
 
     async def get_issues_field_history(
         self,
+        session: AsyncSession,
         jira_issue_ids: List[str],
         field_name: str
     ) -> Dict[str, List[JiraIssueHistoryModel]]:
@@ -33,7 +34,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                 )
             ).order_by(col(JiraIssueHistoryEntity.created_at))
 
-            result = await self.session.exec(stmt)
+            result = await session.exec(stmt)
             history_items = result.all()
 
             # Nhóm theo issue_id
@@ -50,6 +51,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
     async def get_issue_history(
         self,
+        session: AsyncSession,
         jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
@@ -58,7 +60,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                 col(JiraIssueHistoryEntity.jira_issue_id) == jira_issue_id
             ).order_by(col(JiraIssueHistoryEntity.created_at))
 
-            result = await self.session.exec(stmt)
+            result = await session.exec(stmt)
             history_items = result.all()
 
             return [self._entity_to_model(item) for item in history_items]
@@ -68,6 +70,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
     async def get_issue_field_history(
         self,
+        session: AsyncSession,
         jira_issue_id: str,
         field_name: str
     ) -> List[JiraIssueHistoryModel]:
@@ -80,7 +83,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                 )
             ).order_by(col(JiraIssueHistoryEntity.created_at))
 
-            result = await self.session.exec(stmt)
+            result = await session.exec(stmt)
             history_items = result.all()
 
             return [self._entity_to_model(item) for item in history_items]
@@ -90,6 +93,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
     async def create(
         self,
+        session: AsyncSession,
         event: JiraIssueHistoryDBCreateDTO
     ) -> bool:
         """Lưu một sự kiện thay đổi issue bao gồm nhiều thay đổi"""
@@ -98,7 +102,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
             stmt = select(JiraIssueEntity).where(
                 col(JiraIssueEntity.jira_issue_id) == event.jira_issue_id
             )
-            result = await self.session.exec(stmt)
+            result = await session.exec(stmt)
             existing_issue = result.one_or_none()
             if not existing_issue:
                 log.warning(f"Issue {event.jira_issue_id} does not exist in the database")
@@ -127,7 +131,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                         )
                     )
 
-                    history_result = await self.session.exec(history_stmt)
+                    history_result = await session.exec(history_stmt)
                     existing_item = history_result.one_or_none()
                 except Exception as e:
                     log.error(f"Error checking for existing history item: {str(e)}")
@@ -155,7 +159,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                     created_at=created_at_naive,  # Đã loại bỏ timezone
                     jira_change_id=event.jira_change_id
                 )
-                self.session.add(history_item)
+                session.add(history_item)
                 saved_changes += 1
 
             return True
@@ -166,13 +170,13 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
     async def bulk_create(
         self,
+        session: AsyncSession,
         events: List[JiraIssueHistoryDBCreateDTO]
     ) -> bool:
         """Bulk create issue history"""
         try:
             for event in events:
-                await self.create(event)
-            await self.session.commit()
+                await self.create(session=session, event=event)
             return True
         except Exception as e:
             log.error(f"Error bulk creating issue history: {str(e)}")
@@ -180,6 +184,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
 
     async def get_sprint_issue_histories(
         self,
+        session: AsyncSession,
         sprint_id: int,
         from_date: Optional[datetime] = None,
         to_date: Optional[datetime] = None
@@ -191,7 +196,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                 JiraIssueSprintEntity.jira_sprint_id == sprint_id
             )
 
-            result = await self.session.exec(sprint_issues_stmt)
+            result = await session.exec(sprint_issues_stmt)
             issue_ids = result.all()
 
             log.info(f"Issue IDs: {issue_ids}")
@@ -219,7 +224,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                 and_(*conditions)
             ).order_by(col(JiraIssueHistoryEntity.created_at))
 
-            history_result = await self.session.exec(stmt)
+            history_result = await session.exec(stmt)
             history_items = history_result.all()
 
             # log.info(f"History items: {history_items}")

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 from redis.asyncio import Redis
 
@@ -9,7 +9,7 @@ from src.domain.services.redis_service import IRedisService
 class RedisService(IRedisService):
     """Service for managing Redis operations."""
 
-    def __init__(self, redis_client: Redis):
+    def __init__(self, redis_client: "Redis[Any]"):
         self.redis = redis_client
 
     async def get(self, key: str) -> Optional[str]:

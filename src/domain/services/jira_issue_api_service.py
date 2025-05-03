@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.domain.constants.jira import JiraIssueStatus
 from src.domain.models.jira.apis.requests.jira_issue import JiraIssueAPICreateRequestDTO, JiraIssueAPIUpdateRequestDTO
 from src.domain.models.jira.apis.responses.jira_changelog import (
@@ -8,20 +10,21 @@ from src.domain.models.jira.apis.responses.jira_changelog import (
     JiraIssueChangelogBulkFetchAPIGetResponseDTO,
 )
 from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_issue_comment import JiraIssueCommentModel
 from src.domain.models.jira_issue_link import JiraIssueLinkModel
 
 
 class IJiraIssueAPIService(ABC):
     @abstractmethod
-    async def create_issue(self, user_id: int, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
+    async def create_issue(self, session: AsyncSession, user_id: int, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
         pass
 
     @abstractmethod
-    async def update_issue(self, user_id: int, issue_id: str, update: JiraIssueAPIUpdateRequestDTO) -> JiraIssueModel:
+    async def update_issue(self, session: AsyncSession, user_id: int, issue_id: str, update: JiraIssueAPIUpdateRequestDTO) -> JiraIssueModel:
         pass
 
     @abstractmethod
-    async def get_issue(self, user_id: int, issue_id: str) -> Optional[JiraIssueModel]:
+    async def get_issue(self, session: AsyncSession, user_id: int, issue_id: str) -> Optional[JiraIssueModel]:
         pass
 
     @abstractmethod
@@ -30,12 +33,12 @@ class IJiraIssueAPIService(ABC):
         pass
 
     @abstractmethod
-    async def create_issue_with_admin_auth(self, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
+    async def create_issue_with_admin_auth(self, session: AsyncSession, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
         """Create new issue using admin auth"""
         pass
 
     @abstractmethod
-    async def update_issue_with_admin_auth(self, issue_id: str, update: JiraIssueAPIUpdateRequestDTO) -> JiraIssueModel:
+    async def update_issue_with_admin_auth(self, session: AsyncSession, issue_id: str, update: JiraIssueAPIUpdateRequestDTO) -> JiraIssueModel:
         """Update issue using admin auth"""
         pass
 
@@ -49,11 +52,11 @@ class IJiraIssueAPIService(ABC):
         pass
 
     @abstractmethod
-    async def create_issue_link(self, user_id: int, source_issue_id: str, target_issue_id: str, relationship: str) -> bool:
+    async def create_issue_link(self, session: AsyncSession, user_id: int, source_issue_id: str, target_issue_id: str, relationship: str) -> bool:
         pass
 
     @abstractmethod
-    async def get_issue_changelog(self, issue_id: str) -> JiraIssueChangelogAPIGetResponseDTO:
+    async def get_issue_changelog(self, session: AsyncSession, issue_id: str) -> JiraIssueChangelogAPIGetResponseDTO:
         """Lấy lịch sử thay đổi của issue từ Jira API"""
         pass
 
@@ -100,4 +103,14 @@ class IJiraIssueAPIService(ABC):
         Returns:
             List of issue link models
         """
+        pass
+
+    @abstractmethod
+    async def get_issue_comments_with_admin_auth(self, issue_key: str) -> List[JiraIssueCommentModel]:
+        """Get comments for an issue"""
+        pass
+
+    @abstractmethod
+    async def create_issue_comment(self, session: AsyncSession, user_id: int, issue_key: str, comment: str) -> JiraIssueCommentModel:
+        """Create a comment for an issue using admin auth"""
         pass

@@ -2,6 +2,7 @@ from typing import AsyncIterator, Tuple
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, UploadFile
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
 from src.configs.settings import settings
@@ -21,7 +22,12 @@ class MediaApplicationService:
         self.blob_storage_service = blob_storage_service
         self.container_name = settings.AZURE_STORAGE_ACCOUNT_CONTAINER_NAME
 
-    async def upload_media(self, file: UploadFile, user_id: int) -> MediaModel:
+    async def upload_media(
+        self,
+        session: AsyncSession,
+        file: UploadFile,
+        user_id: int
+    ) -> MediaModel:
         # Upload to blob storage
         blob_url = await self.blob_storage_service.upload_file(
             file=file,
@@ -42,15 +48,19 @@ class MediaApplicationService:
             uploaded_by=user_id
         )
 
-        return await self.media_repository.create(media)
+        return await self.media_repository.create(session, media)
 
-    async def get_media(self, media_id: UUID) -> Tuple[MediaModel, AsyncIterator[bytes], int]:
+    async def get_media(
+        self,
+        session: AsyncSession,
+        media_id: UUID
+    ) -> Tuple[MediaModel, AsyncIterator[bytes], int]:
         """Get media file by id
 
         Returns:
             Tuple[MediaModel, AsyncIterator[bytes], int]: Media info, file content stream and file size
         """
-        media = await self.media_repository.get_by_id(media_id)
+        media = await self.media_repository.get_by_id(session, media_id)
         if not media:
             raise HTTPException(status_code=404, detail="Media not found")
 
@@ -62,14 +72,18 @@ class MediaApplicationService:
 
         return media, file_stream, file_size
 
-    async def remove_media(self, media_id: UUID) -> Tuple[bool, str]:
+    async def remove_media(
+        self,
+        session: AsyncSession,
+        media_id: UUID
+    ) -> Tuple[bool, str]:
         """Remove media file from storage and database (soft delete)
 
         Returns:
             Tuple[bool, str]: Success status and message
         """
         # Get media info first
-        media = await self.media_repository.get_by_id(media_id)
+        media = await self.media_repository.get_by_id(session, media_id)
         if not media:
             return False, "Media not found"
 
@@ -81,7 +95,7 @@ class MediaApplicationService:
         )
 
         # Soft delete from database regardless of storage deletion success
-        deleted_from_db = await self.media_repository.delete(media_id)
+        deleted_from_db = await self.media_repository.delete(session, media_id)
 
         if deleted_from_storage and deleted_from_db:
             return True, "Media deleted successfully"

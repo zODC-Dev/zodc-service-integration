@@ -33,6 +33,12 @@ class JiraIssueEntity(SQLModel, table=True):
     is_system_linked: bool = Field(default=False)
     is_deleted: bool = Field(default=False)
     link_url: Optional[str] = Field(default=None)
+    planned_start_time: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
+    planned_end_time: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
+    actual_start_time: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
+    actual_end_time: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
+    # Story ID to which this issue belongs to
+    story_id: Optional[str] = Field(default=None, foreign_key="jira_issues.jira_issue_id")
 
     # Timestamps
     created_at: datetime = Field(

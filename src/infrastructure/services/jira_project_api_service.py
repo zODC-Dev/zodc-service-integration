@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.jira import JiraIssueType
@@ -32,11 +34,12 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         self.user_repository = user_repository
         self.base_url = settings.JIRA_BASE_URL
 
-    async def get_project_details(self, user_id: int, project_key: str) -> JiraProjectModel:
+    async def get_project_details(self, session: AsyncSession, user_id: int, project_key: str) -> JiraProjectModel:
         """Lấy thông tin chi tiết dự án từ Jira API"""
         response_data = await self.client.get(
-            f"/rest/api/3/project/{project_key}",
-            user_id,
+            session=session,
+            endpoint=f"/rest/api/3/project/{project_key}",
+            user_id=user_id,
             error_msg=f"Lỗi khi lấy thông tin dự án {project_key}"
         )
 
@@ -46,11 +49,12 @@ class JiraProjectAPIService(IJiraProjectAPIService):
             JiraProjectMapper
         )
 
-    async def get_project_users(self, user_id: int, project_key: str) -> List[JiraUserModel]:
+    async def get_project_users(self, session: AsyncSession, user_id: int, project_key: str) -> List[JiraUserModel]:
         """Get all users in a project from Jira API"""
         response_data = await self.client.get(
-            "/rest/api/3/user/assignable/search",
-            user_id,
+            session=session,
+            endpoint="/rest/api/3/user/assignable/search",
+            user_id=user_id,
             params={"project": project_key},
             error_msg=f"Error fetching users for project {project_key}"
         )
@@ -68,12 +72,13 @@ class JiraProjectAPIService(IJiraProjectAPIService):
 
         return users
 
-    async def get_project_sprints(self, user_id: int, project_key: str) -> List[JiraSprintModel]:
+    async def get_project_sprints(self, session: AsyncSession, user_id: int, project_key: str) -> List[JiraSprintModel]:
         """Get all sprints for a project from Jira API"""
         # First get board ID for the project
         board_response = await self.client.get(
-            "/rest/agile/1.0/board",
-            user_id,
+            session=session,
+            endpoint="/rest/agile/1.0/board",
+            user_id=user_id,
             params={"projectKeyOrId": project_key},
             error_msg=f"Error fetching board for project {project_key}"
         )
@@ -85,8 +90,9 @@ class JiraProjectAPIService(IJiraProjectAPIService):
 
         # Sau đó lấy sprints cho board
         sprint_response = await self.client.get(
-            f"/rest/agile/1.0/board/{board_id}/sprint",
-            user_id,
+            session=session,
+            endpoint=f"/rest/agile/1.0/board/{board_id}/sprint",
+            user_id=user_id,
             error_msg=f"Error fetching sprints for board {board_id}"
         )
 
@@ -101,11 +107,12 @@ class JiraProjectAPIService(IJiraProjectAPIService):
 
         return sprints
 
-    async def get_accessible_projects(self, user_id: int) -> List[JiraProjectModel]:
+    async def get_accessible_projects(self, session: AsyncSession, user_id: int) -> List[JiraProjectModel]:
         """Get all projects that the user has access to"""
         response_data = await self.client.get(
-            "/rest/api/3/project",
-            user_id,
+            session=session,
+            endpoint="/rest/api/3/project",
+            user_id=user_id,
             error_msg="Error fetching projects"
         )
 
@@ -122,6 +129,7 @@ class JiraProjectAPIService(IJiraProjectAPIService):
 
     async def get_project_issues(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: Optional[str] = None,
@@ -168,9 +176,10 @@ class JiraProjectAPIService(IJiraProjectAPIService):
         jql = " AND ".join(jql_conditions)
 
         response_data = await self.client.post(
-            "/rest/api/3/search",
-            user_id,
-            {
+            session=session,
+            endpoint="/rest/api/3/search",
+            user_id=user_id,
+            data={
                 "jql": jql,
                 # "startAt": start_at,
                 "maxResults": limit,
@@ -181,17 +190,19 @@ class JiraProjectAPIService(IJiraProjectAPIService):
 
         issues: List[JiraIssueModel] = []
         for issue_data in response_data.get("issues", []):
-            issue: JiraIssueModel = await self.client.map_to_domain(
+            issue: Optional[JiraIssueModel] = await self.client.map_to_domain(
                 issue_data,
                 JiraIssueAPIGetResponseDTO,
                 JiraIssueMapper
             )
-            issues.append(issue)
+            if issue:
+                issues.append(issue)
 
         return issues
 
     async def get_sprint_issues(
         self,
+        session: AsyncSession,
         user_id: int,
         sprint_id: str,
         issue_type: Optional[JiraIssueType] = None,
@@ -205,10 +216,11 @@ class JiraProjectAPIService(IJiraProjectAPIService):
 
         jql = " AND ".join(jql_parts)
 
-        return await self.search_issues(user_id, jql, limit=limit)
+        return await self.search_issues(session, user_id, jql, limit=limit)
 
     async def search_issues(
         self,
+        session: AsyncSession,
         user_id: int,
         jql: str,
         start_at: int = 0,
@@ -216,9 +228,10 @@ class JiraProjectAPIService(IJiraProjectAPIService):
     ) -> List[JiraIssueModel]:
         """Search issues with JQL"""
         response_data = await self.client.post(
-            "/rest/api/3/search",
-            user_id,
-            {
+            session=session,
+            endpoint="/rest/api/3/search",
+            user_id=user_id,
+            data={
                 "jql": jql,
                 "startAt": start_at,
                 "maxResults": limit,
@@ -238,12 +251,18 @@ class JiraProjectAPIService(IJiraProjectAPIService):
 
         return issues
 
-    async def get_sprint_by_id(self, user_id: int, sprint_id: int) -> Optional[JiraSprintModel]:
+    async def get_sprint_by_id(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        sprint_id: int
+    ) -> Optional[JiraSprintModel]:
         """Lấy thông tin chi tiết về một sprint cụ thể"""
         try:
             response_data = await self.client.get(
-                f"/rest/agile/1.0/sprint/{sprint_id}",
-                user_id,
+                session=session,
+                endpoint=f"/rest/agile/1.0/sprint/{sprint_id}",
+                user_id=user_id,
                 error_msg=f"Lỗi khi lấy thông tin sprint {sprint_id}"
             )
 

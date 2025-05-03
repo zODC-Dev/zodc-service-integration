@@ -11,7 +11,6 @@ from src.app.dependencies.repositories import (
     get_media_repository,
     get_sync_log_repository,
     get_system_config_repository,
-    get_workflow_mapping_repository,
 )
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
@@ -42,15 +41,16 @@ from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.media_repository import IMediaRepository
 from src.domain.repositories.system_config_repository import ISystemConfigRepository
-from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
 from src.domain.services.gantt_chart_calculator_service import IGanttChartCalculatorService
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService
 from src.domain.services.jira_issue_history_database_service import IJiraIssueHistoryDatabaseService
+from src.domain.services.jira_performance_summary_service import IJiraPerformanceSummaryService
 from src.domain.services.jira_project_api_service import IJiraProjectAPIService
 from src.domain.services.jira_sprint_analytics_service import IJiraSprintAnalyticsService
 from src.domain.services.jira_sprint_api_service import IJiraSprintAPIService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
 from src.domain.services.jira_user_api_service import IJiraUserAPIService
+from src.domain.services.jira_user_database_service import IJiraUserDatabaseService
 from src.domain.services.nats_service import INATSService
 from src.domain.services.token_scheduler_service import ITokenSchedulerService
 from src.domain.services.workflow_service_client import IWorkflowServiceClient
@@ -60,6 +60,7 @@ from src.infrastructure.services.gantt_chart_calculator_service import GanttChar
 from src.infrastructure.services.jira_issue_api_service import JiraIssueAPIService
 from src.infrastructure.services.jira_issue_database_service import JiraIssueDatabaseService
 from src.infrastructure.services.jira_issue_history_database_service import JiraIssueHistoryDatabaseService
+from src.infrastructure.services.jira_performance_summary_service import JiraPerformanceSummaryService
 from src.infrastructure.services.jira_project_api_service import JiraProjectAPIService
 from src.infrastructure.services.jira_project_database_service import JiraProjectDatabaseService
 from src.infrastructure.services.jira_service import JiraAPIClient
@@ -403,10 +404,16 @@ async def get_sprint_analytics_service(
 
 
 async def get_sprint_analytics_application_service(
-    sprint_analytics_service: IJiraSprintAnalyticsService = Depends(get_sprint_analytics_service)
+    sprint_analytics_service: IJiraSprintAnalyticsService = Depends(get_sprint_analytics_service),
+    jira_sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository),
+    jira_issue_repository: IJiraIssueRepository = Depends(get_jira_issue_repository)
 ) -> JiraSprintAnalyticsApplicationService:
     """Get the sprint analytics application service"""
-    return JiraSprintAnalyticsApplicationService(sprint_analytics_service)
+    return JiraSprintAnalyticsApplicationService(
+        sprint_analytics_service=sprint_analytics_service,
+        jira_sprint_repository=jira_sprint_repository,
+        jira_issue_repository=jira_issue_repository
+    )
 
 
 # ============================ GANTT CHART SERVICE ===========================================
@@ -427,12 +434,11 @@ async def get_workflow_service_client(
 async def get_gantt_chart_service(
     issue_repository: IJiraIssueRepository = Depends(get_jira_issue_repository),
     sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository),
-    workflow_mapping_repository: IWorkflowMappingRepository = Depends(get_workflow_mapping_repository),
     gantt_calculator_service: IGanttChartCalculatorService = Depends(get_gantt_chart_calculator_service),
     workflow_service_client: IWorkflowServiceClient = Depends(get_workflow_service_client)
 ) -> GanttChartApplicationService:
     """Get the Gantt chart service"""
-    return GanttChartApplicationService(issue_repository, sprint_repository, workflow_mapping_repository, gantt_calculator_service, workflow_service_client)
+    return GanttChartApplicationService(issue_repository, sprint_repository, gantt_calculator_service, workflow_service_client)
 
 
 # ============================ JIRA WEBHOOK HANDLERS ===========================================
@@ -492,7 +498,7 @@ async def get_webhook_service(
     issue_history_sync_service=Depends(get_jira_issue_history_sync_service),
     jira_project_repository=Depends(get_jira_project_repository),
     redis_service=Depends(get_redis_service),
-    nats_application_service=Depends(get_nats_service),
+    nats_application_service=Depends(get_nats_application_service),
     jira_sprint_repository=Depends(get_jira_sprint_repository)
 ) -> JiraWebhookService:
     """Get Jira webhook service"""
@@ -568,64 +574,25 @@ async def get_microsoft_calendar_application_service(
 # ============================ NATS =================================================
 
 
-# async def get_nats_event_service(
-#     request_handlers: Mapping[str, INATSRequestHandler],
-#     nats_service: INATSService = Depends(get_nats_service),
-#     redis_service: IRedisService = Depends(get_redis_service),
-#     user_repository: IJiraUserRepository = Depends(get_jira_user_repository),
-#     refresh_token_repository: IRefreshTokenRepository = Depends(get_refresh_token_repository),
-#     jira_issue_application_service: JiraIssueApplicationService = Depends(get_jira_issue_service),
-#     jira_sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository),
-#     workflow_mapping_repository: IWorkflowMappingRepository = Depends(get_workflow_mapping_repository),
-#     gantt_chart_service: GanttChartApplicationService = Depends(get_gantt_chart_service),
-#     jira_issue_api_service: IJiraIssueAPIService = Depends(get_jira_issue_api_service)
-# ) -> INATSEventService:
-#     """Get NATS event service with all handlers configured"""
-#     # Configure message handlers
-#     message_handlers = {
-#         NATSSubscribeTopic.USER_EVENT.value:
-#             UserMessageHandler(redis_service),
-#         NATSSubscribeTopic.MICROSOFT_LOGIN.value:
-#             MicrosoftLoginMessageHandler(redis_service, user_repository, refresh_token_repository),
-#         NATSSubscribeTopic.JIRA_LOGIN.value:
-#             JiraLoginMessageHandler(user_repository, refresh_token_repository, redis_service),
-#     }
-
-#     # Configure request handlers
-#     request_handlers = {
-#         NATSSubscribeTopic.JIRA_ISSUE_SYNC.value:
-#             JiraIssueSyncRequestHandler(jira_issue_application_service),
-#         NATSSubscribeTopic.JIRA_ISSUE_LINK.value:
-#             JiraIssueLinkRequestHandler(jira_issue_application_service),
-#         NATSSubscribeTopic.WORKFLOW_SYNC.value:
-#             WorkflowSyncRequestHandler(
-#                 jira_issue_application_service,
-#                 user_repository,
-#                 jira_sprint_repository,
-#                 workflow_mapping_repository,
-#                 redis_service
-#             ),
-#         NATSSubscribeTopic.GANTT_CHART_CALCULATION.value:
-#             GanttChartRequestHandler(gantt_chart_service),
-#         NATSSubscribeTopic.NODE_STATUS_SYNC.value:
-#             NodeStatusSyncHandler(jira_issue_api_service),
-#         NATSSubscribeTopic.WORKFLOW_EDIT.value:
-#             WorkflowEditRequestHandler(jira_issue_application_service, user_repository,
-#                                        jira_sprint_repository, workflow_mapping_repository, redis_service)
-#     }
-
-#     # Create and return service
-#     return NATSEventService(
-#         nats_service=nats_service,
-#         message_handlers=message_handlers,
-#         request_handlers=request_handlers
-#     )
-
-
 def get_system_config_service(
     system_config_repository: ISystemConfigRepository = Depends(get_system_config_repository)
 ) -> SystemConfigApplicationService:
     """Get system config service"""
     return SystemConfigApplicationService(
         system_config_repository=system_config_repository
+    )
+
+
+def get_jira_performance_summary_service(
+    jira_issue_db_service: IJiraIssueDatabaseService = Depends(get_jira_issue_database_service),
+    jira_sprint_db_service: IJiraSprintDatabaseService = Depends(get_jira_sprint_database_service),
+    jira_issue_history_db_service: IJiraIssueHistoryDatabaseService = Depends(get_jira_issue_history_database_service),
+    jira_user_db_service: IJiraUserDatabaseService = Depends(get_jira_user_database_service)
+) -> IJiraPerformanceSummaryService:
+    """Dependency injection cho JiraPerformanceSummaryService"""
+    return JiraPerformanceSummaryService(
+        jira_issue_db_service=jira_issue_db_service,
+        jira_sprint_db_service=jira_sprint_db_service,
+        jira_issue_history_db_service=jira_issue_history_db_service,
+        jira_user_db_service=jira_user_db_service
     )

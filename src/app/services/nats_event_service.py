@@ -1,5 +1,6 @@
 from typing import Any, Dict, Mapping
 
+from src.configs.database import AsyncSessionManager
 from src.configs.logger import log
 from src.domain.services.nats_event_service import INATSEventService
 from src.domain.services.nats_message_handler import INATSMessageHandler, INATSRequestHandler
@@ -32,10 +33,14 @@ class NATSEventService(INATSEventService):
     ) -> None:
         """Register a message handler for a subject"""
         async def message_callback(subject: str, data: Dict[str, Any]) -> None:
-            try:
-                await handler.handle(subject, data)
-            except Exception as e:
-                log.error(f"Error handling message for {subject}: {str(e)}")
+            # Use the centralized session manager
+            async with AsyncSessionManager.session() as session:
+                try:
+                    # Process message with handler
+                    await handler.handle(subject, data, session)
+                except Exception as e:
+                    log.error(f"Error handling message for {subject}: {str(e)}")
+                    raise
 
         await self.nats_service.subscribe(subject, message_callback)
         log.info(f"Registered message handler for {subject}")
@@ -48,11 +53,15 @@ class NATSEventService(INATSEventService):
         """Register a request handler for a subject"""
         async def request_callback(subject: str, data: Dict[str, Any]) -> Dict[str, Any]:
             try:
-                result = await handler.handle(subject, data)
-                return {
-                    "success": True,
-                    "data": result
-                }
+                # Use the centralized session manager
+                async with AsyncSessionManager.session() as session:
+                    # Process request with handler
+                    result = await handler.handle(subject, data, session)
+
+                    return {
+                        "success": True,
+                        "data": result
+                    }
             except Exception as e:
                 log.error(f"Error handling request for {subject}: {str(e)}")
                 return {

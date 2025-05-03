@@ -2,10 +2,12 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
+from pydantic.alias_generators import to_camel
 
 from src.app.schemas.responses.base import BaseResponse
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.models.jira_issue import JiraIssueModel
+from src.domain.models.jira_issue_comment import JiraIssueCommentModel
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.models.jira_user import JiraUserModel
 
@@ -55,6 +57,7 @@ class GetJiraIssueResponse(BaseResponse):
     key: str
     summary: str
     assignee: Optional[JiraAssigneeResponse] = None
+    reporter: Optional[JiraAssigneeResponse] = None
     priority: Optional[str] = None
     type: JiraIssueType
     sprint: Optional[JiraIssueSprintResponse] = None
@@ -92,7 +95,8 @@ class GetJiraIssueResponse(BaseResponse):
             is_system_linked=issue.is_system_linked,
             is_deleted=issue.is_deleted,
             link_url=issue.link_url,
-            last_synced_at=issue.last_synced_at
+            last_synced_at=issue.last_synced_at,
+            reporter=JiraAssigneeResponse.from_domain(issue.reporter) if issue.reporter else None
         )
 
 
@@ -102,7 +106,33 @@ class JiraCreateIssueResponse(BaseResponse):
     self: str  # API URL of the created issue
 
 
-class JiraIssueDescriptionDTO(BaseModel):
+class JiraIssueDescriptionAPIGetDTO(BaseModel):
     """Response model for Jira issue description"""
     key: str
     description: Optional[str] = None
+
+
+class JiraIssueCommentAPIGetDTO(BaseModel):
+    """Response model for Jira issue comments"""
+    id: str
+    assignee: JiraAssigneeResponse
+    content: str
+    created_at: datetime
+
+    class Config:
+        populate_by_name = True
+        alias_generator = to_camel
+
+    @classmethod
+    def from_domain(cls, comment: JiraIssueCommentModel) -> "JiraIssueCommentAPIGetDTO":
+        return cls(
+            id=comment.id,
+            assignee=JiraAssigneeResponse.from_domain(comment.assignee),
+            content=comment.content,
+            created_at=comment.created_at
+        )
+
+
+class JiraIssueCommentAPICreateDTO(BaseModel):
+    """Request model for creating a Jira issue comment"""
+    content: str

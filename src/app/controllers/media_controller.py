@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.media import MediaResponse
@@ -14,9 +15,14 @@ class MediaController:
     def __init__(self, media_service: MediaApplicationService):
         self.media_service = media_service
 
-    async def upload_media(self, file: UploadFile, user_id: int) -> StandardResponse[MediaResponse]:
+    async def upload_media(
+        self,
+        session: AsyncSession,
+        file: UploadFile,
+        user_id: int
+    ) -> StandardResponse[MediaResponse]:
         try:
-            media = await self.media_service.upload_media(file, user_id)
+            media = await self.media_service.upload_media(session=session, file=file, user_id=user_id)
             return StandardResponse(
                 message="File uploaded successfully",
                 data=MediaResponse(
@@ -33,10 +39,14 @@ class MediaController:
                 detail=f"Failed to upload file: {str(e)}"
             ) from e
 
-    async def get_media(self, media_id: UUID) -> StreamingResponse:
+    async def get_media(
+        self,
+        session: AsyncSession,
+        media_id: UUID
+    ) -> StreamingResponse:
         try:
             log.info(f"Media ID: {media_id}")
-            media, file_stream, _ = await self.media_service.get_media(media_id)
+            media, file_stream, _ = await self.media_service.get_media(session=session, media_id=media_id)
 
             log.info(f"Media: {media}")
 
@@ -60,9 +70,13 @@ class MediaController:
                 detail=f"Failed to get media: {str(e)}"
             ) from e
 
-    async def remove_media(self, media_id: UUID) -> StandardResponse[None]:
+    async def remove_media(
+        self,
+        session: AsyncSession,
+        media_id: UUID
+    ) -> StandardResponse[None]:
         try:
-            success, message = await self.media_service.remove_media(media_id)
+            success, message = await self.media_service.remove_media(session=session, media_id=media_id)
             if not success:
                 raise HTTPException(status_code=404, detail=message)
 

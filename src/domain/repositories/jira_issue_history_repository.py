@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.domain.models.database.jira_issue_history import JiraIssueHistoryDBCreateDTO
 from src.domain.models.jira_issue_history import JiraIssueHistoryModel
 
@@ -12,6 +14,7 @@ class IJiraIssueHistoryRepository(ABC):
     @abstractmethod
     async def get_issues_field_history(
         self,
+        session: AsyncSession,
         jira_issue_ids: List[str],
         field_name: str
     ) -> Dict[str, List[JiraIssueHistoryModel]]:
@@ -21,6 +24,7 @@ class IJiraIssueHistoryRepository(ABC):
     @abstractmethod
     async def get_issue_history(
         self,
+        session: AsyncSession,
         jira_issue_id: str
     ) -> List[JiraIssueHistoryModel]:
         """Lấy toàn bộ lịch sử thay đổi của một issue"""
@@ -29,6 +33,7 @@ class IJiraIssueHistoryRepository(ABC):
     @abstractmethod
     async def get_issue_field_history(
         self,
+        session: AsyncSession,
         issue_id: str,  # Lưu ý: Cần chuyển đổi thành string khi truy vấn database
         field_name: str
     ) -> List[JiraIssueHistoryModel]:
@@ -38,6 +43,7 @@ class IJiraIssueHistoryRepository(ABC):
     @abstractmethod
     async def create(
         self,
+        session: AsyncSession,
         event: JiraIssueHistoryDBCreateDTO
     ) -> bool:
         """Lưu một sự kiện thay đổi issue bao gồm nhiều thay đổi"""
@@ -46,6 +52,7 @@ class IJiraIssueHistoryRepository(ABC):
     @abstractmethod
     async def bulk_create(
         self,
+        session: AsyncSession,
         events: List[JiraIssueHistoryDBCreateDTO]
     ) -> bool:
         """Bulk create issue history"""
@@ -54,6 +61,7 @@ class IJiraIssueHistoryRepository(ABC):
     @abstractmethod
     async def get_sprint_issue_histories(
         self,
+        session: AsyncSession,
         sprint_id: int,
         from_date: Optional[datetime] = None,
         to_date: Optional[datetime] = None
