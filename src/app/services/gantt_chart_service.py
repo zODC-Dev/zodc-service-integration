@@ -165,7 +165,7 @@ class GanttChartApplicationService:
             log.debug(f"[GANTT] Schedule calculation completed: {len(tasks)} tasks scheduled")
 
             # Create a reverse hierarchy map for quicker lookup (child_id -> parent_id)
-            reverse_hierarchy_map = {}
+            reverse_hierarchy_map: Dict[str, str] = {}
             for parent, children in hierarchy_map.items():
                 for child in children:
                     reverse_hierarchy_map[child] = parent

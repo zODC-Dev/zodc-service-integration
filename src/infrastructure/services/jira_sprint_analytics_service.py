@@ -779,8 +779,8 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
             result.append(
                 WorkloadModel(
                     user_name=user_name,
-                    completed_points=round(points["completed_points"], 2),
-                    remaining_points=round(points["remaining_points"], 2)
+                    completed_points=round(points.get("completed_points", 0), 2),
+                    remaining_points=round(points.get("remaining_points", 0), 2)
                 )
             )
 

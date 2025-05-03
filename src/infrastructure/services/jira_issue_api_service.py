@@ -1039,7 +1039,6 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             # Check if 'comments' key exists in response_data
             if 'comments' in response_data:
                 # Convert to DTO
-                log.info(f"Response data for issue {issue_key}: {response_data}")
                 response_dto = [JiraIssueCommentAPIGetResponseDTO(**comment)
                                 for comment in response_data['comments']]
 

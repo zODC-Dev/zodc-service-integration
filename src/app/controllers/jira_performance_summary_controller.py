@@ -43,8 +43,10 @@ class JiraPerformanceSummaryController:
         return UserPerformanceSummaryResponse(
             user_id=performance_summary.user_id,
             user_name=performance_summary.user_name,
+            user_email=performance_summary.user_email,
             quarter=performance_summary.quarter,
             year=performance_summary.year,
+            avatar_url=performance_summary.avatar_url,
             total_tasks=performance_summary.total_tasks,
             completed_tasks=performance_summary.completed_tasks,
             task_completion_rate=performance_summary.task_completion_rate,

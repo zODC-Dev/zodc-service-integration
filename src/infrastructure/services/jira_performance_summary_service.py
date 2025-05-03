@@ -64,6 +64,8 @@ class JiraPerformanceSummaryService(IJiraPerformanceSummaryService):
             return UserPerformanceSummaryModel(
                 user_id=user_id,
                 user_name=user.name,
+                user_email=user.email,
+                avatar_url=user.avatar_url,
                 quarter=quarter,
                 year=year,
                 **performance_data

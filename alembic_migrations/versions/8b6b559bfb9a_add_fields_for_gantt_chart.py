@@ -27,10 +27,10 @@ def upgrade() -> None:
     op.add_column('jira_issues', sa.Column('actual_end_time', sa.DateTime(timezone=True), nullable=True))
     op.add_column('jira_issues', sa.Column('story_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True))
     op.create_foreign_key(None, 'jira_issues', 'jira_issues', ['story_id'], ['jira_issue_id'])
-    op.drop_index('ix_system_configs_project_key', table_name='system_configs')
-    op.drop_constraint('uq_system_configs_key_scope_project', 'system_configs', type_='unique')
-    op.create_unique_constraint('uq_system_configs_key_scope', 'system_configs', ['key', 'scope'])
-    op.drop_column('system_configs', 'project_key')
+    # op.drop_index('ix_system_configs_project_key', table_name='system_configs')
+    # op.drop_constraint('uq_system_configs_key_scope_project', 'system_configs', type_='unique')
+    # op.create_unique_constraint('uq_system_configs_key_scope', 'system_configs', ['key', 'scope'])
+    # op.drop_column('system_configs', 'project_key')
     # ### end Alembic commands ###
 
 
