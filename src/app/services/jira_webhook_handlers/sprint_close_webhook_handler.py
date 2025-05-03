@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.logger import log
 from src.domain.constants.jira import JiraSprintState, JiraWebhookEvent
@@ -33,7 +35,7 @@ class SprintCloseWebhookHandler(JiraWebhookHandler):
         """Check if this handler can process the given webhook event"""
         return webhook_event in [JiraWebhookEvent.SPRINT_CLOSED, "jira:sprint_closed", "sprint_closed"]
 
-    async def handle(self, webhook_data: JiraSprintWebhookDTO) -> Dict[str, Any]:
+    async def handle(self, session: AsyncSession, webhook_data: JiraSprintWebhookDTO) -> Dict[str, Any]:
         """Handle the sprint close webhook"""
         sprint_id = webhook_data.sprint.id
         log.info(f"Processing sprint close webhook for sprint {sprint_id}")
@@ -55,17 +57,18 @@ class SprintCloseWebhookHandler(JiraWebhookHandler):
             updated_at=datetime.now(timezone.utc)
         )
 
-        updated_sprint = await self.sprint_database_service.update_sprint_by_jira_sprint_id(sprint_id, update_dto)
+        updated_sprint = await self.sprint_database_service.update_sprint_by_jira_sprint_id(session=session, jira_sprint_id=sprint_id, sprint_data=update_dto)
         if not updated_sprint:
             return {"error": f"Failed to update sprint {sprint_id}"}
 
         # Reset is_system_linked flag for all issues in this sprint
         assert updated_sprint.id is not None, "sprint id is not None"
-        await self.reset_system_linked_flag(updated_sprint.id)
+        await self.reset_system_linked_flag(session=session, sprint_id=updated_sprint.id)
 
         # Log sync event
         await self.sync_log_repository.create_sync_log(
-            SyncLogDBCreateDTO(
+            session=session,
+            sync_log=SyncLogDBCreateDTO(
                 entity_type=EntityType.SPRINT,
                 entity_id=str(sprint_id),
                 operation=OperationType.UPDATE,
@@ -82,13 +85,13 @@ class SprintCloseWebhookHandler(JiraWebhookHandler):
             "closed": True
         }
 
-    async def reset_system_linked_flag(self, sprint_id: int) -> None:
+    async def reset_system_linked_flag(self, session: AsyncSession, sprint_id: int) -> None:
         """Reset is_system_linked flag for all issues in a sprint"""
         try:
             # Since sprint_id here is Jira's sprint ID, we need to use our database ID
             db_sprint_id = sprint_id
             if db_sprint_id:
-                updated_count = await self.jira_issue_repository.reset_system_linked_for_sprint(db_sprint_id)
+                updated_count = await self.jira_issue_repository.reset_system_linked_for_sprint(session=session, sprint_id=db_sprint_id)
                 log.info(
                     f"Reset is_system_linked flag for {updated_count} issues in sprint {sprint_id} (DB ID: {db_sprint_id})")
             else:

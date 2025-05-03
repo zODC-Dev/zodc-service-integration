@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.configs.logger import log
 from src.domain.constants.jira import JiraActionType, JiraIssueType
@@ -11,7 +13,6 @@ from src.domain.models.nats.requests.workflow_edit import WorkflowEditConnection
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
-from src.domain.repositories.workflow_mapping_repository import IWorkflowMappingRepository
 from src.domain.services.nats_message_handler import INATSRequestHandler
 from src.domain.services.redis_service import IRedisService
 
@@ -22,35 +23,21 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
         jira_issue_service: JiraIssueApplicationService,
         user_repository: IJiraUserRepository,
         jira_sprint_repository: IJiraSprintRepository,
-        workflow_mapping_repository: IWorkflowMappingRepository,
         redis_service: IRedisService,
         jira_issue_repository: IJiraIssueRepository
     ):
         self.jira_issue_service = jira_issue_service
         self.user_repository = user_repository
         self.jira_sprint_repository = jira_sprint_repository
-        self.workflow_mapping_repository = workflow_mapping_repository
         self.redis_service = redis_service
         self.jira_issue_repository = jira_issue_repository
 
-    async def handle(self, subject: str, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle(self, subject: str, message: Dict[str, Any], session: AsyncSession) -> Dict[str, Any]:
         """Handle workflow edit requests"""
         try:
             log.info(f"Received workflow edit request: {message}")
             # Convert raw message to DTO
             request = WorkflowEditRequest.model_validate(message)
-
-            # Lưu workflow mapping
-            # workflow_id = str(uuid.uuid4())
-            # workflow_mapping = WorkflowMappingModel(
-            #     workflow_id=workflow_id,
-            #     transaction_id=request.transaction_id,
-            #     project_key=request.project_key,
-            #     sprint_id=request.sprint_id,
-            #     status="active"
-            # )
-            # await self.workflow_mapping_repository.create(workflow_mapping)
-            # log.debug(f"Created workflow mapping with ID: {workflow_id}")
 
             # Tạo mapping ban đầu từ node_mappings nếu có
             node_to_jira_key_map: Dict[str, str] = {}
@@ -65,11 +52,11 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                     log.debug(f"Mapping from issues: Node ID {issue.node_id} -> Jira key {issue.jira_key}")
 
             # Bước 1: Xóa các connections cũ
-            removed_count = await self._remove_connections(request.connections_to_remove, node_to_jira_key_map)
+            removed_count = await self._remove_connections(session=session, connections_to_remove=request.connections_to_remove, node_to_jira_key_map=node_to_jira_key_map)
             log.debug(f"Removed {removed_count} connections")
 
             # Bước 2: Xử lý các issues (tạo mới/cập nhật)
-            created_issues = await self._process_issues(request)
+            created_issues = await self._process_issues(session=session, request=request)
 
             # Cập nhật mapping sau khi xử lý issues
             for result_issue in created_issues:
@@ -105,7 +92,7 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                 "data": WorkflowEditReply(issues=[], removed_connections=0, added_connections=0).model_dump()
             }
 
-    async def _remove_connections(self, connections_to_remove: List[WorkflowEditConnection], node_to_jira_key_map: Dict[str, str]) -> int:
+    async def _remove_connections(self, session: AsyncSession, connections_to_remove: List[WorkflowEditConnection], node_to_jira_key_map: Dict[str, str]) -> int:
         """Xóa các connections hiện có giữa các issues"""
         removed_count = 0
 
@@ -118,7 +105,7 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                 log.debug(f"Removing link between {source_key} and {target_key}")
 
                 # Sử dụng hàm get_issue_links_with_admin_auth mới để lấy tất cả issue links của source_key
-                issue_links = await self.jira_issue_service.jira_issue_api_service.get_issue_links_with_admin_auth(source_key)
+                issue_links = await self.jira_issue_service.jira_issue_api_service.get_issue_links_with_admin_auth(issue_key=source_key)
 
                 if not issue_links:
                     log.debug(f"No links found for issue {source_key}")
@@ -138,7 +125,7 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                     continue
 
                 # Xóa link bằng id
-                success = await self.jira_issue_service.remove_issue_link(link_id)
+                success = await self.jira_issue_service.remove_issue_link(session=session, link_id=link_id)
 
                 if success:
                     removed_count += 1
@@ -152,7 +139,7 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
 
         return removed_count
 
-    async def _process_issues(self, request: WorkflowEditRequest) -> List[WorkflowEditReplyIssue]:
+    async def _process_issues(self, session: AsyncSession, request: WorkflowEditRequest) -> List[WorkflowEditReplyIssue]:
         """Process all issues in the request"""
         result_issues = []
 
@@ -161,7 +148,7 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                 # Check action type
                 if issue.action.lower() == JiraActionType.CREATE.value:
                     # Create new issue
-                    jira_issue = await self._create_issue(issue, request.project_key, request.sprint_id)
+                    jira_issue = await self._create_issue(session=session, issue=issue, project_key=request.project_key, sprint_id=request.sprint_id)
                     if jira_issue:
                         result_issues.append(WorkflowEditReplyIssue(
                             node_id=issue.node_id,
@@ -176,7 +163,7 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                         log.error(f"Cannot update issue without jira_key: {issue.node_id}")
                         continue
 
-                    jira_issue = await self._update_issue(issue, request.project_key, request.sprint_id)
+                    jira_issue = await self._update_issue(session=session, issue=issue, project_key=request.project_key, sprint_id=request.sprint_id)
                     if jira_issue:
                         result_issues.append(WorkflowEditReplyIssue(
                             node_id=issue.node_id,
@@ -190,13 +177,13 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
 
         return result_issues
 
-    async def _create_issue(self, issue: WorkflowEditIssue, project_key: str, sprint_id: Optional[int]) -> JiraIssueModel:
+    async def _create_issue(self, session: AsyncSession, issue: WorkflowEditIssue, project_key: str, sprint_id: Optional[int]) -> JiraIssueModel:
         """Create a new issue in Jira"""
         # Map issue type to Jira issue type
         issue_type = self._map_issue_type(issue.type)
 
         # Tìm Jira sprint ID tương ứng từ sprint ID của DB nếu có
-        jira_sprint_id = await self._get_jira_sprint_id(project_key, sprint_id)
+        jira_sprint_id = await self._get_jira_sprint_id(session=session, project_key=project_key, sprint_id=sprint_id)
         if not jira_sprint_id:
             raise Exception(f"Jira sprint ID not found for sprint ID {sprint_id}")
 
@@ -216,16 +203,17 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
 
         # Sử dụng admin auth để tạo issue
         return await self.jira_issue_service.jira_issue_api_service.create_issue_with_admin_auth(
+            session=session,
             issue_data=create_dto
         )
 
-    async def _update_issue(self, issue: WorkflowEditIssue, project_key: str, sprint_id: Optional[int]) -> JiraIssueModel:
+    async def _update_issue(self, session: AsyncSession, issue: WorkflowEditIssue, project_key: str, sprint_id: Optional[int]) -> JiraIssueModel:
         """Update an existing issue in Jira"""
         if not issue.jira_key:
             raise Exception("Cannot update issue without jira_key")
 
         # Tìm Jira sprint ID tương ứng từ sprint ID của DB nếu có
-        jira_sprint_id = await self._get_jira_sprint_id(project_key, sprint_id)
+        jira_sprint_id = await self._get_jira_sprint_id(session=session, project_key=project_key, sprint_id=sprint_id)
         if not jira_sprint_id:
             raise Exception(f"Jira sprint ID not found for sprint ID {sprint_id}")
 
@@ -241,6 +229,7 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
 
         # Sử dụng admin auth để update issue
         jira_issue = await self.jira_issue_service.jira_issue_api_service.update_issue_with_admin_auth(
+            session=session,
             issue_id=issue.jira_key,
             update=update_dto
         )
@@ -249,7 +238,8 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
         try:
             # Kiểm tra xem issue đã được đánh dấu là system linked chưa
             existing_issue = await self.jira_issue_repository.get_by_jira_issue_id(
-                jira_issue.jira_issue_id
+                session=session,
+                jira_issue_id=jira_issue.jira_issue_id
             )
 
             # Nếu chưa được đánh dấu là system linked
@@ -260,7 +250,9 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                 )
 
                 await self.jira_issue_repository.update(
-                    jira_issue.jira_issue_id, update_db_dto
+                    session=session,
+                    issue_id=jira_issue.jira_issue_id,
+                    issue_update=update_db_dto
                 )
                 log.debug(f"Marked updated issue {jira_issue.key} as system linked in database")
         except Exception as e:
@@ -343,15 +335,15 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
             log.warning(f"Unknown issue type: {issue_type}, defaulting to Task")
             return JiraIssueType.TASK.value
 
-    async def _get_jira_sprint_id(self, project_key: str, sprint_id: Optional[int]) -> Optional[int]:
+    async def _get_jira_sprint_id(self, session: AsyncSession, project_key: str, sprint_id: Optional[int]) -> Optional[int]:
         """Lấy Jira sprint ID từ sprint ID của DB"""
         try:
             if sprint_id is None:
                 # Get current sprint
-                current_sprint = await self.jira_sprint_repository.get_current_sprint(project_key)
+                current_sprint = await self.jira_sprint_repository.get_current_sprint(session=session, project_key=project_key)
                 return current_sprint.jira_sprint_id if current_sprint else None
 
-            sprint = await self.jira_sprint_repository.get_sprint_by_id(sprint_id)
+            sprint = await self.jira_sprint_repository.get_sprint_by_id(session=session, sprint_id=sprint_id)
             return sprint.jira_sprint_id if sprint else None
         except Exception as e:
             raise Exception(f"Error getting Jira sprint ID for sprint ID {sprint_id}: {str(e)}") from e

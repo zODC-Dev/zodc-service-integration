@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.domain.models.database.jira_project import JiraProjectDBCreateDTO, JiraProjectDBUpdateDTO
 from src.domain.models.jira_project import JiraProjectModel
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
@@ -10,27 +12,28 @@ class JiraProjectDatabaseService(IJiraProjectDatabaseService):
     def __init__(self, project_repository: IJiraProjectRepository):
         self.project_repository = project_repository
 
-    async def get_project(self, project_id: int) -> Optional[JiraProjectModel]:
-        return await self.project_repository.get_project_by_id(project_id)
+    async def get_project(self, session: AsyncSession, project_id: int) -> Optional[JiraProjectModel]:
+        return await self.project_repository.get_project_by_id(session, project_id)
 
-    async def get_project_by_key(self, key: str) -> Optional[JiraProjectModel]:
-        return await self.project_repository.get_project_by_key(key)
+    async def get_project_by_key(self, session: AsyncSession, key: str) -> Optional[JiraProjectModel]:
+        return await self.project_repository.get_project_by_key(session, key)
 
-    async def get_all_projects(self) -> List[JiraProjectModel]:
-        return await self.project_repository.get_all_projects()
+    async def get_all_projects(self, session: AsyncSession) -> List[JiraProjectModel]:
+        return await self.project_repository.get_all_projects(session)
 
-    async def create_project(self, project_data: JiraProjectDBCreateDTO) -> JiraProjectModel:
-        return await self.project_repository.create_project(project_data)
+    async def create_project(self, session: AsyncSession, project_data: JiraProjectDBCreateDTO) -> JiraProjectModel:
+        return await self.project_repository.create_project(session, project_data)
 
     async def update_project(
         self,
+        session: AsyncSession,
         project_id: int,
         project_data: JiraProjectDBUpdateDTO
     ) -> JiraProjectModel:
-        return await self.project_repository.update_project(project_id, project_data)
+        return await self.project_repository.update_project(session, project_id, project_data)
 
-    async def delete_project(self, project_id: int) -> None:
-        await self.project_repository.delete_project(project_id)
+    async def delete_project(self, session: AsyncSession, project_id: int) -> None:
+        await self.project_repository.delete_project(session, project_id)
 
     # async def get_project_issues(
     #     self,
@@ -64,6 +67,6 @@ class JiraProjectDatabaseService(IJiraProjectDatabaseService):
     #         limit=limit
     #     )
 
-    async def get_user_projects(self, user_id: int) -> List[JiraProjectModel]:
+    async def get_user_projects(self, session: AsyncSession, user_id: int) -> List[JiraProjectModel]:
         """Get all projects for a specific user"""
-        return await self.project_repository.get_projects_by_user_id(user_id)
+        return await self.project_repository.get_projects_by_user_id(session, user_id)

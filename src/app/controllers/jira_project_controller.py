@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from fastapi import HTTPException
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.app.schemas.responses.base import StandardResponse
 from src.app.schemas.responses.jira_issue import (
@@ -32,6 +33,7 @@ class JiraProjectController:
 
     async def get_project_issues(
         self,
+        session: AsyncSession,
         user_id: int,
         project_key: str,
         sprint_id: Optional[int] = None,
@@ -45,6 +47,7 @@ class JiraProjectController:
 
             log.info(f"User {user_id} is fetching issues for project {project_key} from database")
             issues = await self.jira_project_service.get_project_issues(
+                session=session,
                 user_id=user_id,
                 project_key=project_key,
                 sprint_id=sprint_id,
@@ -56,7 +59,7 @@ class JiraProjectController:
 
             current_sprint: Optional[JiraSprintModel] = None
             if sprint_id:
-                current_sprint = await self.jira_sprint_database_service.get_sprint_by_id(sprint_id)
+                current_sprint = await self.jira_sprint_database_service.get_sprint_by_id(session=session, sprint_id=sprint_id)
 
             return StandardResponse(
                 message="Issues fetched successfully from database",
@@ -69,10 +72,14 @@ class JiraProjectController:
                 detail="Failed to fetch issues from database"
             ) from e
 
-    async def get_projects(self, user_id: int) -> StandardResponse[List[GetJiraProjectResponse]]:
+    async def get_projects(
+        self,
+        session: AsyncSession,
+        user_id: int
+    ) -> StandardResponse[List[GetJiraProjectResponse]]:
         """Get all accessible projects"""
         try:
-            projects = await self.jira_project_service.get_accessible_projects(user_id)
+            projects = await self.jira_project_service.get_accessible_projects(session=session, user_id=user_id)
             return StandardResponse(
                 message="Projects fetched successfully",
                 data=[GetJiraProjectResponse.from_domain(p) for p in projects]
@@ -86,11 +93,12 @@ class JiraProjectController:
 
     async def get_project_sprints(
         self,
+        session: AsyncSession,
         project_key: str,
     ) -> StandardResponse[List[GetJiraSprintResponse]]:
         """Get all sprints for a project with current sprint indication"""
         try:
-            sprints = await self.jira_project_service.get_project_sprints(project_key)
+            sprints = await self.jira_project_service.get_project_sprints(session=session, project_key=project_key)
 
             return StandardResponse(
                 message="Sprints fetched successfully",

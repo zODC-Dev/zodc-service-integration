@@ -1,12 +1,11 @@
-"""
-Cải tiến đề xuất cho Gantt Chart Calculation
+"""Cải tiến đề xuất cho Gantt Chart Calculation
 
 File này chứa các gợi ý để cải thiện và đơn giản hóa tính toán Gantt Chart
 trong hệ thống zodc-integration.
 """
 
 from datetime import datetime, time, timedelta
-from typing import List, Dict, Tuple
+from typing import Dict, List, Tuple
 
 # Các vấn đề chính được phát hiện:
 # 1. Phức tạp không cần thiết trong tính toán thời gian làm việc

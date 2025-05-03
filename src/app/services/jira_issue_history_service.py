@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.domain.exceptions.jira_exceptions import JiraIssueNotFoundError
 from src.domain.models.apis.jira_issue_history import (
@@ -32,11 +34,15 @@ class JiraIssueHistoryApplicationService:
         self.jira_user_db_service = jira_user_db_service
         self.jira_issue_db_service = jira_issue_db_service
 
-    async def sync_issue_history(self, issue_id: str) -> bool:
+    async def save_issue_history_event(self, session: AsyncSession, event: JiraIssueHistoryDBCreateDTO) -> None:
+        """Save a single issue history event to the database"""
+        await self.issue_history_db_service.save_issue_history_event(session, event)
+
+    async def sync_issue_history(self, session: AsyncSession, issue_id: str) -> bool:
         """Đồng bộ toàn bộ lịch sử của một issue"""
         try:
             # Lấy changelog từ Jira API
-            changelog_response = await self.jira_issue_api_service.get_issue_changelog(issue_id)
+            changelog_response = await self.jira_issue_api_service.get_issue_changelog(session=session, issue_id=issue_id)
             if not changelog_response.values:
                 log.warning(f"No changelog found for issue {issue_id}")
                 return False
@@ -55,7 +61,7 @@ class JiraIssueHistoryApplicationService:
                     )
 
                     # Lưu vào database
-                    await self.issue_history_db_service.save_issue_history_event(event)
+                    await self.save_issue_history_event(session, event)
 
             log.info(f"Successfully synced {len(changelog_response.values)} changelog entries for issue {issue_id}")
             return True
@@ -114,27 +120,28 @@ class JiraIssueHistoryApplicationService:
 
         return field_mapping.get(jira_field_name, jira_field_name)
 
-    async def get_issue_changelogs(self, issue_key: str) -> JiraIssueHistoryAPIGetDTO:
+    async def get_issue_changelogs(self, session: AsyncSession, issue_key: str) -> JiraIssueHistoryAPIGetDTO:
         """Lấy changelog của một Jira Issue
 
         Args:
+            session: The database session
             issue_key: Key của Jira Issue
 
         Returns:
             Lịch sử thay đổi của issue
         """
         try:
-            issue = await self.jira_issue_db_service.get_issue_by_key(issue_key)
+            issue = await self.jira_issue_db_service.get_issue_by_key(session, issue_key)
             if not issue:
                 raise JiraIssueNotFoundError(f"Issue {issue_key} not found")
 
             # Lấy tất cả các changelog từ database
-            history_events = await self.issue_history_db_service.get_issue_history(issue.jira_issue_id)
+            history_events = await self.issue_history_db_service.get_issue_history(session, issue.jira_issue_id)
 
             # Chuyển đổi sang định dạng DTO
             changelogs = []
             for event in history_events:
-                changelog = await self._convert_to_changelog_dto(event)
+                changelog = await self._convert_to_changelog_dto(session, event)
                 if changelog:
                     changelogs.append(changelog)
 
@@ -148,7 +155,7 @@ class JiraIssueHistoryApplicationService:
             log.error(f"Error getting changelogs for issue {issue_key}: {str(e)}")
             raise e
 
-    async def _convert_to_changelog_dto(self, event) -> Optional[JiraIssueChangelogAPIGetDTO]:
+    async def _convert_to_changelog_dto(self, session: AsyncSession, event) -> Optional[JiraIssueChangelogAPIGetDTO]:
         """Chuyển đổi dữ liệu từ database sang DTO"""
         try:
             # Chuyển đổi field name sang fieldId enum
@@ -157,14 +164,14 @@ class JiraIssueHistoryApplicationService:
                 return None
 
             # Lấy thông tin tác giả
-            author = await self._get_author_info(event.author_id)
+            author = await self._get_author_info(session, event.author_id)
             if not author:
                 return None
 
             # If field id is assignee, we need to get the avatar url from the user
             avatar_url = None
             if field_id == JiraIssueFieldId.ASSIGNEE:
-                avatar_url = await self._get_assignee_avatar_url(event.new_value)
+                avatar_url = await self._get_assignee_avatar_url(session=session, assignee_id=event.new_value)
 
             # Tạo đối tượng DTO
             return JiraIssueChangelogAPIGetDTO(
@@ -203,10 +210,13 @@ class JiraIssueHistoryApplicationService:
             avatar_url=avatar_url
         )
 
-    async def _get_author_info(self, author_id: str) -> Optional[JiraIssueChangelogAuthorAPIGetDTO]:
+    async def _get_author_info(self, session: AsyncSession, author_id: str) -> Optional[JiraIssueChangelogAuthorAPIGetDTO]:
         """Lấy thông tin tác giả từ database"""
         try:
-            user = await self.jira_user_db_service.get_user_by_jira_account_id(author_id)
+            user = await self.jira_user_db_service.get_user_by_jira_account_id(
+                session=session,
+                jira_account_id=author_id
+            )
             if not user:
                 return None
 
@@ -216,9 +226,12 @@ class JiraIssueHistoryApplicationService:
             log.error(f"Error getting author info for {author_id}: {str(e)}")
             return None
 
-    async def _get_assignee_avatar_url(self, assignee_id: str) -> Optional[str]:
+    async def _get_assignee_avatar_url(self, session: AsyncSession, assignee_id: str) -> Optional[str]:
         """Lấy avatar url của assignee"""
-        user = await self.jira_user_db_service.get_user_by_jira_account_id(assignee_id)
+        user = await self.jira_user_db_service.get_user_by_jira_account_id(
+            session=session,
+            jira_account_id=assignee_id
+        )
         if not user:
             return None
         return user.avatar_url

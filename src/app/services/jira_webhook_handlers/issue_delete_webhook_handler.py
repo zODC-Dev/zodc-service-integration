@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
@@ -27,13 +29,14 @@ class IssueDeleteWebhookHandler(JiraWebhookHandler):
         """Check if this handler can process the given webhook event"""
         return webhook_event == JiraWebhookEvent.ISSUE_DELETED
 
-    async def handle(self, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:
+    async def handle(self, session: AsyncSession, webhook_data: JiraWebhookResponseDTO) -> Dict[str, Any]:
         """Handle the issue deletion webhook"""
         issue_id = webhook_data.issue.id
 
         # Log the webhook sync
         await self.sync_log_repository.create_sync_log(
-            SyncLogDBCreateDTO(
+            session=session,
+            sync_log=SyncLogDBCreateDTO(
                 entity_type=EntityType.ISSUE,
                 entity_id=issue_id,
                 operation=OperationType.SYNC,
@@ -46,15 +49,16 @@ class IssueDeleteWebhookHandler(JiraWebhookHandler):
         )
 
         # Get existing issue
-        issue = await self.jira_issue_repository.get_by_jira_issue_id(issue_id)
+        issue = await self.jira_issue_repository.get_by_jira_issue_id(session=session, jira_issue_id=issue_id)
         if not issue:
             log.warning(f"Issue {issue_id} not found in database, can't mark as deleted")
             return {"error": "Issue not found", "issue_id": issue_id}
 
         # Mark as deleted instead of removing
         await self.jira_issue_repository.update(
-            issue_id,
-            JiraIssueDBUpdateDTO(
+            session=session,
+            issue_id=issue_id,
+            issue_update=JiraIssueDBUpdateDTO(
                 is_deleted=True,
                 updated_at=issue.updated_at,  # Preserve the last updated time
                 last_synced_at=datetime.now(timezone.utc)

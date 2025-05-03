@@ -1,11 +1,11 @@
 import asyncio
 from contextlib import asynccontextmanager
 import time
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 from src.app.dependencies.container import DependencyContainer
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
-from src.configs.database import AsyncSessionLocal
+from src.configs.database import AsyncSessionManager
 from src.configs.logger import log
 from src.domain.constants.jira import JiraWebhookEvent
 from src.domain.models.jira.webhooks.jira_webhook import (
@@ -28,18 +28,18 @@ class JiraWebhookQueueService:
         webhook_handlers: List[JiraWebhookHandler]
     ):
         # Dùng PriorityQueue để đảm bảo xử lý theo thứ tự ưu tiên
-        self.queues: Dict[str, asyncio.PriorityQueue] = {}
+        self.queues: Dict[str, asyncio.PriorityQueue[Tuple[float, float, BaseJiraWebhookDTO]]] = {}
         self.processing: Set[str] = set()
         self.last_created_webhooks: Dict[str, float] = {}
 
         # Theo dõi tất cả task đang chạy
-        self.running_tasks: Set[asyncio.Task] = set()
+        self.running_tasks: Set[asyncio.Task[None]] = set()
 
         # Số lần retry tối đa cho webhook update khi không tìm thấy issue
         self.max_retries = 3
 
         # Queue cho các webhook cần retry
-        self.retry_queue: asyncio.Queue = asyncio.Queue()
+        self.retry_queue: asyncio.Queue[Tuple[float, float, BaseJiraWebhookDTO]] = asyncio.Queue()
         self.RETRY_INTERVAL = 1  # 1s
 
         # Bắt đầu worker xử lý retry
@@ -59,7 +59,7 @@ class JiraWebhookQueueService:
         retry_task = asyncio.create_task(self._process_retry_queue())
         self._track_task(retry_task)
 
-    def _track_task(self, task: asyncio.Task) -> None:
+    def _track_task(self, task: asyncio.Task[None]) -> None:
         """Theo dõi task để đảm bảo xử lý lỗi và dọn dẹp"""
         self.running_tasks.add(task)
         task.add_done_callback(lambda t: self.running_tasks.remove(t))
@@ -109,6 +109,8 @@ class JiraWebhookQueueService:
             priority = self._calculate_priority(parsed_webhook)
             log.debug(f"Calculated priority {priority} for webhook {parsed_webhook.webhook_event}")
 
+            assert entity_id is not None
+
             # Lấy hoặc tạo queue cho entity này
             if entity_id not in self.queues:
                 self.queues[entity_id] = asyncio.PriorityQueue()
@@ -119,7 +121,7 @@ class JiraWebhookQueueService:
 
             # Khởi động worker mới nếu entity này chưa đang được xử lý
             if entity_id not in self.processing:
-                entity_task = asyncio.create_task(self._process_entity_queue(entity_id))
+                entity_task: asyncio.Task[None] = asyncio.create_task(self._process_entity_queue(entity_id))
                 self._track_task(entity_task)
                 log.debug(f"Started processing task for entity {entity_id}")
 
@@ -170,7 +172,7 @@ class JiraWebhookQueueService:
             queue = self.queues[entity_id]
             await asyncio.sleep(self.DEBOUNCE_TIME)
 
-            webhooks = []
+            webhooks: List[BaseJiraWebhookDTO] = []
             highest_priority = float('inf')
 
             while not queue.empty():
@@ -313,57 +315,52 @@ class JiraWebhookQueueService:
 
     @asynccontextmanager
     async def _get_webhook_service(self):
-        """Tạo webhook service mới với session database mới"""
-        session = AsyncSessionLocal()
+        """Create a new webhook service with an isolated database session"""
         redis_client = None
-        try:
-            # Sử dụng factory để tạo handlers và services
-            handlers, services = await DependencyContainer.create_webhook_handlers(session)
 
-            # Store redis_client to close it later
-            if 'redis_service' in services and hasattr(services['redis_service'], '_redis'):
-                redis_client = services['redis_service']._redis
-
-            # Tạo webhook service với các handlers đã tạo
-            webhook_service = JiraWebhookService(
-                jira_issue_repository=services['issue_repo'],
-                sync_log_repository=services['sync_log_repo'],
-                jira_issue_api_service=services['jira_issue_api_service'],
-                jira_sprint_api_service=services['jira_sprint_api_service'],
-                sprint_database_service=services['sprint_database_service'],
-                issue_history_sync_service=services['issue_history_sync_service'],
-                jira_project_repository=services['project_repo'],
-                redis_service=services['redis_service'],
-                jira_sprint_repository=services['sprint_repo'],
-                nats_application_service=services['nats_application_service'],
-                handlers=handlers
-            )
-
-            yield webhook_service
-        except Exception as e:
-            log.error(f"Error in webhook service session: {str(e)}")
-            # Handle rollback
-        finally:
-            # Close resources
+        # Use the centralized session manager
+        async with AsyncSessionManager.session() as session:
             try:
-                await session.close()
-            except Exception as close_error:
-                log.warning(f"Error closing webhook service session: {str(close_error)}")
+                # Use factory to create handlers and services
+                handlers, services = await DependencyContainer.create_webhook_handlers()
 
-            # Close Redis client if we have one
-            if redis_client:
-                try:
-                    await redis_client.close()
-                except Exception as redis_error:
-                    log.warning(f"Error closing Redis client: {str(redis_error)}")
+                # Store redis_client to close it later
+                if 'redis_service' in services and hasattr(services['redis_service'], '_redis'):
+                    redis_client = services['redis_service']._redis
+
+                # Create webhook service with handlers
+                webhook_service = JiraWebhookService(
+                    jira_issue_repository=services['issue_repo'],
+                    sync_log_repository=services['sync_log_repo'],
+                    jira_issue_api_service=services['jira_issue_api_service'],
+                    jira_sprint_api_service=services['jira_sprint_api_service'],
+                    sprint_database_service=services['sprint_database_service'],
+                    issue_history_sync_service=services['issue_history_sync_service'],
+                    jira_project_repository=services['project_repo'],
+                    redis_service=services['redis_service'],
+                    jira_sprint_repository=services['sprint_repo'],
+                    nats_application_service=services['nats_application_service'],
+                    handlers=handlers
+                )
+
+                # Yield both the webhook service and session
+                yield webhook_service, session
+
+            finally:
+                # Close Redis client if we have one
+                if redis_client:
+                    try:
+                        await redis_client.close()
+                    except Exception as redis_error:
+                        log.warning(f"Error closing Redis client: {str(redis_error)}")
 
     async def _process_webhook_with_new_session(self, webhook_data: BaseJiraWebhookDTO) -> bool:
         """Xử lý webhook với một session database mới và độc lập"""
         try:
             # Sử dụng context manager để đảm bảo session được đóng đúng cách
-            async with self._get_webhook_service() as webhook_service:
-                # Xử lý webhook
-                result = await webhook_service.handle_webhook(webhook_data)
+            async with self._get_webhook_service() as (webhook_service, session):
+                # Xử lý webhook, passing the session explicitly
+                result = await webhook_service.handle_webhook(session, webhook_data)
 
                 # Kiểm tra kết quả
                 if result and "error" in result:
@@ -399,7 +396,7 @@ class JiraWebhookQueueService:
             for key in keys_to_remove:
                 self.retry_counts.pop(key, None)
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Stop all running tasks and clean up resources"""
         for task in list(self.running_tasks):
             if not task.done():

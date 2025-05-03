@@ -121,7 +121,6 @@ class JiraIssueFields(BaseModel):
     reporter: Optional[JiraUser] = None
     priority: Optional[JiraPriority] = None
     estimate_point: Optional[float] = Field(default=None, alias="customfield_10016")
-    actual_point: Optional[float] = Field(default=None, alias="customfield_10017")
     sprints: Optional[List[JiraSprint | None]] = Field(default=None, alias="customfield_10020")
 
 

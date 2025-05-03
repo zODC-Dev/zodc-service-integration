@@ -19,8 +19,8 @@ from src.infrastructure.entities.system_config import ProjectConfigEntity, Syste
 class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
     """Repository for system configuration"""
 
-    def __init__(self, session: AsyncSession):
-        self.session = session
+    def __init__(self):
+        pass
 
     def _to_system_config_model(self, entity: SystemConfigEntity, project_configs: List[ProjectConfigEntity] = None) -> SystemConfigModel:
         """Convert entity to model"""
@@ -85,7 +85,7 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             updated_at=entity.updated_at.isoformat() if entity.updated_at else None
         )
 
-    def _prepare_system_config_entity(self, dto: Union[SystemConfigDBCreateDTO, SystemConfigDBUpdateDTO],
+    def _prepare_system_config_entity(self, session: AsyncSession, dto: Union[SystemConfigDBCreateDTO, SystemConfigDBUpdateDTO],
                                       is_update: bool = False) -> Dict[str, Any]:
         """Prepare entity values from DTO"""
         entity_data = {}
@@ -127,7 +127,7 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
 
         return entity_data
 
-    def _prepare_project_config_entity(self, dto: Union[ProjectConfigDBCreateDTO, ProjectConfigDBUpdateDTO],
+    def _prepare_project_config_entity(self, session: AsyncSession, dto: Union[ProjectConfigDBCreateDTO, ProjectConfigDBUpdateDTO],
                                        config_type: ConfigType,
                                        is_update: bool = False) -> Dict[str, Any]:
         """Prepare project config entity values from DTO"""
@@ -161,23 +161,23 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
 
         return entity_data
 
-    async def get(self, id: int) -> Optional[SystemConfigModel]:
+    async def get(self, session: AsyncSession, id: int) -> Optional[SystemConfigModel]:
         """Get configuration by ID"""
-        entity = await self.session.get(SystemConfigEntity, id)
+        entity = await session.get(SystemConfigEntity, id)
         if not entity:
             return None
 
         # Get associated project configs
-        result = await self.session.exec(
+        result = await session.exec(
             select(ProjectConfigEntity).where(
                 col(ProjectConfigEntity.system_config_id) == id
             )
         )
-        project_configs = result.all()
+        project_configs = list(result.all())
 
-        return self._to_system_config_model(entity, project_configs)
+        return self._to_system_config_model(entity=entity, project_configs=project_configs)
 
-    async def get_by_key(self, key: str, scope: ConfigScope = ConfigScope.GENERAL) -> Optional[SystemConfigModel]:
+    async def get_by_key(self, session: AsyncSession, key: str, scope: ConfigScope = ConfigScope.GENERAL) -> Optional[SystemConfigModel]:
         """Get configuration by key and scope"""
         query = select(SystemConfigEntity).where(
             and_(
@@ -185,23 +185,23 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
                 col(SystemConfigEntity.scope) == scope
             )
         )
-        result = await self.session.exec(query)
+        result = await session.exec(query)
         entity = result.first()
 
         if not entity:
             return None
 
         # Get associated project configs
-        result = await self.session.exec(
+        result_project_configs = await session.exec(
             select(ProjectConfigEntity).where(
                 col(ProjectConfigEntity.system_config_id) == entity.id
             )
         )
-        project_configs = list(result.all())
+        project_configs = list(result_project_configs.all())
 
         return self._to_system_config_model(entity, project_configs)
 
-    async def get_project_config(self, system_config_id: int, project_key: str) -> Optional[ProjectConfigModel]:
+    async def get_project_config(self, session: AsyncSession, system_config_id: int, project_key: str) -> Optional[ProjectConfigModel]:
         """Get project-specific configuration"""
         query = select(ProjectConfigEntity).where(
             and_(
@@ -209,7 +209,7 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
                 col(ProjectConfigEntity.project_key) == project_key
             )
         )
-        result = await self.session.exec(query)
+        result = await session.exec(query)
         entity = result.first()
 
         if not entity:
@@ -217,29 +217,29 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
 
         return self._to_project_config_model(entity)
 
-    async def get_project_config_by_id(self, id: int) -> Optional[ProjectConfigModel]:
+    async def get_project_config_by_id(self, session: AsyncSession, id: int) -> Optional[ProjectConfigModel]:
         """Get project-specific configuration by ID"""
-        entity = await self.session.get(ProjectConfigEntity, id)
+        entity = await session.get(ProjectConfigEntity, id)
         if not entity:
             return None
 
         # Load the associated system config
-        system_config = await self.session.get(SystemConfigEntity, entity.system_config_id)
+        system_config = await session.get(SystemConfigEntity, entity.system_config_id)
         entity.system_config = system_config
 
         return self._to_project_config_model(entity)
 
-    async def get_by_key_for_project(self, key: str, project_key: str) -> Optional[SystemConfigModel]:
+    async def get_by_key_for_project(self, session: AsyncSession, key: str, project_key: str) -> Optional[SystemConfigModel]:
         """Get config for project with fallback to general scope"""
         # First try to get the config at project scope
-        project_scope_config = await self.get_by_key(key, ConfigScope.PROJECT)
+        project_scope_config = await self.get_by_key(session=session, key=key, scope=ConfigScope.PROJECT)
 
         if not project_scope_config:
             # If not found, try general scope
-            return await self.get_by_key(key, ConfigScope.GENERAL)
+            return await self.get_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
         # If found, check if we have a project-specific value
-        result = await self.session.exec(
+        result = await session.exec(
             select(ProjectConfigEntity).where(
                 and_(
                     col(ProjectConfigEntity.system_config_id) == project_scope_config.id,
@@ -272,7 +272,7 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
 
         return project_scope_config
 
-    async def list(self, scope: Optional[ConfigScope] = None,
+    async def list(self, session: AsyncSession, scope: Optional[ConfigScope] = None,
                    limit: int = 100, offset: int = 0,
                    search: Optional[str] = None,
                    sort_by: Optional[str] = None,
@@ -305,18 +305,18 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
                 count_query = count_query.where(filter_clause)
 
             # Get total count
-            count_result = await self.session.exec(count_query)
+            count_result = await session.exec(count_query)
             total_count = len(list(count_result))
 
             # Apply sorting
-            valid_sort_fields = {
-                "id": SystemConfigEntity.id,
-                "key": SystemConfigEntity.key,
-                "scope": SystemConfigEntity.scope,
-                "type": SystemConfigEntity.type,
-                "description": SystemConfigEntity.description,
-                "created_at": SystemConfigEntity.created_at,
-                "updated_at": SystemConfigEntity.updated_at
+            valid_sort_fields: Dict[str, Any] = {
+                "id": col(SystemConfigEntity.id),
+                "key": col(SystemConfigEntity.key),
+                "scope": col(SystemConfigEntity.scope),
+                "type": col(SystemConfigEntity.type),
+                "description": col(SystemConfigEntity.description),
+                "created_at": col(SystemConfigEntity.created_at),
+                "updated_at": col(SystemConfigEntity.updated_at)
             }
 
             if sort_by and sort_by in valid_sort_fields:
@@ -333,19 +333,19 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             query = query.offset(offset).limit(limit)
 
             # Execute query
-            result = await self.session.exec(query)
+            result = await session.exec(query)
             entities = result.all()
 
             # Convert to domain models
             models = []
             for entity in entities:
                 # Get associated project configs for each entity
-                project_config_result = await self.session.exec(
+                project_config_result = await session.exec(
                     select(ProjectConfigEntity).where(
                         col(ProjectConfigEntity.system_config_id) == entity.id
                     )
                 )
-                project_configs = project_config_result.all()
+                project_configs = list(project_config_result.all())
 
                 models.append(self._to_system_config_model(entity, project_configs))
 
@@ -354,11 +354,12 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             log.error(f"Error listing configurations: {str(e)}")
             raise
 
-    async def list_for_project(self, project_key: str,
+    async def list_for_project(self, session: AsyncSession, project_key: str,
                                limit: int = 100, offset: int = 0) -> Tuple[List[SystemConfigModel], int]:
         """List configurations for a specific project"""
         # First get project-scope configs
         project_configs, project_count = await self.list(
+            session=session,
             scope=ConfigScope.PROJECT,
             limit=limit,
             offset=offset
@@ -366,7 +367,10 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
 
         # Then get general configs
         general_configs, general_count = await self.list(
-            scope=ConfigScope.GENERAL
+            session=session,
+            scope=ConfigScope.GENERAL,
+            limit=limit,
+            offset=offset
         )
 
         # Now for each config, check if there are project-specific values
@@ -375,7 +379,9 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
         # Process project-scoped configs first
         for config in project_configs:
             # Get the project-specific value if it exists
-            project_config = await self.get_project_config(config.id, project_key)
+            if config.id is None:
+                continue
+            project_config = await self.get_project_config(session=session, system_config_id=config.id, project_key=project_key)
 
             if project_config:
                 # Clone the config and set the project-specific value
@@ -389,72 +395,77 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
 
         return result_configs, len(result_configs)
 
-    async def create(self, dto: SystemConfigDBCreateDTO) -> SystemConfigModel:
+    async def create(self, session: AsyncSession, dto: SystemConfigDBCreateDTO) -> SystemConfigModel:
         """Create a new configuration"""
         try:
             # Prepare entity data
-            entity_data = self._prepare_system_config_entity(dto)
+            entity_data = self._prepare_system_config_entity(session=session, dto=dto)
 
             # Create entity
             entity = SystemConfigEntity(**entity_data)
-            self.session.add(entity)
-            await self.session.commit()
-            await self.session.refresh(entity)
+            session.add(entity)
+            # Let the session manager handle the transaction
+            await session.flush()
+            await session.refresh(entity)
 
             return self._to_system_config_model(entity)
         except Exception as e:
             log.error(f"Error creating system config: {str(e)}")
-            await self.session.rollback()
+            # Let the session manager handle rollbacks
             raise
 
-    async def update(self, id: int, dto: SystemConfigDBUpdateDTO) -> Optional[SystemConfigModel]:
+    async def update(self, session: AsyncSession, id: int, dto: SystemConfigDBUpdateDTO) -> Optional[SystemConfigModel]:
         """Update an existing configuration"""
         try:
-            entity = await self.session.get(SystemConfigEntity, id)
+            entity = await session.get(SystemConfigEntity, id)
             if not entity:
                 return None
 
             # Prepare update data
-            update_data = self._prepare_system_config_entity(dto, is_update=True)
+            update_data = self._prepare_system_config_entity(session=session, dto=dto, is_update=True)
 
             # Update entity fields
             for key, value in update_data.items():
                 setattr(entity, key, value)
 
-            self.session.add(entity)
-            await self.session.commit()
-            await self.session.refresh(entity)
+            session.add(entity)
+            # Let the session manager handle the transaction
+            await session.flush()
+
+            await session.refresh(entity)
 
             # Get associated project configs
-            result = await self.session.exec(
+            result = await session.exec(
                 select(ProjectConfigEntity).where(
                     col(ProjectConfigEntity.system_config_id) == id
                 )
             )
-            project_configs = result.all()
+            project_configs = list(result.all())
 
-            return self._to_system_config_model(entity, project_configs)
+            return self._to_system_config_model(entity=entity, project_configs=project_configs)
         except Exception as e:
             log.error(f"Error updating system config: {str(e)}")
-            await self.session.rollback()
+            # Let the session manager handle rollbacks
             raise
 
-    async def create_project_config(self, dto: ProjectConfigDBCreateDTO) -> ProjectConfigModel:
+    async def create_project_config(self, session: AsyncSession, dto: ProjectConfigDBCreateDTO) -> ProjectConfigModel:
         """Create a project-specific configuration"""
         try:
             # Get the system config to determine type
-            system_config = await self.session.get(SystemConfigEntity, dto.system_config_id)
+            system_config = await session.get(SystemConfigEntity, dto.system_config_id)
             if not system_config:
                 raise ValueError(f"System config with ID {dto.system_config_id} not found")
 
             # Prepare entity data
-            entity_data = self._prepare_project_config_entity(dto, system_config.type)
+            entity_data = self._prepare_project_config_entity(
+                session=session, dto=dto, config_type=ConfigType(system_config.type))
 
             # Create entity
             entity = ProjectConfigEntity(**entity_data)
-            self.session.add(entity)
-            await self.session.commit()
-            await self.session.refresh(entity)
+            session.add(entity)
+            # Let the session manager handle the transaction
+            await session.flush()
+            await session.refresh(entity)
 
             # Ensure the entity has the system_config loaded
             entity.system_config = system_config
@@ -462,32 +473,34 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             return self._to_project_config_model(entity)
         except Exception as e:
             log.error(f"Error creating project config: {str(e)}")
-            await self.session.rollback()
+            # Let the session manager handle rollbacks
             raise
 
-    async def update_project_config(self, id: int, dto: ProjectConfigDBUpdateDTO) -> Optional[ProjectConfigModel]:
+    async def update_project_config(self, session: AsyncSession, id: int, dto: ProjectConfigDBUpdateDTO) -> Optional[ProjectConfigModel]:
         """Update a project-specific configuration"""
         try:
-            entity = await self.session.get(ProjectConfigEntity, id)
+            entity = await session.get(ProjectConfigEntity, id)
             if not entity:
                 return None
 
             # Get the system config to determine type
             system_config_id = dto.system_config_id or entity.system_config_id
-            system_config = await self.session.get(SystemConfigEntity, system_config_id)
+            system_config = await session.get(SystemConfigEntity, system_config_id)
             if not system_config:
                 raise ValueError(f"System config with ID {system_config_id} not found")
 
             # Prepare update data
-            update_data = self._prepare_project_config_entity(dto, system_config.type, is_update=True)
+            update_data = self._prepare_project_config_entity(
+                session=session, dto=dto, config_type=ConfigType(system_config.type), is_update=True)
 
             # Update entity fields
             for key, value in update_data.items():
                 setattr(entity, key, value)
 
-            self.session.add(entity)
-            await self.session.commit()
-            await self.session.refresh(entity)
+            session.add(entity)
+            # Let the session manager handle the transaction
+            await session.flush()
+            await session.refresh(entity)
 
             # Ensure the entity has the system_config loaded
             entity.system_config = system_config
@@ -495,18 +508,18 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             return self._to_project_config_model(entity)
         except Exception as e:
             log.error(f"Error updating project config: {str(e)}")
-            await self.session.rollback()
+            # Let the session manager handle rollbacks
             raise
 
-    async def delete(self, id: int) -> bool:
+    async def delete(self, session: AsyncSession, id: int) -> bool:
         """Delete a configuration"""
         try:
-            entity = await self.session.get(SystemConfigEntity, id)
+            entity = await session.get(SystemConfigEntity, id)
             if not entity:
                 return False
 
             # First delete associated project configs
-            result = await self.session.exec(
+            result = await session.exec(
                 select(ProjectConfigEntity).where(
                     col(ProjectConfigEntity.system_config_id) == id
                 )
@@ -514,39 +527,41 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             project_configs = result.all()
 
             for project_config in project_configs:
-                await self.session.delete(project_config)
+                await session.delete(project_config)
 
             # Then delete the system config
-            await self.session.delete(entity)
-            await self.session.commit()
+            await session.delete(entity)
+            # Let the session manager handle the transaction
+            await session.flush()
 
             return True
         except Exception as e:
             log.error(f"Error deleting system config: {str(e)}")
-            await self.session.rollback()
+            # Let the session manager handle rollbacks
             raise
 
-    async def delete_project_config(self, id: int) -> bool:
+    async def delete_project_config(self, session: AsyncSession, id: int) -> bool:
         """Delete a project-specific configuration"""
         try:
-            entity = await self.session.get(ProjectConfigEntity, id)
+            entity = await session.get(ProjectConfigEntity, id)
             if not entity:
                 return False
 
-            await self.session.delete(entity)
-            await self.session.commit()
+            await session.delete(entity)
+            # Let the session manager handle the transaction
+            await session.flush()
 
             return True
         except Exception as e:
             log.error(f"Error deleting project config: {str(e)}")
-            await self.session.rollback()
+            # Let the session manager handle rollbacks
             raise
 
-    async def upsert(self, dto: SystemConfigDBCreateDTO) -> SystemConfigModel:
+    async def upsert(self, session: AsyncSession, dto: SystemConfigDBCreateDTO) -> SystemConfigModel:
         """Create or update a configuration based on key and scope"""
         try:
             # Check if config exists
-            result = await self.session.exec(
+            result = await session.exec(
                 select(SystemConfigEntity).where(
                     and_(
                         col(SystemConfigEntity.key) == dto.key,
@@ -558,20 +573,21 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
 
             if entity and entity.id is not None:
                 # Update existing
-                update_dto = SystemConfigDBUpdateDTO(**dto.dict())
-                return await self.update(entity.id, update_dto)
+                update_dto = SystemConfigDBUpdateDTO(**dto.model_dump())
+                return await self.update(session=session, id=entity.id, dto=update_dto)
             else:
-                # Create new
-                return await self.create(dto)
+                # Create new using the create method that has proper transaction handling
+                return await self.create(session=session, dto=dto)
         except Exception as e:
             log.error(f"Error upserting system config: {str(e)}")
+            # Let session manager handle rollbacks
             raise
 
-    async def upsert_project_config(self, dto: ProjectConfigDBCreateDTO) -> ProjectConfigModel:
+    async def upsert_project_config(self, session: AsyncSession, dto: ProjectConfigDBCreateDTO) -> ProjectConfigModel:
         """Create or update a project-specific configuration"""
         try:
             # Check if config exists
-            result = await self.session.exec(
+            result = await session.exec(
                 select(ProjectConfigEntity).where(
                     and_(
                         col(ProjectConfigEntity.system_config_id) == dto.system_config_id,
@@ -581,13 +597,14 @@ class SQLAlchemySystemConfigRepository(ISystemConfigRepository):
             )
             entity = result.first()
 
-            if entity:
+            if entity and entity.id is not None:
                 # Update existing
                 update_dto = ProjectConfigDBUpdateDTO(**dto.model_dump())
-                return await self.update_project_config(entity.id, update_dto)
+                return await self.update_project_config(session=session, id=entity.id, dto=update_dto)
             else:
-                # Create new
-                return await self.create_project_config(dto)
+                # Create new using method with proper transaction handling
+                return await self.create_project_config(session=session, dto=dto)
         except Exception as e:
             log.error(f"Error upserting project config: {str(e)}")
+            # Let session manager handle rollbacks
             raise

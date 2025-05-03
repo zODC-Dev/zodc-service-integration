@@ -1,14 +1,16 @@
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from redis.asyncio import Redis
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.app.services.jira_project_service import JiraProjectApplicationService
+from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.app.services.media_service import MediaApplicationService
 from src.app.services.nats_application_service import NATSApplicationService
 from src.app.services.nats_event_service import NATSEventService
@@ -24,7 +26,7 @@ from src.app.services.nats_handlers.user_message_handler import UserMessageHandl
 from src.app.services.nats_handlers.workflow_edit_handler import WorkflowEditRequestHandler
 from src.app.services.nats_handlers.workflow_sync_handler import WorkflowSyncRequestHandler
 from src.app.services.system_config_service import SystemConfigApplicationService
-from src.configs.database import get_db, session_maker
+from src.configs.database import get_db
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.nats_events import NATSSubscribeTopic
@@ -44,7 +46,6 @@ from src.infrastructure.repositories.sqlalchemy_media_repository import SQLAlche
 from src.infrastructure.repositories.sqlalchemy_refresh_token_repository import SQLAlchemyRefreshTokenRepository
 from src.infrastructure.repositories.sqlalchemy_sync_log_repository import SQLAlchemySyncLogRepository
 from src.infrastructure.repositories.sqlalchemy_system_config_repository import SQLAlchemySystemConfigRepository
-from src.infrastructure.repositories.sqlalchemy_workflow_mapping_repository import SQLAlchemyWorkflowMappingRepository
 from src.infrastructure.services.gantt_chart_calculator_service import GanttChartCalculatorService
 from src.infrastructure.services.jira_issue_api_service import JiraIssueAPIService
 from src.infrastructure.services.jira_issue_database_service import JiraIssueDatabaseService
@@ -61,7 +62,6 @@ from src.infrastructure.services.nats_workflow_service_client import NATSWorkflo
 from src.infrastructure.services.redis_service import RedisService
 from src.infrastructure.services.token_refresh_service import TokenRefreshService
 from src.infrastructure.services.token_scheduler_service import TokenSchedulerService
-from src.infrastructure.unit_of_works.sqlalchemy_jira_sync_session import SQLAlchemyJiraSyncSession
 
 
 class DependencyContainer:
@@ -86,7 +86,6 @@ class DependencyContainer:
     jira_issue_repository: Optional[SQLAlchemyJiraIssueRepository] = None
     jira_sprint_repository: Optional[SQLAlchemyJiraSprintRepository] = None
     issue_history_repository: Optional[SQLAlchemyJiraIssueHistoryRepository] = None
-    workflow_mapping_repository: Optional[SQLAlchemyWorkflowMappingRepository] = None
     media_repository: Optional[SQLAlchemyMediaRepository] = None
     system_config_repository: Optional[SQLAlchemySystemConfigRepository] = None
 
@@ -99,7 +98,6 @@ class DependencyContainer:
     jira_issue_api_service: Optional[IJiraIssueAPIService] = None
     jira_sprint_api_service: Optional[IJiraSprintAPIService] = None
     jira_user_api_service: Optional[IJiraUserAPIService] = None
-    sync_session: Optional[SQLAlchemyJiraSyncSession] = None
     jira_project_api_service: Optional[IJiraProjectAPIService] = None
     jira_project_database_service: Optional[JiraProjectDatabaseService] = None
     jira_sprint_database_service: Optional[JiraSprintDatabaseService] = None
@@ -149,16 +147,15 @@ class DependencyContainer:
         await instance.nats_service.connect()
 
         # Initialize repositories
-        instance.jira_user_repository = SQLAlchemyJiraUserRepository(instance.db)
-        instance.refresh_token_repository = SQLAlchemyRefreshTokenRepository(instance.db)
-        instance.project_repository = SQLAlchemyJiraProjectRepository(instance.db)
-        instance.sync_log_repository = SQLAlchemySyncLogRepository(instance.db)
-        instance.jira_issue_repository = SQLAlchemyJiraIssueRepository(instance.db)
-        instance.jira_sprint_repository = SQLAlchemyJiraSprintRepository(instance.db)
-        instance.issue_history_repository = SQLAlchemyJiraIssueHistoryRepository(instance.db)
-        instance.workflow_mapping_repository = SQLAlchemyWorkflowMappingRepository(instance.db)
-        instance.media_repository = SQLAlchemyMediaRepository(instance.db)
-        instance.system_config_repository = SQLAlchemySystemConfigRepository(instance.db)
+        instance.jira_user_repository = SQLAlchemyJiraUserRepository()
+        instance.refresh_token_repository = SQLAlchemyRefreshTokenRepository()
+        instance.project_repository = SQLAlchemyJiraProjectRepository()
+        instance.sync_log_repository = SQLAlchemySyncLogRepository()
+        instance.jira_issue_repository = SQLAlchemyJiraIssueRepository()
+        instance.jira_sprint_repository = SQLAlchemyJiraSprintRepository()
+        instance.issue_history_repository = SQLAlchemyJiraIssueHistoryRepository()
+        instance.media_repository = SQLAlchemyMediaRepository()
+        instance.system_config_repository = SQLAlchemySystemConfigRepository()
 
         # Initialize token services
         instance.token_refresh_service = TokenRefreshService(
@@ -212,8 +209,6 @@ class DependencyContainer:
             instance.sync_log_repository
         )
 
-        instance.sync_session = SQLAlchemyJiraSyncSession(session_maker)
-
         instance.jira_project_api_service = JiraProjectAPIService(
             instance.jira_api_client,
             instance.jira_user_repository
@@ -247,10 +242,14 @@ class DependencyContainer:
             jira_project_db_service=instance.jira_project_database_service,
             jira_issue_db_service=instance.jira_issue_database_service,
             jira_sprint_db_service=instance.jira_sprint_database_service,
-            sync_session=instance.sync_session,
-            sync_log_repository=instance.sync_log_repository,
             jira_issue_api_service=instance.jira_issue_api_service,
-            jira_issue_history_service=instance.issue_history_sync_service
+            jira_issue_history_service=instance.issue_history_sync_service,
+            sync_log_repository=instance.sync_log_repository,
+            jira_project_repository=instance.project_repository,
+            jira_issue_repository=instance.jira_issue_repository,
+            jira_sprint_repository=instance.jira_sprint_repository,
+            jira_user_repository=instance.jira_user_repository,
+            jira_issue_history_repository=instance.issue_history_repository
         )
 
         instance.gantt_calculator_service = GanttChartCalculatorService()
@@ -259,7 +258,6 @@ class DependencyContainer:
         instance.gantt_chart_service = GanttChartApplicationService(
             instance.jira_issue_repository,
             instance.jira_sprint_repository,
-            instance.workflow_mapping_repository,
             instance.gantt_calculator_service,
             instance.workflow_service_client
         )
@@ -296,7 +294,6 @@ class DependencyContainer:
                 instance.jira_issue_application_service,
                 instance.jira_user_repository,
                 instance.jira_sprint_repository,
-                instance.workflow_mapping_repository,
                 instance.redis_service,
                 instance.jira_issue_repository
             ),
@@ -310,7 +307,6 @@ class DependencyContainer:
                 instance.jira_issue_application_service,
                 instance.jira_user_repository,
                 instance.jira_sprint_repository,
-                instance.workflow_mapping_repository,
                 instance.redis_service,
                 instance.jira_issue_repository
             ),
@@ -355,7 +351,7 @@ class DependencyContainer:
         cls._instance = None
 
     @classmethod
-    async def get_db_for_job(cls):
+    async def get_db_for_job(cls) -> AsyncSession:
         """Get a new DB session for background jobs"""
         db_generator = get_db()
         db = await anext(db_generator)
@@ -365,7 +361,7 @@ class DependencyContainer:
             await db.close()
 
     @classmethod
-    async def create_webhook_handlers(cls, session) -> Tuple[List[Callable[[], Awaitable[None]]], Dict[str, Any]]:
+    async def create_webhook_handlers(cls) -> Tuple[List[JiraWebhookHandler], Dict[str, Any]]:
         """Create webhook handlers with optional session"""
         from redis.asyncio import Redis
 
@@ -397,12 +393,12 @@ class DependencyContainer:
         from src.infrastructure.services.redis_service import RedisService
 
         # Tạo các repositories cần thiết
-        issue_repo = SQLAlchemyJiraIssueRepository(session)
-        sync_log_repo = SQLAlchemySyncLogRepository(session)
-        project_repo = SQLAlchemyJiraProjectRepository(session)
-        sprint_repo = SQLAlchemyJiraSprintRepository(session)
-        user_repo = SQLAlchemyJiraUserRepository(session)
-        issue_history_repo = SQLAlchemyJiraIssueHistoryRepository(session)
+        issue_repo = SQLAlchemyJiraIssueRepository()
+        sync_log_repo = SQLAlchemySyncLogRepository()
+        project_repo = SQLAlchemyJiraProjectRepository()
+        sprint_repo = SQLAlchemyJiraSprintRepository()
+        user_repo = SQLAlchemyJiraUserRepository()
+        issue_history_repo = SQLAlchemyJiraIssueHistoryRepository()
 
         # Lấy services từ container chính
         container = cls.get_instance()
@@ -420,6 +416,11 @@ class DependencyContainer:
             jira_issue_api_service = container.jira_issue_api_service
             jira_sprint_api_service = container.jira_sprint_api_service
             jira_user_api_service = container.jira_user_api_service
+
+            assert jira_issue_api_service is not None, "JiraIssueAPIService has not been initialized"
+            assert jira_sprint_api_service is not None, "JiraSprintAPIService has not been initialized"
+            assert jira_user_api_service is not None, "JiraUserAPIService has not been initialized"
+
             # Tạo các services cần thiết
             jira_issue_db_service = JiraIssueDatabaseService(issue_repo)
             jira_user_db_service = JiraUserDatabaseService(user_repo)
@@ -436,8 +437,13 @@ class DependencyContainer:
             # Tạo handlers
             handlers = [
                 # Issue handlers
-                IssueCreateWebhookHandler(issue_repo, sync_log_repo, jira_issue_api_service,
-                                          project_repo, redis_service),
+                IssueCreateWebhookHandler(
+                    jira_issue_repository=issue_repo,
+                    sync_log_repository=sync_log_repo,
+                    jira_issue_api_service=jira_issue_api_service,
+                    jira_project_repository=project_repo,
+                    redis_service=redis_service
+                ),
                 IssueUpdateWebhookHandler(
                     jira_issue_repository=issue_repo,
                     sync_log_repository=sync_log_repo,
@@ -548,8 +554,8 @@ def setup_scheduled_jobs(scheduler: AsyncIOScheduler) -> None:
         try:
             db = await DependencyContainer.get_db_for_job()
             try:
-                repository = SQLAlchemyRefreshTokenRepository(db)
-                await repository.cleanup_expired_tokens()
+                repository = SQLAlchemyRefreshTokenRepository()
+                await repository.cleanup_expired_tokens(session=db)
                 log.info("Completed expired tokens cleanup")
             finally:
                 await db.close()
@@ -562,22 +568,22 @@ def setup_scheduled_jobs(scheduler: AsyncIOScheduler) -> None:
             db = await DependencyContainer.get_db_for_job()
             try:
                 container = DependencyContainer.get_instance()
-                user_repository = SQLAlchemyJiraUserRepository(db)
-                refresh_token_repository = SQLAlchemyRefreshTokenRepository(db)
+                user_repository = SQLAlchemyJiraUserRepository()
+                refresh_token_repository = SQLAlchemyRefreshTokenRepository()
                 token_refresh_service = TokenRefreshService(
-                    container.redis_service,
-                    user_repository,
-                    refresh_token_repository
+                    redis_service=container.redis_service,
+                    user_repository=user_repository,
+                    refresh_token_repository=refresh_token_repository
                 )
                 token_scheduler_service = TokenSchedulerService(
-                    token_refresh_service,
-                    refresh_token_repository
+                    token_refresh_service=token_refresh_service,
+                    refresh_token_repository=refresh_token_repository
                 )
 
-                users = await user_repository.get_all_users()
+                users = await user_repository.get_all_users(db)
                 for user in users:
                     if user and user.user_id:
-                        await token_scheduler_service.schedule_token_refresh(user.user_id)
+                        await token_scheduler_service.schedule_token_refresh(session=db, user_id=user.user_id)
                 log.info("Completed token refresh check")
             finally:
                 await db.close()

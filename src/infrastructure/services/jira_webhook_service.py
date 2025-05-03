@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.services.jira_issue_history_service import JiraIssueHistoryApplicationService
 from src.app.services.jira_webhook_handlers.jira_webhook_handler import JiraWebhookHandler
 from src.app.services.nats_application_service import NATSApplicationService
@@ -50,8 +52,16 @@ class JiraWebhookService:
         # Sử dụng handlers được cung cấp hoặc tạo mới
         self.handlers = handlers or []
 
-    async def handle_webhook(self, webhook_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Handle a webhook by delegating to appropriate handler"""
+    async def handle_webhook(self, session: AsyncSession, webhook_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Handle a webhook by delegating to appropriate handler
+
+        Args:
+            session: The database session to use for database operations
+            webhook_data: The webhook data to process
+
+        Returns:
+            The result of the handler or None if no handler was found
+        """
         try:
             # Parse webhook using factory method
             parsed_webhook = BaseJiraWebhookDTO.parse_webhook(webhook_data)
@@ -76,9 +86,9 @@ class JiraWebhookService:
                     log.error("Sprint webhook is missing sprint data")
                     return {"error": "Missing sprint data"}
 
-            # Process with handlers
+            # Process with handlers, passing the session
             for handler in self.handlers:
-                result = await handler.process(parsed_webhook)
+                result = await handler.process(session, parsed_webhook)
                 if result is not None:
                     return result
 

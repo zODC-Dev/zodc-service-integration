@@ -20,7 +20,6 @@ from src.infrastructure.entities.jira_issue_history import JiraIssueHistoryEntit
 from src.infrastructure.entities.sync_log import SyncLogEntity
 from src.infrastructure.entities.refresh_token import RefreshTokenEntity
 from src.infrastructure.entities.media import MediaEntity
-from src.infrastructure.entities.workflow_mapping import WorkflowMappingEntity
 from src.infrastructure.entities.system_config import SystemConfigEntity, ProjectConfigEntity
 
 # this is the Alembic Config object, which provides

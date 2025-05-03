@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.configs.logger import log
 from src.domain.models.database.media import MediaDBCreateDTO
 from src.domain.models.media import MediaModel
 from src.domain.repositories.media_repository import IMediaRepository
@@ -12,41 +13,57 @@ from src.infrastructure.entities.media import MediaEntity
 
 
 class SQLAlchemyMediaRepository(IMediaRepository):
-    def __init__(self, session: AsyncSession):
-        self.session = session
+    def __init__(self):
+        pass
 
-    async def create(self, media: MediaDBCreateDTO) -> MediaModel:
-        db_media = MediaEntity(
-            media_id=media.media_id,
-            filename=media.filename,
-            blob_url=media.blob_url,
-            content_type=media.content_type,
-            size=media.size,
-            uploaded_by=media.uploaded_by,
-            container_name=media.container_name
-        )
-        self.session.add(db_media)
-        await self.session.commit()
-        await self.session.refresh(db_media)
-        return MediaModel.model_validate(db_media.model_dump())
+    async def create(self, session: AsyncSession, media: MediaDBCreateDTO) -> MediaModel:
+        """Create a new media entry"""
+        try:
+            db_media = MediaEntity(
+                media_id=media.media_id,
+                filename=media.filename,
+                blob_url=media.blob_url,
+                content_type=media.content_type,
+                size=media.size,
+                uploaded_by=media.uploaded_by,
+                container_name=media.container_name
+            )
 
-    async def get_by_id(self, media_id: UUID) -> Optional[MediaModel]:
-        result = await self.session.exec(
-            select(MediaEntity).where(col(MediaEntity.media_id) == media_id, col(MediaEntity.deleted_at).is_(None))
-        )
-        media = result.first()
-        return MediaModel.model_validate(media.model_dump()) if media else None
+            session.add(db_media)
+            # Let the session manager handle the transaction
+            await session.flush()
+            await session.refresh(db_media)
 
-    async def get_by_user(self, user_id: int) -> List[MediaModel]:
-        result = await self.session.exec(
+            return MediaModel.model_validate(db_media.model_dump())
+        except Exception as e:
+            log.error(f"Error creating media: {str(e)}")
+            raise
+
+    async def get_by_id(self, session: AsyncSession, media_id: UUID) -> Optional[MediaModel]:
+        """Get media by ID"""
+        try:
+            result = await session.exec(
+                select(MediaEntity).where(col(MediaEntity.media_id) == media_id, col(MediaEntity.deleted_at).is_(None))
+            )
+            media = result.first()
+            if not media:
+                return None
+
+            return MediaModel.model_validate(media.model_dump())
+        except Exception as e:
+            log.error(f"Error getting media by ID: {str(e)}")
+            raise
+
+    async def get_by_user(self, session: AsyncSession, user_id: int) -> List[MediaModel]:
+        result = await session.exec(
             select(MediaEntity).where(col(MediaEntity.uploaded_by) == user_id, col(MediaEntity.deleted_at).is_(None))
         )
-        media_list = result.all()
-        return [MediaModel.model_validate(media.model_dump()) for media in media_list]
+        medias = result.all()
+        return [MediaModel.model_validate(media.model_dump()) for media in medias]
 
-    async def delete(self, media_id: UUID) -> bool:
+    async def delete(self, session: AsyncSession, media_id: UUID) -> bool:
         """Soft delete media by setting deleted_at timestamp"""
-        result = await self.session.exec(
+        result = await session.exec(
             select(MediaEntity).where(col(MediaEntity.media_id) == media_id, col(MediaEntity.deleted_at).is_(None))
         )
         media = result.first()
@@ -55,6 +72,7 @@ class SQLAlchemyMediaRepository(IMediaRepository):
             return False
 
         media.deleted_at = datetime.now()
-        self.session.add(media)
-        await self.session.commit()
+        session.add(media)
+        # Let the session manager handle the transaction
+        await session.flush()
         return True

@@ -1,6 +1,8 @@
 import asyncio
 from typing import List, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.domain.exceptions.jira_exceptions import JiraRequestError
 from src.domain.models.jira.apis.mappers.jira_user import JiraUserMapper
@@ -32,8 +34,9 @@ class JiraUserAPIService(IJiraUserAPIService):
         for attempt in range(self.retry_attempts):
             try:
                 response_data = await client_to_use.get(
-                    "/rest/api/3/user",
-                    None,  # Không cần user_id
+                    session=None,
+                    endpoint="/rest/api/3/user",
+                    user_id=None,  # Không cần user_id
                     params={"accountId": account_id},
                     error_msg=f"Error fetching user with account ID {account_id}"
                 )
@@ -70,13 +73,19 @@ class JiraUserAPIService(IJiraUserAPIService):
 
         return None
 
-    async def get_user_by_account_id(self, user_id: int, account_id: str) -> Optional[JiraUserModel]:
+    async def get_user_by_account_id(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        account_id: str
+    ) -> Optional[JiraUserModel]:
         """Get user details from Jira API by account ID"""
         for attempt in range(self.retry_attempts):
             try:
                 response_data = await self.client.get(
-                    "/rest/api/3/user",
-                    user_id,
+                    session=session,
+                    endpoint="/rest/api/3/user",
+                    user_id=user_id,
                     params={"accountId": account_id},
                     error_msg=f"Error fetching user with account ID {account_id}"
                 )
@@ -113,12 +122,19 @@ class JiraUserAPIService(IJiraUserAPIService):
 
         return None
 
-    async def search_users(self, user_id: int, query: str, max_results: int = 50) -> List[JiraUserModel]:
+    async def search_users(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        query: str,
+        max_results: int = 50
+    ) -> List[JiraUserModel]:
         """Search Jira users by query string"""
         try:
             response_data = await self.client.get(
-                "/rest/api/3/user/search",
-                user_id,
+                session=session,
+                endpoint="/rest/api/3/user/search",
+                user_id=user_id,
                 params={"query": query, "maxResults": max_results},
                 error_msg=f"Error searching users with query '{query}'"
             )

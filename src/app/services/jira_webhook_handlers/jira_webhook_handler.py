@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.configs.logger import log
 from src.domain.models.jira.webhooks.jira_webhook import (
     BaseJiraWebhookDTO,
@@ -50,8 +52,16 @@ class JiraWebhookHandler(ABC):
         pass
 
     @abstractmethod
-    async def handle(self, webhook_data: BaseJiraWebhookDTO) -> Dict[str, Any]:
-        """Handle the webhook"""
+    async def handle(self, session: AsyncSession, webhook_data: BaseJiraWebhookDTO) -> Dict[str, Any]:
+        """Handle the webhook
+
+        Args:
+            session: The database session to use for database operations
+            webhook_data: The webhook data to process
+
+        Returns:
+            A dictionary with the result of the operation
+        """
         pass
 
     async def get_latest_issue_data(self, issue_id: str) -> Optional[JiraIssueModel]:
@@ -60,8 +70,16 @@ class JiraWebhookHandler(ABC):
             return await self.jira_issue_api_service.get_issue_with_admin_auth(issue_id)
         return None
 
-    async def process(self, webhook_data: BaseJiraWebhookDTO) -> Optional[Dict[str, Any]]:
-        """Process the webhook if this handler can handle it"""
+    async def process(self, session: AsyncSession, webhook_data: BaseJiraWebhookDTO) -> Optional[Dict[str, Any]]:
+        """Process the webhook if this handler can handle it
+
+        Args:
+            session: The database session to use for database operations
+            webhook_data: The webhook data to process
+
+        Returns:
+            The result of the handler or None if the handler can't handle this webhook
+        """
         try:
             # Sử dụng normalized_event thay vì tự chuẩn hóa
             event_type = webhook_data.normalized_event
@@ -73,7 +91,7 @@ class JiraWebhookHandler(ABC):
             if not await self.can_handle(event_type):
                 return None
 
-            result = await self.handle(webhook_data)
+            result = await self.handle(session, webhook_data)
             return result
 
         except Exception as e:
@@ -102,7 +120,7 @@ class JiraWebhookHandler(ABC):
                 return None
 
             # Lấy board details để lấy project_key
-            board_data = await self.jira_sprint_api_service.get_board_by_id(sprint_data.board_id)
+            board_data = await self.jira_sprint_api_service.get_board_by_id_with_admin_auth(sprint_data.board_id)
             if not board_data:
                 log.error(f"Could not find board data for ID {sprint_data.board_id}")
                 return None

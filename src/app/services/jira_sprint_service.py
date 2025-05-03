@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 import re
 from typing import Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.app.schemas.responses.jira_project import TaskCountByStatus
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus, JiraSprintState
@@ -24,12 +26,17 @@ class JiraSprintApplicationService:
         self.jira_sprint_database_service = jira_sprint_database_service
         self.jira_issue_repository = jira_issue_repository
 
-    async def get_current_sprint(self, project_key: str) -> Optional[JiraSprintModel]:
+    async def get_current_sprint(
+        self,
+        session: AsyncSession,
+        project_key: str
+    ) -> Optional[JiraSprintModel]:
         """Get the current sprint in Jira"""
-        return await self.jira_sprint_database_service.get_current_sprint(project_key=project_key)
+        return await self.jira_sprint_database_service.get_current_sprint(session=session, project_key=project_key)
 
     async def start_sprint(
         self,
+        session: AsyncSession,
         sprint_id: int,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
@@ -38,13 +45,14 @@ class JiraSprintApplicationService:
         """Start a sprint in Jira using admin account
 
         Args:
+            session: AsyncSession
             sprint_id: ID of the sprint to start
             start_date: Optional start date for the sprint (default: current date)
             end_date: Optional end date for the sprint (default: start_date + 14 days)
             goal: Optional goal for the sprint
         """
         # Get sprint from database
-        sprint = await self.jira_sprint_database_service.get_sprint_by_id(sprint_id=sprint_id)
+        sprint = await self.jira_sprint_database_service.get_sprint_by_id(session=session, sprint_id=sprint_id)
         if sprint is None:
             return None
 
@@ -56,7 +64,7 @@ class JiraSprintApplicationService:
             end_date = start_date + timedelta(days=14)
 
         # Start the sprint in Jira with the provided dates and goal
-        await self.jira_sprint_api_service.start_sprint(
+        await self.jira_sprint_api_service.start_sprint_with_admin_auth(
             sprint_id=sprint.jira_sprint_id,
             start_date=start_date,
             end_date=end_date,
@@ -72,20 +80,27 @@ class JiraSprintApplicationService:
 
         return sprint
 
-    async def end_sprint(self, sprint_id: int) -> Optional[JiraSprintModel]:
+    async def end_sprint(
+        self,
+        session: AsyncSession,
+        sprint_id: int
+    ) -> Optional[JiraSprintModel]:
         """End a sprint in Jira using admin account"""
         # Get sprint from database
-        sprint = await self.jira_sprint_database_service.get_sprint_by_id(sprint_id=sprint_id)
+        sprint = await self.jira_sprint_database_service.get_sprint_by_id(session=session, sprint_id=sprint_id)
         if sprint is None:
             return None
 
         # End sprint in Jira
-        await self.jira_sprint_api_service.end_sprint(sprint_id=sprint.jira_sprint_id)
+        await self.jira_sprint_api_service.end_sprint_with_admin_auth(sprint_id=sprint.jira_sprint_id)
         sprint.state = JiraSprintState.CLOSED.value
 
         # Reset is_system_linked flag for all issues in this sprint
         try:
-            updated_count = await self.jira_issue_repository.reset_system_linked_for_sprint(sprint_id)
+            updated_count = await self.jira_issue_repository.reset_system_linked_for_sprint(
+                session=session,
+                sprint_id=sprint_id
+            )
             log.info(f"Reset is_system_linked flag for {updated_count} issues in sprint {sprint_id}")
         except Exception as e:
             log.error(f"Error resetting is_system_linked flag for issues in sprint {sprint_id}: {str(e)}")
@@ -95,16 +110,21 @@ class JiraSprintApplicationService:
 
         return sprint
 
-    async def get_sprint_details(self, sprint_id: int) -> tuple[Optional[JiraSprintModel], TaskCountByStatus]:
+    async def get_sprint_details(
+        self,
+        session: AsyncSession,
+        sprint_id: int
+    ) -> tuple[Optional[JiraSprintModel], TaskCountByStatus]:
         """Get sprint details with tasks by status"""
         # Get sprint from database
-        sprint = await self.jira_sprint_database_service.get_sprint_by_id(sprint_id=sprint_id)
+        sprint = await self.jira_sprint_database_service.get_sprint_by_id(session=session, sprint_id=sprint_id)
         if sprint is None:
             return None, {}
 
         assert sprint.project_key is not None, "Sprint must have a project key"
         # Get all issues for this sprint
         issues = await self.jira_issue_repository.get_project_issues(
+            session=session,
             project_key=sprint.project_key,
             sprint_id=sprint_id,
             include_deleted=False
@@ -158,7 +178,7 @@ class JiraSprintApplicationService:
             # assert board id is not None, since last sprint must have a board id
             assert old_sprint.board_id is not None, "Last sprint must have a board id"
 
-            new_sprint_jira_id = await self.jira_sprint_api_service.create_sprint(
+            new_sprint_jira_id = await self.jira_sprint_api_service.create_sprint_with_admin_auth(
                 name=next_sprint_name,
                 board_id=old_sprint.board_id,
                 project_key=old_sprint.project_key

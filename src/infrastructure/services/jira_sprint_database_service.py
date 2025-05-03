@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.domain.constants.jira import JiraSprintState
 from src.domain.models.database.jira_sprint import JiraSprintDBCreateDTO, JiraSprintDBUpdateDTO
 from src.domain.models.jira_sprint import JiraSprintModel
@@ -11,24 +13,24 @@ class JiraSprintDatabaseService(IJiraSprintDatabaseService):
     def __init__(self, sprint_repository: IJiraSprintRepository):
         self.sprint_repository = sprint_repository
 
-    async def create_sprint(self, sprint_data: JiraSprintDBCreateDTO) -> JiraSprintModel:
-        return await self.sprint_repository.create_sprint(sprint_data)
+    async def create_sprint(self, session: AsyncSession, sprint_data: JiraSprintDBCreateDTO) -> JiraSprintModel:
+        return await self.sprint_repository.create_sprint(session, sprint_data)
 
-    async def update_sprint(self, sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
-        return await self.sprint_repository.update_sprint(sprint_id, sprint_data)
+    async def update_sprint(self, session: AsyncSession, sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
+        return await self.sprint_repository.update_sprint(session, sprint_id, sprint_data)
 
-    async def update_sprint_by_jira_sprint_id(self, jira_sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
-        return await self.sprint_repository.update_sprint_by_jira_sprint_id(jira_sprint_id, sprint_data)
+    async def update_sprint_by_jira_sprint_id(self, session: AsyncSession, jira_sprint_id: int, sprint_data: JiraSprintDBUpdateDTO) -> JiraSprintModel:
+        return await self.sprint_repository.update_sprint_by_jira_sprint_id(session, jira_sprint_id, sprint_data)
 
-    async def get_sprint_by_id(self, sprint_id: int, include_deleted: bool = False) -> Optional[JiraSprintModel]:
-        return await self.sprint_repository.get_sprint_by_id(sprint_id, include_deleted)
+    async def get_sprint_by_id(self, session: AsyncSession, sprint_id: int, include_deleted: bool = False) -> Optional[JiraSprintModel]:
+        return await self.sprint_repository.get_sprint_by_id(session, sprint_id, include_deleted)
 
-    async def get_sprint_by_jira_sprint_id(self, jira_sprint_id: int, include_deleted: bool = False) -> Optional[JiraSprintModel]:
-        return await self.sprint_repository.get_sprint_by_jira_sprint_id(jira_sprint_id, include_deleted)
+    async def get_sprint_by_jira_sprint_id(self, session: AsyncSession, jira_sprint_id: int, include_deleted: bool = False) -> Optional[JiraSprintModel]:
+        return await self.sprint_repository.get_sprint_by_jira_sprint_id(session, jira_sprint_id, include_deleted)
 
-    async def get_project_sprints(self, project_key: str, include_deleted: bool = False) -> List[JiraSprintModel]:
+    async def get_project_sprints(self, session: AsyncSession, project_key: str, include_deleted: bool = False) -> List[JiraSprintModel]:
         """Get all sprints for a project and determine current sprint"""
-        sprints = await self.sprint_repository.get_project_sprints(project_key, include_deleted)
+        sprints = await self.sprint_repository.get_project_sprints(session, project_key, include_deleted)
         if not sprints:
             return []
 
@@ -64,5 +66,8 @@ class JiraSprintDatabaseService(IJiraSprintDatabaseService):
 
         return sprints
 
-    async def get_current_sprint(self, project_key: str) -> Optional[JiraSprintModel]:
-        return await self.sprint_repository.get_current_sprint(project_key)
+    async def get_current_sprint(self, session: AsyncSession, project_key: str) -> Optional[JiraSprintModel]:
+        return await self.sprint_repository.get_current_sprint(session, project_key)
+
+    async def get_all_sprints(self, session: AsyncSession) -> List[JiraSprintModel]:
+        return await self.sprint_repository.get_all_sprints(session)
