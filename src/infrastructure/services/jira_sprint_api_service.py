@@ -325,7 +325,7 @@ class JiraSprintAPIService(IJiraSprintAPIService):
                 sprint_id = response.get("id")
                 if not sprint_id:
                     log.error(f"Created sprint response doesn't contain ID: {response}")
-                    return None
+                    raise Exception(f"Failed to create sprint: {response}")
 
                 log.info(f"Successfully created sprint '{name}' with ID {sprint_id}")
                 return sprint_id

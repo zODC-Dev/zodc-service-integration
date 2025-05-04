@@ -17,7 +17,7 @@ class TokenSchedulerService(ITokenSchedulerService):
     ):
         self.token_refresh_service = token_refresh_service
         self.refresh_token_repository = refresh_token_repository
-        self.refresh_threshold = timedelta(minutes=5)
+        self.refresh_threshold = timedelta(minutes=60)
         self.refresh_token_threshold = timedelta(days=7)
 
     async def schedule_token_refresh(self, session: AsyncSession, user_id: int) -> None:

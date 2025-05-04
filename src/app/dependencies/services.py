@@ -416,6 +416,14 @@ async def get_sprint_analytics_application_service(
     )
 
 
+def get_system_config_service(
+    system_config_repository: ISystemConfigRepository = Depends(get_system_config_repository)
+) -> SystemConfigApplicationService:
+    """Get system config service"""
+    return SystemConfigApplicationService(
+        system_config_repository=system_config_repository
+    )
+
 # ============================ GANTT CHART SERVICE ===========================================
 
 
@@ -435,10 +443,11 @@ async def get_gantt_chart_service(
     issue_repository: IJiraIssueRepository = Depends(get_jira_issue_repository),
     sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository),
     gantt_calculator_service: IGanttChartCalculatorService = Depends(get_gantt_chart_calculator_service),
-    workflow_service_client: IWorkflowServiceClient = Depends(get_workflow_service_client)
+    workflow_service_client: IWorkflowServiceClient = Depends(get_workflow_service_client),
+    system_config_service: SystemConfigApplicationService = Depends(get_system_config_service)
 ) -> GanttChartApplicationService:
     """Get the Gantt chart service"""
-    return GanttChartApplicationService(issue_repository, sprint_repository, gantt_calculator_service, workflow_service_client)
+    return GanttChartApplicationService(issue_repository, sprint_repository, gantt_calculator_service, workflow_service_client, system_config_service)
 
 
 # ============================ JIRA WEBHOOK HANDLERS ===========================================
@@ -572,15 +581,6 @@ async def get_microsoft_calendar_application_service(
     return MicrosoftCalendarApplicationService(calendar_service=calendar_service)
 
 # ============================ NATS =================================================
-
-
-def get_system_config_service(
-    system_config_repository: ISystemConfigRepository = Depends(get_system_config_repository)
-) -> SystemConfigApplicationService:
-    """Get system config service"""
-    return SystemConfigApplicationService(
-        system_config_repository=system_config_repository
-    )
 
 
 def get_jira_performance_summary_service(

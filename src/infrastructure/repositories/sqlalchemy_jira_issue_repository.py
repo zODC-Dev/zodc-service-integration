@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlmodel import and_, col, select
+from sqlmodel import and_, col, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.configs.logger import log
@@ -222,7 +222,12 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
             updated_locally=model.updated_locally,
             is_system_linked=model.is_system_linked,
             is_deleted=model.is_deleted,
-            link_url=model.link_url
+            link_url=model.link_url,
+            planned_start_time=model.planned_start_time,
+            planned_end_time=model.planned_end_time,
+            actual_start_time=model.actual_start_time,
+            actual_end_time=model.actual_end_time,
+            story_id=model.story_id
         )
 
     def _to_domain(self, entity: JiraIssueEntity) -> JiraIssueModel:
@@ -335,17 +340,22 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                         col(JiraIssueSprintEntity.jira_sprint_id) == col(JiraSprintEntity.jira_sprint_id)
                     ).where(col(JiraSprintEntity.id) == sprint_id)
                 elif is_backlog:
-                    # Issues with has no sprints or all sprints are closed but task is not done yet, are backlog
-                    subquery = select(JiraIssueEntity.jira_issue_id).join(
+                    # Issues with no sprints or all sprints are closed but task is not done yet, are backlog
+                    subquery = select(JiraIssueEntity.jira_issue_id).outerjoin(
                         JiraIssueSprintEntity,
                         col(JiraIssueEntity.jira_issue_id) == col(JiraIssueSprintEntity.jira_issue_id)
-                    ).join(
+                    ).outerjoin(
                         JiraSprintEntity,
                         col(JiraIssueSprintEntity.jira_sprint_id) == col(JiraSprintEntity.jira_sprint_id)
                     ).where(
-                        and_(
-                            col(JiraSprintEntity.state).not_in(['active', 'future']),
-                            col(JiraIssueEntity.status) != JiraIssueStatus.DONE.value
+                        or_(
+                            # No sprints
+                            col(JiraIssueSprintEntity.jira_sprint_id).is_(None),
+                            # All sprints are closed but task not done
+                            and_(
+                                col(JiraSprintEntity.state).not_in(['active', 'future']),
+                                col(JiraIssueEntity.status) != JiraIssueStatus.DONE.value
+                            )
                         )
                     )
 
@@ -397,27 +407,47 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
     async def update_by_key(self, session: AsyncSession, jira_issue_key: str, issue_update: JiraIssueDBUpdateDTO) -> JiraIssueModel:
         """Update issue by key"""
+        log.info(f"[REPOSITORY] Updating issue with key {jira_issue_key}")
+        log.debug(f"[REPOSITORY] Update data: {issue_update.model_dump(exclude_none=True)}")
+
         query = select(JiraIssueEntity).where(col(JiraIssueEntity.key) == jira_issue_key)
         result = await session.exec(query)
         entity = result.first()
         if not entity:
+            log.error(f"[REPOSITORY] Issue with key {jira_issue_key} not found")
             raise ValueError(f"Issue with key {jira_issue_key} not found")
+
+        log.debug(f"[REPOSITORY] Found issue with key {jira_issue_key}, ID: {entity.id}")
 
         # Convert existing entity to domain model
         existing_issue = self._to_domain(entity)
+        log.debug(
+            f"[REPOSITORY] Existing issue before update: planned_start_time={existing_issue.planned_start_time}, planned_end_time={existing_issue.planned_end_time}, story_id={existing_issue.story_id}")
 
         # Combine existing data with update data
         updated_issue = self._merge_update_with_existing(existing_issue, issue_update)
+        log.debug(
+            f"[REPOSITORY] Updated issue after merge: planned_start_time={updated_issue.planned_start_time}, planned_end_time={updated_issue.planned_end_time}, story_id={updated_issue.story_id}")
 
         # Convert back to entity and update fields
         updated_entity = self._to_entity(updated_issue)
         for key, value in updated_entity.model_dump(exclude={'id', 'sprints'}).items():
             if value is not None:  # Only update non-None values
+                old_value = getattr(entity, key, None)
                 setattr(entity, key, value)
+                if old_value != value:
+                    log.debug(f"[REPOSITORY] Updated field {key}: {old_value} -> {value}")
 
+        log.info(f"[REPOSITORY] Adding updated entity to session")
         session.add(entity)
+
+        log.info(f"[REPOSITORY] Flushing session")
         await session.flush()
+
+        log.info(f"[REPOSITORY] Refreshing entity")
         await session.refresh(entity)
+
+        log.info(f"[REPOSITORY] Issue with key {jira_issue_key} successfully updated")
         return self._to_domain(entity)
 
     async def get_issues_by_keys(self, session: AsyncSession, keys: List[str]) -> List[JiraIssueModel]:

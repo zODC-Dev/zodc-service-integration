@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.jira_sprint import JiraSprintModel
+from src.configs.logger import log
 
 
 class JiraIssueDBCreateDTO(BaseModel):
@@ -182,3 +183,26 @@ class JiraIssueDBUpdateDTO(BaseModel):
             actual_end_time=domain.actual_end_time,
             story_id=domain.story_id,
         )
+
+    @classmethod
+    def _merge_with_existing(cls, existing: JiraIssueModel, dto) -> JiraIssueModel:
+        """Merge update DTO with existing model"""
+        update_dict = dto.model_dump(exclude_none=True)
+        log.debug(f"[JIRA_ISSUE_DTO] Merging update: {update_dict}")
+
+        existing_dict = existing.model_dump()
+        merged_dict = {**existing_dict, **update_dict}
+
+        # Log specific fields that are important for tracking
+        if 'planned_start_time' in update_dict:
+            log.info(
+                f"[JIRA_ISSUE_DTO] Updating planned_start_time: {existing.planned_start_time} -> {update_dict['planned_start_time']}")
+
+        if 'planned_end_time' in update_dict:
+            log.info(
+                f"[JIRA_ISSUE_DTO] Updating planned_end_time: {existing.planned_end_time} -> {update_dict['planned_end_time']}")
+
+        if 'story_id' in update_dict:
+            log.info(f"[JIRA_ISSUE_DTO] Updating story_id: {existing.story_id} -> {update_dict['story_id']}")
+
+        return JiraIssueModel(**merged_dict)

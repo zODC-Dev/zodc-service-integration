@@ -1,9 +1,9 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
+from bs4 import BeautifulSoup, Tag, NavigableString
 
 
 def convert_html_to_adf(html: str) -> Dict[str, Any]:
     """Convert HTML to ADF"""
-    from bs4 import BeautifulSoup
 
     # Initialize empty ADF document structure
     adf = {
@@ -19,33 +19,33 @@ def convert_html_to_adf(html: str) -> Dict[str, Any]:
     soup = BeautifulSoup(html, 'html.parser')
 
     # Helper function to process text nodes
-    def create_text_node(text):
+    def create_text_node(text: str) -> Dict[str, Any]:
         return {
             "type": "text",
             "text": text
         }
 
     # Helper function to process paragraphs
-    def process_paragraph(element):
+    def process_paragraph(element: Tag) -> Dict[str, Any]:
         para = {
             "type": "paragraph",
             "content": []
         }
 
         for child in element.children:
-            if child.name == 'strong' or child.name == 'b':
+            if isinstance(child, Tag) and child.name == 'strong' or isinstance(child, Tag) and child.name == 'b':
                 para["content"].append({
                     "type": "text",
                     "text": child.get_text(),
                     "marks": [{"type": "strong"}]
                 })
-            elif child.name == 'em' or child.name == 'i':
+            elif isinstance(child, Tag) and child.name == 'em' or isinstance(child, Tag) and child.name == 'i':
                 para["content"].append({
                     "type": "text",
                     "text": child.get_text(),
                     "marks": [{"type": "em"}]
                 })
-            elif child.name == 'a':
+            elif isinstance(child, Tag) and child.name == 'a':
                 para["content"].append({
                     "type": "text",
                     "text": child.get_text(),
@@ -54,7 +54,7 @@ def convert_html_to_adf(html: str) -> Dict[str, Any]:
                         "attrs": {"href": child.get('href', '')}
                     }]
                 })
-            elif isinstance(child, str):
+            elif isinstance(child, NavigableString):
                 text = child.strip()
                 if text:
                     para["content"].append(create_text_node(text))
@@ -63,45 +63,46 @@ def convert_html_to_adf(html: str) -> Dict[str, Any]:
 
     # Process HTML elements
     for element in soup.children:
-        if isinstance(element, str):
+        if isinstance(element, NavigableString):
             if element.strip():
                 adf["content"].append({
                     "type": "paragraph",
                     "content": [create_text_node(element.strip())]
                 })
-        elif element.name == 'p':
-            adf["content"].append(process_paragraph(element))
-        elif element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-            level = int(element.name[1])
-            adf["content"].append({
-                "type": "heading",
-                "attrs": {"level": level},
-                "content": [create_text_node(element.get_text().strip())]
-            })
-        elif element.name == 'ul':
-            list_items = []
-            for li in element.find_all('li', recursive=False):
-                list_items.append({
-                    "type": "listItem",
-                    "content": [process_paragraph(li)]
-                })
-            if list_items:
+        elif isinstance(element, Tag):
+            if element.name == 'p':
+                adf["content"].append(process_paragraph(element))
+            elif element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                level = int(element.name[1])
                 adf["content"].append({
-                    "type": "bulletList",
-                    "content": list_items
+                    "type": "heading",
+                    "attrs": {"level": level},
+                    "content": [create_text_node(element.get_text().strip())]
                 })
-        elif element.name == 'ol':
-            list_items = []
-            for li in element.find_all('li', recursive=False):
-                list_items.append({
-                    "type": "listItem",
-                    "content": [process_paragraph(li)]
-                })
-            if list_items:
-                adf["content"].append({
-                    "type": "orderedList",
-                    "content": list_items
-                })
+            elif element.name == 'ul':
+                list_items = []
+                for li in element.find_all('li', recursive=False):
+                    list_items.append({
+                        "type": "listItem",
+                        "content": [process_paragraph(li)]
+                    })
+                if list_items:
+                    adf["content"].append({
+                        "type": "bulletList",
+                        "content": list_items
+                    })
+            elif element.name == 'ol':
+                list_items = []
+                for li in element.find_all('li', recursive=False):
+                    list_items.append({
+                        "type": "listItem",
+                        "content": [process_paragraph(li)]
+                    })
+                if list_items:
+                    adf["content"].append({
+                        "type": "orderedList",
+                        "content": list_items
+                    })
 
     return adf
 
@@ -117,7 +118,7 @@ def convert_adf_to_text(adf_data: Union[str, Dict[str, Any], None]) -> Optional[
     try:
         # Xử lý ADF object
         if isinstance(adf_data, dict):
-            text_parts = []
+            text_parts: List[str] = []
 
             # Lấy text từ content
             if "content" in adf_data:

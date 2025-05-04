@@ -7,11 +7,11 @@ from pydantic import BaseModel
 class ProjectConfigModel(BaseModel):
     """Configuration for schedule calculation"""
     working_hours_per_day: int = 8
-    hours_per_point: int = 4
+    estimate_point_to_hours: int = 4
     start_work_hour: time = time(9, 0)
     end_work_hour: time = time(17, 30)
     lunch_break_minutes: int = 30
-    include_weekends: bool = False
+    # include_weekends: bool = False  # Removed as it will never be True
 
 
 class GanttChartJiraIssueModel(BaseModel):

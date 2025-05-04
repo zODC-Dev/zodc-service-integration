@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlmodel import Column, DateTime, Field, ForeignKey, Relationship, String, Text
+from sqlmodel import Column, DateTime, Field, ForeignKey, Relationship, String, Text, UniqueConstraint
 
 from src.infrastructure.entities.base import BaseEntity
 
@@ -29,7 +29,7 @@ class JiraIssueHistoryEntity(BaseEntity, table=True):
     author_id: Optional[str] = Field(
         sa_column=Column(String, ForeignKey("jira_users.jira_account_id", name="fk_jira_users"), nullable=True)
     )
-    jira_change_id: Optional[str] = Field(max_length=100, nullable=False)
+    jira_change_id: Optional[str] = Field(max_length=100, nullable=False)  # This field is not unique
     created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), default=datetime.now))
 
     # Định nghĩa mối quan hệ với JiraIssueEntity và JiraUserEntity
@@ -43,6 +43,10 @@ class JiraIssueHistoryEntity(BaseEntity, table=True):
         sa_relationship_kwargs={"lazy": "joined"}
     )
 
+    # Define a unique constraint for jira_change_id and field_name combination
+    __table_args__ = (
+        UniqueConstraint('jira_change_id', 'field_name', name='uq_jira_issue_history_jira_change_id_field_name'),
+    )
     # def __repr__(self):
     #     """String representation of the JiraIssueHistoryEntity"""
     #     return f"<JiraIssueHistory(id={self.id}, issue_id={self.issue_id}, field={self.field_name})>"

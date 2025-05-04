@@ -38,12 +38,21 @@ class JiraAPIClient:
 
     async def _get_token(self, session: AsyncSession, user_id: int) -> str:
         """Get Jira token from cache or refresh"""
-        # Schedule token refresh check
-        await self.token_scheduler_service.schedule_token_refresh(session=session, user_id=user_id)
-
         # Try to get token from cache first
         token = await self.redis_service.get_cached_jira_token(user_id)
         if token:
+            # Chỉ kiểm tra token refresh định kỳ, không phải mỗi lần request API
+            # Sử dụng một key cache riêng để theo dõi thời điểm kiểm tra cuối cùng
+            last_check_key = f"jira_token_last_check:{user_id}"
+            last_check = await self.redis_service.get(last_check_key)
+
+            # Nếu chưa từng kiểm tra hoặc đã 10 phút từ lần kiểm tra cuối cùng
+            if not last_check:
+                # Schedule token refresh check
+                await self.token_scheduler_service.schedule_token_refresh(session=session, user_id=user_id)
+                # Cập nhật thời điểm kiểm tra, hết hạn sau 10 phút
+                await self.redis_service.set(last_check_key, "1", 600)  # 600 seconds = 10 minutes
+
             return token
 
         # If not in cache, using refresh token to get new access token

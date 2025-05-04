@@ -28,7 +28,7 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
             log.info(f"[GANTT-CALC] Starting schedule calculation for {len(issues)} issues")
             log.debug(f"[GANTT-CALC] Sprint period: {sprint_start_date} to {sprint_end_date}")
             log.debug(
-                f"[GANTT-CALC] Configuration: hours_per_point={config.hours_per_point}, hours_per_day={config.working_hours_per_day}")
+                f"[GANTT-CALC] Configuration: hours_per_point={config.estimate_point_to_hours}, hours_per_day={config.working_hours_per_day}")
 
             # Convert flattened connections to dependency map
             dependency_map = self._build_dependency_map(connections)
@@ -184,7 +184,7 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
 
             # Get estimate points from issue
             estimate_points = issue.estimate_points
-            estimate_hours = estimate_points * config.hours_per_point
+            estimate_hours = estimate_points * config.estimate_point_to_hours
 
             # If it's a story with subtasks, calculate estimate as sum of subtasks
             if node_id in hierarchy_map:
@@ -199,7 +199,7 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
                     log.debug(
                         f"[GANTT-CALC] Story {node_id} estimate adjusted: {estimate_points} -> {child_estimate} points")
                     estimate_points = child_estimate
-                    estimate_hours = estimate_points * config.hours_per_point
+                    estimate_hours = estimate_points * config.estimate_point_to_hours
 
             # Find latest end time of dependencies
             latest_dependency_end = sprint_start
@@ -224,7 +224,7 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
                             f"[GANTT-CALC] Task {node_id} depends on start of {dep_node} ({dep_type}): {latest_dependency_end}")
 
             # Calculate start time
-            start_time = self._next_work_time(latest_dependency_end, work_start, work_end, config.include_weekends)
+            start_time = self._next_work_time(latest_dependency_end, work_start, work_end)
             log.debug(f"[GANTT-CALC] Task {node_id} raw start time: {latest_dependency_end} -> adjusted: {start_time}")
 
             # Calculate end time
@@ -234,8 +234,7 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
                 work_start,
                 work_end,
                 hours_per_day,
-                config.lunch_break_minutes,
-                config.include_weekends
+                config.lunch_break_minutes
             )
             log.debug(f"[GANTT-CALC] Task {node_id} end time: {end_time} (duration: {estimate_hours} hours)")
 
@@ -317,11 +316,11 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
         current_time: datetime,
         work_start: time,
         work_end: time,
-        include_weekends: bool
+        include_weekends: bool = False  # Parameter kept for compatibility but ignored
     ) -> datetime:
         """Find next valid work time from current time"""
-        # If weekend and we don't include weekends, move to Monday
-        if not include_weekends and current_time.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
+        # If weekend, move to Monday (weekends are always excluded)
+        if current_time.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
             days_to_add = 7 - current_time.weekday() + 1  # Move to Monday
             current_time = (current_time + timedelta(days=days_to_add)).replace(
                 hour=work_start.hour,
@@ -344,8 +343,8 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
         # If after work hours, move to next work day
         if current_time_time >= work_end:
             next_day = current_time + timedelta(days=1)
-            # If next day is weekend and we don't include weekends, move to Monday
-            if not include_weekends and next_day.weekday() >= 5:
+            # If next day is weekend, move to Monday
+            if next_day.weekday() >= 5:
                 days_to_add = 7 - next_day.weekday() + 1
                 next_day = next_day + timedelta(days=days_to_add)
 
@@ -366,16 +365,16 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
         work_end: time,
         hours_per_day: int,
         lunch_break_minutes: int,
-        include_weekends: bool
+        include_weekends: bool = False  # Parameter kept for compatibility but ignored
     ) -> datetime:
         """Add work hours to start time, respecting work schedule"""
         remaining_hours = work_hours
         current_time = start_time
 
         while remaining_hours > 0:
-            # Skip weekends if not included
-            if not include_weekends and current_time.weekday() >= 5:
-                current_time = self._next_work_day(current_time, work_start, include_weekends)
+            # Skip weekends (weekends are always excluded)
+            if current_time.weekday() >= 5:
+                current_time = self._next_work_day(current_time, work_start)
                 continue
 
             # Calculate work hours left in current day
@@ -406,7 +405,7 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
 
             # If no time left today, move to next work day
             if hours_left_today <= 0:
-                current_time = self._next_work_day(current_time, work_start, include_weekends)
+                current_time = self._next_work_day(current_time, work_start)
                 continue
 
             # Determine how many hours to add today
@@ -424,16 +423,16 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
 
             # If day is complete, move to next work day
             if current_time.time() >= work_end:
-                current_time = self._next_work_day(current_time, work_start, include_weekends)
+                current_time = self._next_work_day(current_time, work_start)
 
         return current_time
 
-    def _next_work_day(self, current_time: datetime, work_start: time, include_weekends: bool) -> datetime:
+    def _next_work_day(self, current_time: datetime, work_start: time, include_weekends: bool = False) -> datetime:
         """Get the start of the next work day"""
         next_day = current_time + timedelta(days=1)
 
-        # Skip weekends if not included
-        if not include_weekends and next_day.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
+        # Skip weekends (weekends are always excluded)
+        if next_day.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
             days_to_add = 8 - next_day.weekday()  # Move to Monday
             next_day = next_day + timedelta(days=days_to_add)
 

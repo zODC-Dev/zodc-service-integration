@@ -105,7 +105,7 @@ class SQLAlchemyJiraUserRepository(IJiraUserRepository):
             log.error(f"Error updating user: {str(e)}")
             raise
 
-    async def update_user_by_jira_account_id(self, session: AsyncSession, jira_account_id: str, user_data: JiraUserDBUpdateDTO) -> Optional[JiraUserModel]:
+    async def update_user_by_jira_account_id(self, session: AsyncSession, jira_account_id: str, user_data: JiraUserDBUpdateDTO) -> JiraUserModel:
         """Update user by Jira account ID"""
         try:
             # Get existing user
