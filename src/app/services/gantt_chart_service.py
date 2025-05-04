@@ -16,6 +16,7 @@ from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.services.gantt_chart_calculator_service import IGanttChartCalculatorService
 from src.domain.services.workflow_service_client import IWorkflowServiceClient
+from src.app.services.system_config_service import SystemConfigApplicationService
 
 
 class GanttChartApplicationService:
@@ -26,12 +27,14 @@ class GanttChartApplicationService:
         issue_repository: IJiraIssueRepository,
         sprint_repository: IJiraSprintRepository,
         gantt_calculator_service: IGanttChartCalculatorService,
-        workflow_service_client: IWorkflowServiceClient
+        workflow_service_client: IWorkflowServiceClient,
+        system_config_service: SystemConfigApplicationService
     ):
         self.issue_repository = issue_repository
         self.sprint_repository = sprint_repository
         self.gantt_calculator_service = gantt_calculator_service
         self.workflow_service_client = workflow_service_client
+        self.system_config_service = system_config_service
 
     async def get_gantt_chart(
         self,
@@ -49,10 +52,26 @@ class GanttChartApplicationService:
             log.debug(f"[GANTT] Input connections count: {len(connections) if connections else 0}")
             log.debug(f"[GANTT] Configuration: {config.model_dump() if config else 'default'}")
 
-            # Use default config if not provided
+            # Nếu không có config được cung cấp, chúng ta sẽ tạo từ cấu hình database
             if not config:
-                config = ProjectConfigModel()
-                log.debug("[GANTT] Using default configuration")
+                # Lấy các cấu hình từ service
+                hours_per_point = await self.system_config_service.get_estimate_point_to_hours(
+                    session=session, project_key=project_key
+                )
+                working_hours_per_day = await self.system_config_service.get_working_hours_per_day(session=session)
+                lunch_break_minutes = await self.system_config_service.get_lunch_break_minutes(session=session)
+                start_work_hour = await self.system_config_service.get_start_work_hour(session=session)
+                end_work_hour = await self.system_config_service.get_end_work_hour(session=session)
+
+                # Tạo config model từ các giá trị database
+                config = ProjectConfigModel(
+                    estimate_point_to_hours=hours_per_point,
+                    working_hours_per_day=working_hours_per_day,
+                    lunch_break_minutes=lunch_break_minutes,
+                    start_work_hour=start_work_hour,
+                    end_work_hour=end_work_hour
+                )
+                log.debug(f"[GANTT] Created configuration from database: {config.model_dump()}")
 
             # Get sprint information
             log.debug(f"[GANTT] Fetching sprint information for ID: {sprint_id}")
@@ -61,6 +80,7 @@ class GanttChartApplicationService:
                 log.error(f"[GANTT] Sprint with ID {sprint_id} not found")
                 raise ValueError(f"Sprint with ID {sprint_id} not found")
 
+            assert sprint.start_date is not None, "Sprint start date is None"
             assert sprint.end_date is not None, "Sprint end date is None"
             log.debug(f"[GANTT] Sprint period: {sprint.start_date} to {sprint.end_date}")
 
@@ -143,14 +163,6 @@ class GanttChartApplicationService:
             for conn in flattened_connections:
                 log.debug(f"[GANTT] Flattened connection: {conn.from_node_id} -> {conn.to_node_id} ({conn.type})")
 
-            if not sprint.start_date or not sprint.end_date:
-                log.warning("[GANTT] Sprint start or end date is not set")
-                return GanttChartModel(
-                    sprint_id=sprint_id,
-                    sprint_name=sprint.name or f"Sprint {sprint_id}",
-                    project_key=project_key,
-                )
-
             # Calculate schedule
             log.debug(
                 f"[GANTT] Calculating schedule for {len(gantt_chart_issues_list)} issues with {len(flattened_connections)} connections")
@@ -178,6 +190,9 @@ class GanttChartApplicationService:
                         planned_end_time=task.plan_end_time
                     )
 
+                    log.info(
+                        f"[GANTT] Updating task {task.jira_key} with planned times: start={task.plan_start_time}, end={task.plan_end_time}")
+
                     # If this task is a child of a story, update the story_id field
                     if task.node_id in reverse_hierarchy_map:
                         parent_node_id = reverse_hierarchy_map[task.node_id]
@@ -186,12 +201,22 @@ class GanttChartApplicationService:
                         if parent_task and parent_task.jira_key:
                             log.debug(f"[GANTT] Setting story_id for task {task.jira_key}: {parent_task.jira_key}")
                             update_dto.story_id = parent_task.jira_key
+                            log.info(f"[GANTT] Task {task.jira_key} is part of story {parent_task.jira_key}")
 
-                    await self.issue_repository.update_by_key(
-                        session=session,
-                        jira_issue_key=task.jira_key,
-                        issue_update=update_dto
-                    )
+                    try:
+                        log.info(f"[GANTT] Calling issue_repository.update_by_key for {task.jira_key}")
+                        updated_issue = await self.issue_repository.update_by_key(
+                            session=session,
+                            jira_issue_key=task.jira_key,
+                            issue_update=update_dto
+                        )
+                        log.info(f"[GANTT] Successfully updated issue {task.jira_key} in database")
+                        log.debug(
+                            f"[GANTT] Updated issue details: planned_start_time={updated_issue.planned_start_time}, planned_end_time={updated_issue.planned_end_time}, story_id={updated_issue.story_id}")
+                    except Exception as e:
+                        log.error(f"[GANTT] Failed to update issue {task.jira_key} in database: {str(e)}")
+                else:
+                    log.warning(f"[GANTT] Task {task.node_id} has no jira_key, skipping database update")
 
             # Check if schedule is feasible
             is_feasible = self.gantt_calculator_service.is_schedule_feasible(

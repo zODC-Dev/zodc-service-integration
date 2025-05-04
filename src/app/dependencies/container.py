@@ -26,7 +26,7 @@ from src.app.services.nats_handlers.user_message_handler import UserMessageHandl
 from src.app.services.nats_handlers.workflow_edit_handler import WorkflowEditRequestHandler
 from src.app.services.nats_handlers.workflow_sync_handler import WorkflowSyncRequestHandler
 from src.app.services.system_config_service import SystemConfigApplicationService
-from src.configs.database import get_db, create_session
+from src.configs.database import create_session, get_db
 from src.configs.logger import log
 from src.configs.settings import settings
 from src.domain.constants.nats_events import NATSSubscribeTopic
@@ -259,7 +259,8 @@ class DependencyContainer:
             instance.jira_issue_repository,
             instance.jira_sprint_repository,
             instance.gantt_calculator_service,
-            instance.workflow_service_client
+            instance.workflow_service_client,
+            instance.system_config_application_service
         )
 
         instance.nats_application_service = NATSApplicationService(instance.nats_service)

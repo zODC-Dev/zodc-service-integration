@@ -67,7 +67,7 @@ class JiraWebhookQueueService:
         # Xử lý exception nếu có
         task.add_done_callback(self._handle_task_exception)
 
-    def _handle_task_exception(self, task: asyncio.Task) -> None:
+    def _handle_task_exception(self, task: asyncio.Task[None]) -> None:
         """Xử lý exception từ task nếu có"""
         if not task.cancelled() and task.exception():
             log.error(f"Task failed with exception: {task.exception()}")

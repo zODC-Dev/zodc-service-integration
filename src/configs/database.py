@@ -106,7 +106,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def create_session() -> AsyncSession:
     """Create a new database session without context manager.
 
-    This should only be used in specific cases where the lifecycle 
+    This should only be used in specific cases where the lifecycle
     of the session needs to be managed manually, like in background jobs.
     The caller is responsible for committing/rolling back and closing the session.
 

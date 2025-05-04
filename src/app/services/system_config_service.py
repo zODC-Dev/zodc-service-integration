@@ -3,6 +3,7 @@ from typing import List, Optional, Union
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.domain.constants.system_config import SystemConfigConstants
 from src.configs.database import log
 from src.domain.models.database.system_config import (
     ProjectConfigDBCreateDTO,
@@ -243,14 +244,14 @@ class SystemConfigApplicationService:
 
     async def get_working_hours_per_day(self, session: AsyncSession) -> int:
         """Get working_hours_per_day config with fallback to default value"""
-        key = "working_hours_per_day"
+        key = SystemConfigConstants.WORKING_HOURS_PER_DAY
         config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
         return config.value if config else 8  # Default: 8 hours
 
-    async def get_hours_per_point(self, session: AsyncSession, project_key: Optional[str] = None) -> int:
-        """Get hours_per_point config with fallback to default value"""
-        key = "hours_per_point"
+    async def get_estimate_point_to_hours(self, session: AsyncSession, project_key: Optional[str] = None) -> int:
+        """Get estimate_point_to_hours config with fallback to default value"""
+        key = SystemConfigConstants.ESTIMATE_POINT_TO_HOURS
 
         if project_key:
             # Try to get project-specific value
@@ -263,28 +264,21 @@ class SystemConfigApplicationService:
 
     async def get_lunch_break_minutes(self, session: AsyncSession) -> int:
         """Get lunch_break_minutes config with fallback to default value"""
-        key = "lunch_break_minutes"
+        key = SystemConfigConstants.LUNCH_BREAK_MINUTES
         config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
         return config.value if config else 30  # Default: 30 minutes
 
-    async def get_include_weekends(self, session: AsyncSession) -> bool:
-        """Get include_weekends config with fallback to default value"""
-        key = "include_weekends"
-        config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
-
-        return config.value if config else False  # Default: False
-
     async def get_start_work_hour(self, session: AsyncSession) -> time:
         """Get start_work_hour config with fallback to default value"""
-        key = "start_work_hour"
+        key = SystemConfigConstants.START_WORK_HOUR
         config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
         return config.value if config else time(9, 0)  # Default: 9:00 AM
 
     async def get_end_work_hour(self, session: AsyncSession) -> time:
         """Get end_work_hour config with fallback to default value"""
-        key = "end_work_hour"
+        key = SystemConfigConstants.END_WORK_HOUR
         config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
         return config.value if config else time(17, 30)  # Default: 5:30 PM

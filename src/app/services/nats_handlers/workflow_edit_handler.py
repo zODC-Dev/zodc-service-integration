@@ -63,9 +63,6 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                 node_to_jira_key_map[result_issue.node_id] = result_issue.jira_key
                 log.debug(f"Updated mapping: Node ID {result_issue.node_id} -> Jira key {result_issue.jira_key}")
 
-                # Lưu jira_key vào Redis để đánh dấu là system_linked khi webhook được gọi
-                await self._mark_issue_for_system_linking(result_issue.jira_key)
-
             # Bước 3: Tạo các connections mới
             added_count = 0
             if request.connections:
@@ -202,15 +199,24 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
             create_dto.estimate_point = issue.estimate_point
 
         # Sử dụng admin auth để tạo issue
-        return await self.jira_issue_service.jira_issue_api_service.create_issue_with_admin_auth(
+        jira_issue = await self.jira_issue_service.jira_issue_api_service.create_issue_with_admin_auth(
             session=session,
             issue_data=create_dto
         )
+
+        # Mark the issue for system linking IMMEDIATELY after creation
+        if jira_issue and jira_issue.key:
+            await self._mark_issue_for_system_linking(jira_issue.key)
+
+        return jira_issue
 
     async def _update_issue(self, session: AsyncSession, issue: WorkflowEditIssue, project_key: str, sprint_id: Optional[int]) -> JiraIssueModel:
         """Update an existing issue in Jira"""
         if not issue.jira_key:
             raise Exception("Cannot update issue without jira_key")
+
+        # Mark the issue for system linking BEFORE updating it
+        await self._mark_issue_for_system_linking(issue.jira_key)
 
         # Tìm Jira sprint ID tương ứng từ sprint ID của DB nếu có
         jira_sprint_id = await self._get_jira_sprint_id(session=session, project_key=project_key, sprint_id=sprint_id)

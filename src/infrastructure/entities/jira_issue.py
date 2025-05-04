@@ -38,7 +38,7 @@ class JiraIssueEntity(SQLModel, table=True):
     actual_start_time: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
     actual_end_time: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
     # Story ID to which this issue belongs to
-    story_id: Optional[str] = Field(default=None, foreign_key="jira_issues.jira_issue_id")
+    story_id: Optional[str] = Field(default=None, foreign_key="jira_issues.key")
 
     # Timestamps
     created_at: datetime = Field(
