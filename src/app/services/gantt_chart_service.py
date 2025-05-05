@@ -2,6 +2,7 @@ from typing import Dict, List, Optional
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.app.services.system_config_service import SystemConfigApplicationService
 from src.configs.logger import log
 from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
 from src.domain.models.gantt_chart import (
@@ -16,7 +17,6 @@ from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.services.gantt_chart_calculator_service import IGanttChartCalculatorService
 from src.domain.services.workflow_service_client import IWorkflowServiceClient
-from src.app.services.system_config_service import SystemConfigApplicationService
 
 
 class GanttChartApplicationService:

@@ -3,8 +3,8 @@ from typing import List, Optional, Union
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.domain.constants.system_config import SystemConfigConstants
 from src.configs.database import log
+from src.domain.constants.system_config import SystemConfigConstants
 from src.domain.models.database.system_config import (
     ProjectConfigDBCreateDTO,
     ProjectConfigDBUpdateDTO,

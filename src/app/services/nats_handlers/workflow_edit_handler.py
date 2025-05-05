@@ -52,7 +52,9 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
                         return WorkflowEditReply(
                             success=False,
                             error_message=f"Issue {issue.jira_key} was synced after {issue.last_synced_at}, skipping",
-                            issues=[]
+                            issues=[],
+                            removed_connections=0,
+                            added_connections=0
                         ).model_dump()
 
             # Tạo mapping ban đầu từ node_mappings nếu có

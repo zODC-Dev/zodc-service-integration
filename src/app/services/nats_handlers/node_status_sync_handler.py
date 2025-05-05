@@ -2,12 +2,12 @@ from typing import Any, Dict
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
 from src.domain.models.nats.replies.node_status_sync import NodeStatusSyncReply
 from src.domain.models.nats.requests.node_status_sync import NodeStatusSyncRequest
+from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
 from src.domain.services.nats_message_handler import INATSRequestHandler
 

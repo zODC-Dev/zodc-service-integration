@@ -1,10 +1,10 @@
 from typing import Any, Dict, List, Optional, Union
-from bs4 import BeautifulSoup, Tag, NavigableString
+
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 
 def convert_html_to_adf(html: str) -> Dict[str, Any]:
     """Convert HTML to ADF"""
-
     # Initialize empty ADF document structure
     adf = {
         "version": 1,

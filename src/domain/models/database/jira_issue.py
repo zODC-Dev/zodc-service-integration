@@ -1,12 +1,11 @@
 from datetime import datetime, timezone
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.models.jira_sprint import JiraSprintModel
-from src.configs.logger import log
 
 
 class JiraIssueDBCreateDTO(BaseModel):

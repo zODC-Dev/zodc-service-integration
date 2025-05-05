@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Optional
 
-
 from pydantic import BaseModel, Field
 from pydantic.alias_generators import to_camel
 

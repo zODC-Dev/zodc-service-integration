@@ -1,10 +1,8 @@
-from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
-from src.domain.models.database.jira_issue import JiraIssueDBCreateDTO, JiraIssueDBUpdateDTO
+from src.domain.constants.jira import JiraIssueType
 from src.domain.models.jira_issue import JiraIssueModel
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.services.jira_issue_database_service import IJiraIssueDatabaseService

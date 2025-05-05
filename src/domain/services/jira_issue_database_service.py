@@ -4,7 +4,6 @@ from typing import List, Optional
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.domain.constants.jira import JiraIssueType
-from src.domain.models.database.jira_issue import JiraIssueDBCreateDTO, JiraIssueDBUpdateDTO
 from src.domain.models.jira_issue import JiraIssueModel
 
 
