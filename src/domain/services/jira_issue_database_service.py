@@ -18,27 +18,6 @@ class IJiraIssueDatabaseService(ABC):
         pass
 
     @abstractmethod
-    async def create_issue(
-        self,
-        session: AsyncSession,
-        user_id: int,
-        issue: JiraIssueDBCreateDTO
-    ) -> JiraIssueModel:
-        """Create a new Jira issue"""
-        pass
-
-    @abstractmethod
-    async def update_issue(
-        self,
-        session: AsyncSession,
-        user_id: int,
-        issue_id: str,
-        update: JiraIssueDBUpdateDTO
-    ) -> JiraIssueModel:
-        """Update an existing Jira issue"""
-        pass
-
-    @abstractmethod
     async def get_project_issues(
         self,
         session: AsyncSession,

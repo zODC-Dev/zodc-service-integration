@@ -26,7 +26,6 @@ class JiraIssueType(Enum):
 
 class JiraIssueStatus(Enum):
     IN_PROGRESS = "In Progress"
-    IN_REVIEW = "In Review"
     DONE = "Done"
     TO_DO = "To Do"
 
@@ -41,24 +40,6 @@ class JiraIssueStatus(Enum):
             if member.value.lower() == status.lower():
                 return member
         raise ValueError(f"Invalid status: {status}")
-
-
-# Status ID mapping - cần cập nhật các ID tương ứng với Jira instance của bạn
-# JIRA_STATUS_ID_MAPPING = {
-#     "10014": JiraIssueStatus.TO_DO,
-#     "10015": JiraIssueStatus.IN_PROGRESS,
-#     "10002": JiraIssueStatus.IN_REVIEW,
-#     "10016": JiraIssueStatus.DONE,
-# }
-
-# # Issue Type ID mapping
-# JIRA_ISSUE_TYPE_ID_MAPPING = {
-#     "10020": JiraIssueType.TASK,
-#     "10022": JiraIssueType.STORY,
-#     "10023": JiraIssueType.EPIC,
-#     "10021": JiraIssueType.BUG,
-#     "10024": JiraIssueType.SUB_TASK,
-# }
 
 
 class JiraSprintState(Enum):

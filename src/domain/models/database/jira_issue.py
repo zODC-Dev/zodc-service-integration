@@ -15,8 +15,8 @@ class JiraIssueDBCreateDTO(BaseModel):
     project_key: str
     summary: str
     description: Optional[str] = None
-    type: Optional[Union[JiraIssueType, str]] = None
-    status: Optional[Union[JiraIssueStatus, str]] = None
+    type: Optional[str] = None
+    status: Optional[str] = None
     assignee_id: Optional[str] = None
     reporter_id: Optional[str] = None
     estimate_point: Optional[float] = None
@@ -127,7 +127,7 @@ class JiraIssueDBUpdateDTO(BaseModel):
     priority: Optional[str] = None
     sprints: Optional[List[JiraSprintModel]] = None
     is_deleted: Optional[bool] = None
-    type: Optional[Union[JiraIssueType, str]] = None
+    type: Optional[str] = None
     link_url: Optional[str] = None
     updated_at: Optional[datetime] = None
     planned_start_time: Optional[datetime] = None
@@ -136,36 +136,36 @@ class JiraIssueDBUpdateDTO(BaseModel):
     actual_end_time: Optional[datetime] = None
     story_id: Optional[str] = None
 
-    @field_validator('status')
-    @classmethod
-    def validate_status(cls, v):
-        if v is None:
-            return None
-        if isinstance(v, JiraIssueStatus):
-            return v
-        try:
-            return JiraIssueStatus(v)
-        except ValueError as e:
-            raise ValueError(f"Invalid status: {v}") from e
+    # @field_validator('status')
+    # @classmethod
+    # def validate_status(cls, v):
+    #     if v is None:
+    #         return None
+    #     if isinstance(v, JiraIssueStatus):
+    #         return v
+    #     try:
+    #         return JiraIssueStatus(v)
+    #     except ValueError as e:
+    #         raise ValueError(f"Invalid status: {v}") from e
 
-    @field_validator('type')
-    @classmethod
-    def validate_type(cls, v):
-        if v is None:
-            return None
-        if isinstance(v, JiraIssueType):
-            return v
-        try:
-            return JiraIssueType(v)
-        except ValueError as e:
-            raise ValueError(f"Invalid issue type: {v}") from e
+    # @field_validator('type')
+    # @classmethod
+    # def validate_type(cls, v):
+    #     if v is None:
+    #         return None
+    #     if isinstance(v, JiraIssueType):
+    #         return v
+    #     try:
+    #         return JiraIssueType(v)
+    #     except ValueError as e:
+    #         raise ValueError(f"Invalid issue type: {v}") from e
 
     @classmethod
     def _from_domain(cls, domain: 'JiraIssueModel') -> 'JiraIssueDBUpdateDTO':
         return cls(
             summary=domain.summary,
             description=domain.description,
-            status=domain.status,
+            status=domain.status.value,
             assignee_id=domain.assignee_id,
             estimate_point=domain.estimate_point,
             actual_point=domain.actual_point,
@@ -183,26 +183,3 @@ class JiraIssueDBUpdateDTO(BaseModel):
             actual_end_time=domain.actual_end_time,
             story_id=domain.story_id,
         )
-
-    @classmethod
-    def _merge_with_existing(cls, existing: JiraIssueModel, dto) -> JiraIssueModel:
-        """Merge update DTO with existing model"""
-        update_dict = dto.model_dump(exclude_none=True)
-        log.debug(f"[JIRA_ISSUE_DTO] Merging update: {update_dict}")
-
-        existing_dict = existing.model_dump()
-        merged_dict = {**existing_dict, **update_dict}
-
-        # Log specific fields that are important for tracking
-        if 'planned_start_time' in update_dict:
-            log.info(
-                f"[JIRA_ISSUE_DTO] Updating planned_start_time: {existing.planned_start_time} -> {update_dict['planned_start_time']}")
-
-        if 'planned_end_time' in update_dict:
-            log.info(
-                f"[JIRA_ISSUE_DTO] Updating planned_end_time: {existing.planned_end_time} -> {update_dict['planned_end_time']}")
-
-        if 'story_id' in update_dict:
-            log.info(f"[JIRA_ISSUE_DTO] Updating story_id: {existing.story_id} -> {update_dict['story_id']}")
-
-        return JiraIssueModel(**merged_dict)

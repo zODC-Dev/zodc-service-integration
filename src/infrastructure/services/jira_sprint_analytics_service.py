@@ -151,7 +151,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         for issue in issues:
             if issue.status == JiraIssueStatus.DONE:
                 completed_issues.append(issue)
-            elif issue.status in [JiraIssueStatus.IN_PROGRESS, JiraIssueStatus.IN_REVIEW]:
+            elif issue.status in [JiraIssueStatus.IN_PROGRESS]:
                 in_progress_issues.append(issue)
             else:
                 to_do_issues.append(issue)

@@ -447,7 +447,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         # Định nghĩa workflow tiêu chuẩn
         standard_workflow = {
             JiraIssueStatus.TO_DO: [JiraIssueStatus.IN_PROGRESS],
-            JiraIssueStatus.IN_PROGRESS: [JiraIssueStatus.IN_REVIEW, JiraIssueStatus.DONE],
+            JiraIssueStatus.IN_PROGRESS: [JiraIssueStatus.DONE],
             JiraIssueStatus.IN_REVIEW: [JiraIssueStatus.DONE, JiraIssueStatus.IN_PROGRESS],
             JiraIssueStatus.DONE: [JiraIssueStatus.IN_PROGRESS]
         }

@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class WorkflowEditReplyIssue(BaseModel):
@@ -10,6 +10,8 @@ class WorkflowEditReplyIssue(BaseModel):
 
 
 class WorkflowEditReply(BaseModel):
+    success: Optional[bool] = Field(default=True, description="Success")
+    error_message: Optional[str] = Field(default=None, description="Error message")
     issues: List[WorkflowEditReplyIssue]
     removed_connections: int  # Số connections đã xóa thành công
     added_connections: int    # Số connections đã thêm thành công

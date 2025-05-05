@@ -19,6 +19,7 @@ class JiraIssueUpdateDataPublishDTO(BaseModel):
     status: str = Field(..., description="Jira issue status", alias="status")
     updated_at: datetime = Field(default_factory=datetime.now, alias="updatedAt")
     old_status: Optional[str] = Field(None, description="Jira issue old status", alias="oldStatus")
+    last_synced_at: Optional[datetime] = Field(None, description="Last synced at", alias="lastSyncedAt")
 
     class Config:
         populate_by_name = True
@@ -27,6 +28,10 @@ class JiraIssueUpdateDataPublishDTO(BaseModel):
     @field_serializer("updated_at")
     def serialize_updated_at(self, updated_at: datetime, _info: Any) -> str:
         return updated_at.isoformat()
+
+    @field_serializer("last_synced_at")
+    def serialize_last_synced_at(self, last_synced_at: datetime, _info: Any) -> str:
+        return last_synced_at.isoformat() if last_synced_at else None
 
 
 class JiraIssueUpdatePublishDTO(NATSPublishDTO):

@@ -83,11 +83,18 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         # Update in database
         update_dto = JiraIssueConverter._convert_to_update_dto(issue_data)
 
-        # If issue is done, update actual end time, if issue is in progress, update actual start time
-        if update_dto.status == JiraIssueStatus.DONE.value:
+        # If issue is from in progress to done, update actual end time, if issue is from todo to in progress, update actual start time
+        if current_issue.status == JiraIssueStatus.IN_PROGRESS and update_dto.status == JiraIssueStatus.DONE.value:
+            log.debug(
+                f"Updating actual end time for issue {issue_id} from {current_issue.actual_end_time} to {datetime.now()}")
             update_dto.actual_end_time = datetime.now()
-        elif update_dto.status == JiraIssueStatus.IN_PROGRESS.value:
+        elif current_issue.status == JiraIssueStatus.TO_DO and update_dto.status == JiraIssueStatus.IN_PROGRESS.value:
+            log.debug(
+                f"Updating actual start time for issue {issue_id} from {current_issue.actual_start_time} to {datetime.now()}")
             update_dto.actual_start_time = datetime.now()
+        else:
+            log.debug(
+                f"No actual time update for issue {issue_id} because status is not changed from {current_issue.status.value} to {update_dto.status}")
 
         updated_issue = await self.jira_issue_repository.update(session=session, issue_id=issue_id, issue_update=update_dto)
 
@@ -95,7 +102,7 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         if updated_issue:
             try:
                 await self._publish_issue_update_event(session=session, issue_data=issue_data, old_issue=current_issue)
-                log.info(f"Published issue update event for issue {issue_id} to NATS")
+                log.debug(f"Published issue update event for issue {issue_id} to NATS")
             except Exception as e:
                 log.error(f"Error publishing issue update event for issue {issue_id}: {str(e)}")
 
@@ -150,7 +157,8 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
             status=status,
             sprint_id=sprint_id,
             updated_at=updated_at,
-            old_status=old_status
+            old_status=old_status,
+            last_synced_at=issue_data.last_synced_at
         )
 
         # Create publish DTO and send via NATS

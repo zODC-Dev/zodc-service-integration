@@ -2,6 +2,7 @@ from typing import Any, Dict
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.app.services.jira_issue_service import JiraIssueApplicationService
 from src.configs.logger import log
 from src.domain.exceptions.jira_exceptions import JiraRequestError
@@ -16,9 +17,11 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
         self,
         jira_issue_service: JiraIssueApplicationService,
         jira_user_repository: IJiraUserRepository,
+        jira_issue_repository: IJiraIssueRepository
     ):
         self.jira_issue_service = jira_issue_service
         self.jira_user_repository = jira_user_repository
+        self.jira_issue_repository = jira_issue_repository
 
     async def handle(self, subject: str, message: Dict[str, Any], session: AsyncSession) -> Dict[str, Any]:
         """Handle Jira issue reassign request
@@ -58,6 +61,20 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
             user_id = request.old_user_id or request.new_user_id
 
             assert user_id is not None, "user_id is not None"
+
+            # Check last synced at
+            if request.last_synced_at:
+                issue = await self.jira_issue_repository.get_by_jira_issue_key(session=session, jira_issue_key=request.jira_key)
+                if issue and issue.last_synced_at and issue.last_synced_at > request.last_synced_at:
+                    log.info(f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping")
+                    return JiraIssueReassignNATSReplyDTO(
+                        success=False,
+                        jira_key=request.jira_key,
+                        node_id=request.node_id,
+                        old_user_id=request.old_user_id,
+                        new_user_id=request.new_user_id,
+                        error_message=f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping"
+                    ).model_dump()
 
             # Update assignee in Jira
             success = await self.jira_issue_service.update_issue_assignee(

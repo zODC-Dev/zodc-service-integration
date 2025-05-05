@@ -2,6 +2,7 @@ from typing import Any, Dict
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.configs.logger import log
 from src.domain.constants.jira import JiraIssueStatus
 from src.domain.exceptions.jira_exceptions import JiraAuthenticationError, JiraConnectionError, JiraRequestError
@@ -14,17 +15,16 @@ from src.domain.services.nats_message_handler import INATSRequestHandler
 class NodeStatusSyncHandler(INATSRequestHandler):
     """Xử lý message đồng bộ trạng thái node từ hệ thống khác sang Jira"""
 
-    def __init__(self, jira_issue_api_service: IJiraIssueAPIService):
+    def __init__(self, jira_issue_api_service: IJiraIssueAPIService, jira_issue_repository: IJiraIssueRepository):
         self.jira_issue_api_service = jira_issue_api_service
+        self.jira_issue_repository = jira_issue_repository
 
     def _parse_status(self, status: str) -> JiraIssueStatus:
         """Parse status từ string sang enum JiraIssueStatus"""
         try:
             # Convert IN_PROGRESS, IN_REVIEW, DONE, TO_DO to JiraIssueStatus
             if status.lower() == "in_progress" or status.lower() == "in_process":
-                return JiraIssueStatus.IN_PROGRESS
-            elif status.lower() == "in_review":
-                return JiraIssueStatus.IN_REVIEW
+                return JiraIssueStatus.IN_PROGRES
             elif status.lower() == "done" or status.lower() == "completed":
                 return JiraIssueStatus.DONE
             elif status.lower() == "to_do":
@@ -50,6 +50,17 @@ class NodeStatusSyncHandler(INATSRequestHandler):
             # Parse dữ liệu đầu vào
             request = NodeStatusSyncRequest.model_validate(message)
             transaction_id = request.transaction_id
+
+            # Check last synced at
+            if request.last_synced_at:
+                issue = await self.jira_issue_repository.get_by_jira_issue_key(session=session, jira_issue_key=request.jira_key)
+                if issue and issue.last_synced_at and issue.last_synced_at > request.last_synced_at:
+                    log.info(f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping")
+                    return NodeStatusSyncReply(
+                        success=False,
+                        error_message=f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping",
+                        data={"transaction_id": request.transaction_id}
+                    ).model_dump()
 
             log.info(
                 f"[NodeStatusSyncHandler] Nhận request cập nhật trạng thái, transaction_id={request.transaction_id}, jira_key={request.jira_key}, status={request.status}")
