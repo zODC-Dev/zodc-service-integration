@@ -20,13 +20,6 @@ class GanttTaskResponse(BaseModel):
     actual_start: Optional[datetime] = Field(default=None, description="Actual start time")
     actual_end: Optional[datetime] = Field(default=None, description="Actual end time")
 
-
-class GanttChartFeasibilityResponse(BaseModel):
-    """Response schema for sprint feasibility check"""
-    is_feasible: bool = Field(..., description="Whether all tasks can be completed within sprint duration")
-    total_points: float = Field(..., description="Total story points in sprint")
-    total_hours: float = Field(..., description="Total hours in sprint")
-    sprint_start_date: datetime = Field(..., description="Sprint start date")
-    sprint_end_date: datetime = Field(..., description="Sprint end date")
-    expected_completion_date: datetime = Field(..., description="Expected completion date of all tasks")
-    task_count: int = Field(..., description="Number of tasks in sprint")
+    # class Config:
+    #     populate_by_name = True
+    #     alias_generator = to_camel

@@ -10,4 +10,6 @@ class WorkflowSyncReplyIssue(BaseModel):
 
 
 class WorkflowSyncReply(BaseModel):
+    success: bool
+    error_message: Optional[str] = None
     issues: List[WorkflowSyncReplyIssue]

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel
@@ -11,6 +12,7 @@ class WorkflowEditIssue(BaseModel):
     jira_key: Optional[str] = None
     estimate_point: Optional[float] = None
     action: str  # "create" hoặc "update"
+    last_synced_at: Optional[datetime] = None
 
 
 class WorkflowEditConnection(BaseModel):

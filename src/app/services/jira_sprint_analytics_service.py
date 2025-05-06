@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -313,6 +313,8 @@ class JiraSprintAnalyticsApplicationService:
             if not sprint:
                 raise ValueError(f"Sprint with ID {sprint_id} not found")
 
+            assert sprint.start_date is not None, "Sprint start date is required"
+
             # Get all issues in the sprint
             issues = await self.jira_issue_repository.get_project_issues(session=session, project_key=project_key, sprint_id=sprint_id)
 
@@ -350,29 +352,35 @@ class JiraSprintAnalyticsApplicationService:
                 progress = None
 
                 # Calculate progress for stories
-                if issue.type.value.lower() in story_types and issue.jira_issue_id in story_tasks:
-                    total_tasks = story_tasks[issue.jira_issue_id]
-                    completed_tasks = story_completed_tasks[issue.jira_issue_id]
+                if issue.type.value.lower() in story_types and issue.key in story_tasks:
+                    total_tasks = story_tasks[issue.key]
+                    completed_tasks = story_completed_tasks[issue.key]
 
                     if total_tasks > 0:
                         progress = (completed_tasks / total_tasks) * 100
-                        log.debug(
-                            f"Calculated progress for story {issue.key}: {progress}% ({completed_tasks}/{total_tasks} tasks)")
+
+                # Calculate plan_start and plan_end
+                plan_start = issue.planned_start_time or sprint.start_date
+                plan_duration = issue.estimate_point * 4
+                plan_end = plan_start + timedelta(hours=plan_duration)
 
                 task = GanttTaskResponse(
-                    id=issue.jira_issue_id,
+                    id=issue.key,
                     name=issue.summary,
                     assignee=issue.assignee.name if issue.assignee else None,
                     type=issue.type,
                     status=issue.status,
                     dependencies=issue.story_id,
-                    plan_start=issue.planned_start_time,
-                    plan_end=issue.planned_end_time,
+                    plan_start=plan_start,
+                    plan_end=plan_end,
                     actual_start=issue.actual_start_time,
                     actual_end=issue.actual_end_time,
                     progress=progress
                 )
                 tasks.append(task)
+
+            # Sort tasks by planned_start_time`
+            tasks.sort(key=lambda x: x.plan_start)
 
             return tasks
 

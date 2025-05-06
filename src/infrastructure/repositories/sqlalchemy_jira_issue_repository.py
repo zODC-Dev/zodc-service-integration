@@ -329,7 +329,6 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
             # Add sprint filter
             if sprint_id or is_backlog is not None:
-                log.info(f"Sprint ID: {sprint_id}, Is backlog: {is_backlog}")
                 if sprint_id:
                     # Join with issue_sprint table to filter by sprint_id
                     query = query.join(
@@ -438,13 +437,13 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                 if old_value != value:
                     log.debug(f"[REPOSITORY] Updated field {key}: {old_value} -> {value}")
 
-        log.info(f"[REPOSITORY] Adding updated entity to session")
+        log.info("[REPOSITORY] Adding updated entity to session")
         session.add(entity)
 
-        log.info(f"[REPOSITORY] Flushing session")
+        log.info("[REPOSITORY] Flushing session")
         await session.flush()
 
-        log.info(f"[REPOSITORY] Refreshing entity")
+        log.info("[REPOSITORY] Refreshing entity")
         await session.refresh(entity)
 
         log.info(f"[REPOSITORY] Issue with key {jira_issue_key} successfully updated")
@@ -462,7 +461,6 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
                 )
             )
 
-            log.debug(f"[REPO] Executing query: {query}")
             result = await session.exec(query)
             entities = result.all()
             log.debug(f"[REPO] Found {len(entities)} issues in database")

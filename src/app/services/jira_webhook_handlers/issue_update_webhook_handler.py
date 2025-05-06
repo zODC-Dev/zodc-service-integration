@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -83,19 +83,30 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
         # Update in database
         update_dto = JiraIssueConverter._convert_to_update_dto(issue_data)
 
-        # If issue is done, update actual end time, if issue is in progress, update actual start time
-        if update_dto.status == JiraIssueStatus.DONE.value:
+        # Define last synced at
+        current_time = datetime.now(timezone.utc)
+        update_dto.last_synced_at = current_time
+
+        # If issue is from in progress to done, update actual end time, if issue is from todo to in progress, update actual start time
+        if current_issue.status == JiraIssueStatus.IN_PROGRESS and update_dto.status == JiraIssueStatus.DONE.value:
+            log.debug(
+                f"Updating actual end time for issue {issue_id} from {current_issue.actual_end_time} to {datetime.now()}")
             update_dto.actual_end_time = datetime.now()
-        elif update_dto.status == JiraIssueStatus.IN_PROGRESS.value:
+        elif current_issue.status == JiraIssueStatus.TO_DO and update_dto.status == JiraIssueStatus.IN_PROGRESS.value:
+            log.debug(
+                f"Updating actual start time for issue {issue_id} from {current_issue.actual_start_time} to {datetime.now()}")
             update_dto.actual_start_time = datetime.now()
+        else:
+            log.debug(
+                f"No actual time update for issue {issue_id} because status is not changed from {current_issue.status.value} to {update_dto.status}")
 
         updated_issue = await self.jira_issue_repository.update(session=session, issue_id=issue_id, issue_update=update_dto)
 
         # Publish issue update to NATS for masterflow service
         if updated_issue:
             try:
-                await self._publish_issue_update_event(session=session, issue_data=issue_data, old_issue=current_issue)
-                log.info(f"Published issue update event for issue {issue_id} to NATS")
+                await self._publish_issue_update_event(session=session, issue_data=issue_data, old_issue=current_issue, last_synced_at=current_time)
+                log.debug(f"Published issue update event for issue {issue_id} to NATS")
             except Exception as e:
                 log.error(f"Error publishing issue update event for issue {issue_id}: {str(e)}")
 
@@ -104,7 +115,7 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
             "updated": updated_issue is not None
         }
 
-    async def _publish_issue_update_event(self, session: AsyncSession, issue_data: JiraIssueModel, old_issue: JiraIssueModel) -> None:
+    async def _publish_issue_update_event(self, session: AsyncSession, issue_data: JiraIssueModel, old_issue: JiraIssueModel, last_synced_at: datetime) -> None:
         """Publish issue update event to NATS for masterflow service"""
         # Extract required data from issue_data
         jira_key = issue_data.key
@@ -133,11 +144,13 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
                         sprint_id = current_sprint.id
                         break
 
-        # Get updated timestamp
-        updated_at = issue_data.updated_at
-
         # Get old status as string
         old_status = old_issue.status.value if old_issue.status else None
+
+        # # Convert last_synced_at to non-timezone format for NATS service
+        # last_synced_at = convert_timestamptz_to_timestamp(issue_data.last_synced_at)
+        # if last_synced_at:
+        #     log.debug(f"Converted last_synced_at for NATS from {issue_data.last_synced_at} to {last_synced_at}")
 
         # Create update data model
         update_data = JiraIssueUpdateDataPublishDTO(
@@ -149,8 +162,8 @@ class IssueUpdateWebhookHandler(JiraWebhookHandler):
             estimate_point=estimate_point,
             status=status,
             sprint_id=sprint_id,
-            updated_at=updated_at,
-            old_status=old_status
+            old_status=old_status,
+            last_synced_at=last_synced_at
         )
 
         # Create publish DTO and send via NATS

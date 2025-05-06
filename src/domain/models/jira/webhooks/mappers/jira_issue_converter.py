@@ -31,6 +31,7 @@ class JiraIssueConverter:
     @staticmethod
     def _convert_to_update_dto(issue_data: JiraIssueModel) -> JiraIssueDBUpdateDTO:
         """Convert JiraIssueModel to JiraIssueDBUpdateDTO"""
+        current_time = datetime.now(timezone.utc)
         return JiraIssueDBUpdateDTO(
             summary=issue_data.summary,
             description=issue_data.description,
@@ -41,8 +42,8 @@ class JiraIssueConverter:
             estimate_point=issue_data.estimate_point,
             actual_point=issue_data.actual_point,
             priority=issue_data.priority,
-            updated_at=datetime.now(timezone.utc),
-            last_synced_at=datetime.now(timezone.utc),
+            updated_at=current_time,
+            last_synced_at=current_time,
             link_url=issue_data.link_url,
             sprints=issue_data.sprints
         )

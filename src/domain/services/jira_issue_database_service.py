@@ -4,7 +4,6 @@ from typing import List, Optional
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.domain.constants.jira import JiraIssueType
-from src.domain.models.database.jira_issue import JiraIssueDBCreateDTO, JiraIssueDBUpdateDTO
 from src.domain.models.jira_issue import JiraIssueModel
 
 
@@ -15,27 +14,6 @@ class IJiraIssueDatabaseService(ABC):
 
     @abstractmethod
     async def get_issues_by_user_id(self, session: AsyncSession, user_id: int) -> List[JiraIssueModel]:
-        pass
-
-    @abstractmethod
-    async def create_issue(
-        self,
-        session: AsyncSession,
-        user_id: int,
-        issue: JiraIssueDBCreateDTO
-    ) -> JiraIssueModel:
-        """Create a new Jira issue"""
-        pass
-
-    @abstractmethod
-    async def update_issue(
-        self,
-        session: AsyncSession,
-        user_id: int,
-        issue_id: str,
-        update: JiraIssueDBUpdateDTO
-    ) -> JiraIssueModel:
-        """Update an existing Jira issue"""
         pass
 
     @abstractmethod

@@ -2,6 +2,7 @@ from typing import Dict, List, Optional
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.app.services.system_config_service import SystemConfigApplicationService
 from src.configs.logger import log
 from src.domain.models.database.jira_issue import JiraIssueDBUpdateDTO
 from src.domain.models.gantt_chart import (
@@ -16,7 +17,6 @@ from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.services.gantt_chart_calculator_service import IGanttChartCalculatorService
 from src.domain.services.workflow_service_client import IWorkflowServiceClient
-from src.app.services.system_config_service import SystemConfigApplicationService
 
 
 class GanttChartApplicationService:
@@ -41,7 +41,6 @@ class GanttChartApplicationService:
         session: AsyncSession,
         project_key: str,
         sprint_id: int,
-        config: Optional[ProjectConfigModel] = None,
         issues: Optional[List[GanttChartJiraIssueModel]] = None,
         connections: Optional[List[GanttChartConnectionModel]] = None
     ) -> GanttChartModel:
@@ -50,28 +49,25 @@ class GanttChartApplicationService:
             log.debug(f"[GANTT] Starting Gantt chart calculation for sprint: {sprint_id}, project: {project_key}")
             log.debug(f"[GANTT] Input issues count: {len(issues) if issues else 0}")
             log.debug(f"[GANTT] Input connections count: {len(connections) if connections else 0}")
-            log.debug(f"[GANTT] Configuration: {config.model_dump() if config else 'default'}")
 
-            # Nếu không có config được cung cấp, chúng ta sẽ tạo từ cấu hình database
-            if not config:
-                # Lấy các cấu hình từ service
-                hours_per_point = await self.system_config_service.get_estimate_point_to_hours(
-                    session=session, project_key=project_key
-                )
-                working_hours_per_day = await self.system_config_service.get_working_hours_per_day(session=session)
-                lunch_break_minutes = await self.system_config_service.get_lunch_break_minutes(session=session)
-                start_work_hour = await self.system_config_service.get_start_work_hour(session=session)
-                end_work_hour = await self.system_config_service.get_end_work_hour(session=session)
+            # Lấy các cấu hình từ service
+            hours_per_point = await self.system_config_service.get_estimate_point_to_hours(
+                session=session, project_key=project_key
+            )
+            working_hours_per_day = await self.system_config_service.get_working_hours_per_day(session=session)
+            lunch_break_minutes = await self.system_config_service.get_lunch_break_minutes(session=session)
+            start_work_hour = await self.system_config_service.get_start_work_hour(session=session)
+            end_work_hour = await self.system_config_service.get_end_work_hour(session=session)
 
-                # Tạo config model từ các giá trị database
-                config = ProjectConfigModel(
-                    estimate_point_to_hours=hours_per_point,
-                    working_hours_per_day=working_hours_per_day,
-                    lunch_break_minutes=lunch_break_minutes,
-                    start_work_hour=start_work_hour,
-                    end_work_hour=end_work_hour
-                )
-                log.debug(f"[GANTT] Created configuration from database: {config.model_dump()}")
+            # Tạo config model từ các giá trị database
+            config = ProjectConfigModel(
+                estimate_point_to_hours=hours_per_point,
+                working_hours_per_day=working_hours_per_day,
+                lunch_break_minutes=lunch_break_minutes,
+                start_work_hour=start_work_hour,
+                end_work_hour=end_work_hour
+            )
+            log.debug(f"[GANTT] Created configuration from database: {config.model_dump()}")
 
             # Get sprint information
             log.debug(f"[GANTT] Fetching sprint information for ID: {sprint_id}")
@@ -157,11 +153,10 @@ class GanttChartApplicationService:
             for parent, children in hierarchy_map.items():
                 log.debug(f"[GANTT] Parent {parent} has {len(children)} children: {children}")
 
-            # Flatten connections for dependency calculation
+            # Giữ nguyên các connection, không cần chuyển đổi phức tạp
+            # Gang calculator mới sẽ xử lý propagation
             flattened_connections = self._flatten_connections(connections_list, hierarchy_map)
             log.debug(f"[GANTT] Flattened connections: {len(flattened_connections)} connections")
-            for conn in flattened_connections:
-                log.debug(f"[GANTT] Flattened connection: {conn.from_node_id} -> {conn.to_node_id} ({conn.type})")
 
             # Calculate schedule
             log.debug(
@@ -190,7 +185,7 @@ class GanttChartApplicationService:
                         planned_end_time=task.plan_end_time
                     )
 
-                    log.info(
+                    log.debug(
                         f"[GANTT] Updating task {task.jira_key} with planned times: start={task.plan_start_time}, end={task.plan_end_time}")
 
                     # If this task is a child of a story, update the story_id field
@@ -201,16 +196,16 @@ class GanttChartApplicationService:
                         if parent_task and parent_task.jira_key:
                             log.debug(f"[GANTT] Setting story_id for task {task.jira_key}: {parent_task.jira_key}")
                             update_dto.story_id = parent_task.jira_key
-                            log.info(f"[GANTT] Task {task.jira_key} is part of story {parent_task.jira_key}")
+                            log.debug(f"[GANTT] Task {task.jira_key} is part of story {parent_task.jira_key}")
 
                     try:
-                        log.info(f"[GANTT] Calling issue_repository.update_by_key for {task.jira_key}")
+                        log.debug(f"[GANTT] Calling issue_repository.update_by_key for {task.jira_key}")
                         updated_issue = await self.issue_repository.update_by_key(
                             session=session,
                             jira_issue_key=task.jira_key,
                             issue_update=update_dto
                         )
-                        log.info(f"[GANTT] Successfully updated issue {task.jira_key} in database")
+                        log.debug(f"[GANTT] Successfully updated issue {task.jira_key} in database")
                         log.debug(
                             f"[GANTT] Updated issue details: planned_start_time={updated_issue.planned_start_time}, planned_end_time={updated_issue.planned_end_time}, story_id={updated_issue.story_id}")
                     except Exception as e:
@@ -273,93 +268,30 @@ class GanttChartApplicationService:
     ) -> List[GanttChartConnectionModel]:
         """Convert all connections to flat dependency relationships for scheduling"""
         flattened = []
-        stories = set()
 
-        # First, identify all stories
-        for parent in hierarchy_map:
-            stories.add(parent)
-
-        # Process all connections
+        # Process all connections, keep only "relates to" and "contains"
         for connection in connections:
             conn_type = connection.type.lower()
-            from_node = connection.from_node_id
-            to_node = connection.to_node_id
 
+            # Keep "relates to" as is - these are direct dependencies
             if conn_type == "relates to":
-                # Direct dependency - keep as is
                 flattened.append(GanttChartConnectionModel(
-                    from_node_id=from_node,
-                    to_node_id=to_node,
+                    from_node_id=connection.from_node_id,
+                    to_node_id=connection.to_node_id,
                     type="relates to"
                 ))
 
-                # If this is a story → story relationship, we need to add implicit dependencies
-                # from the last tasks of first story to the first tasks of second story
-                if from_node in stories and to_node in stories:
-                    # Add dependencies between last tasks of first story and first tasks of second story
-                    if from_node in hierarchy_map and to_node in hierarchy_map:
-                        # Find terminal tasks (those with no outgoing relates_to connections)
-                        terminal_tasks_from = self._find_terminal_tasks(
-                            hierarchy_map[from_node], connections)
-
-                        # Find initial tasks (those with no incoming relates_to connections)
-                        initial_tasks_to = self._find_initial_tasks(
-                            hierarchy_map[to_node], connections)
-
-                        # Add dependencies between terminal and initial tasks
-                        for term_task in terminal_tasks_from:
-                            for init_task in initial_tasks_to:
-                                flattened.append(GanttChartConnectionModel(
-                                    from_node_id=term_task,
-                                    to_node_id=init_task,
-                                    type="relates to"
-                                ))
-
+            # Keep "contains" as is - these define the hierarchy structure
+            # Gantt calculator will use hierarchy_map for parent-child relationships
             elif conn_type == "contains":
-                # Parent-child relationship (story contains task)
-                # 1. A child task can't start before its parent story
                 flattened.append(GanttChartConnectionModel(
-                    from_node_id=from_node,  # Story
-                    to_node_id=to_node,      # Task
-                    type="child_starts_after_parent"
+                    from_node_id=connection.from_node_id,
+                    to_node_id=connection.to_node_id,
+                    type="contains"
                 ))
 
-                # 2. A parent story can't finish until all its children are done
-                flattened.append(GanttChartConnectionModel(
-                    from_node_id=to_node,    # Task
-                    to_node_id=from_node,    # Story
-                    type="parent_finishes_after_child"
-                ))
-
+        log.debug(f"[GANTT] Flattened connections: {len(flattened)} connections")
         return flattened
-
-    def _find_terminal_tasks(self, tasks: List[str], connections: List[GanttChartConnectionModel]) -> List[str]:
-        """Find tasks that have no outgoing relates_to connections within their parent story"""
-        # Get all tasks that are sources in relates_to connections
-        source_tasks = set()
-        for conn in connections:
-            if conn.type.lower() == "relates to" and conn.from_node_id in tasks and conn.to_node_id in tasks:
-                source_tasks.add(conn.from_node_id)
-
-        # Terminal tasks are those that are not sources to other tasks in the same story
-        terminal_tasks = [task for task in tasks if task not in source_tasks]
-
-        # If no terminal tasks found, return all tasks
-        return terminal_tasks if terminal_tasks else tasks
-
-    def _find_initial_tasks(self, tasks: List[str], connections: List[GanttChartConnectionModel]) -> List[str]:
-        """Find tasks that have no incoming relates_to connections within their parent story"""
-        # Get all tasks that are targets in relates_to connections
-        target_tasks = set()
-        for conn in connections:
-            if conn.type.lower() == "relates to" and conn.to_node_id in tasks and conn.from_node_id in tasks:
-                target_tasks.add(conn.to_node_id)
-
-        # Initial tasks are those that are not targets from other tasks in the same story
-        initial_tasks = [task for task in tasks if task not in target_tasks]
-
-        # If no initial tasks found, return all tasks
-        return initial_tasks if initial_tasks else tasks
 
     async def _get_connections(
         self,

@@ -35,13 +35,13 @@ class SQLAlchemyJiraSprintRepository(IJiraSprintRepository):
         data = self._prepare_data(sprint_data.model_dump())
 
         sprint = JiraSprintEntity(**data)
-        session.add(sprint)
 
         # check if project key is in the database
         project = await session.exec(select(JiraProjectEntity).where(col(JiraProjectEntity.key) == sprint.project_key))
         if not project:
             raise Exception(f"Project with key {sprint.project_key} not found")
 
+        session.add(sprint)
         try:
             # Let the calling context handle the transaction
             await session.flush()

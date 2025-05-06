@@ -36,7 +36,7 @@ class MediaApplicationService:
 
         media_id = uuid4()
 
-        log.info(f"Media ID in create: {media_id}")
+        log.debug(f"Media ID in create: {media_id}")
 
         # Create media record
         media = MediaDBCreateDTO(
