@@ -157,6 +157,11 @@ class DependencyContainer:
         instance.media_repository = SQLAlchemyMediaRepository()
         instance.system_config_repository = SQLAlchemySystemConfigRepository()
 
+        # Initialize system config service
+        instance.system_config_application_service = SystemConfigApplicationService(
+            system_config_repository=instance.system_config_repository
+        )
+
         # Initialize token services
         instance.token_refresh_service = TokenRefreshService(
             instance.redis_service,
@@ -256,11 +261,11 @@ class DependencyContainer:
         instance.workflow_service_client = NATSWorkflowServiceClient(instance.nats_service)
 
         instance.gantt_chart_service = GanttChartApplicationService(
-            instance.jira_issue_repository,
-            instance.jira_sprint_repository,
-            instance.gantt_calculator_service,
-            instance.workflow_service_client,
-            instance.system_config_application_service
+            issue_repository=instance.jira_issue_repository,
+            sprint_repository=instance.jira_sprint_repository,
+            gantt_calculator_service=instance.gantt_calculator_service,
+            workflow_service_client=instance.workflow_service_client,
+            system_config_service=instance.system_config_application_service
         )
 
         instance.nats_application_service = NATSApplicationService(instance.nats_service)
@@ -357,7 +362,7 @@ class DependencyContainer:
     async def get_db_for_job(cls) -> AsyncSession:
         """Get a new DB session for background jobs"""
         # Instead of using get_db() which uses context manager,
-        # we use create_session() which gives us a session without context manager
+        # we use create_session() which gives us a session without context manager,
         # that we can properly close manually after use
         return await create_session()
 
