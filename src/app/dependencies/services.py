@@ -447,7 +447,13 @@ async def get_gantt_chart_service(
     system_config_service: SystemConfigApplicationService = Depends(get_system_config_service)
 ) -> GanttChartApplicationService:
     """Get the Gantt chart service"""
-    return GanttChartApplicationService(issue_repository, sprint_repository, gantt_calculator_service, workflow_service_client, system_config_service)
+    return GanttChartApplicationService(
+        issue_repository=issue_repository,
+        sprint_repository=sprint_repository,
+        gantt_calculator_service=gantt_calculator_service,
+        workflow_service_client=workflow_service_client,
+        system_config_service=system_config_service
+    )
 
 
 # ============================ JIRA WEBHOOK HANDLERS ===========================================
