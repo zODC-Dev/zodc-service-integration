@@ -27,12 +27,13 @@ class GanttChartRequestHandler(INATSRequestHandler):
 
             # Validate request against our defined model
             request = GanttChartCalculationRequest.model_validate(message)
-            log.info(f"[GANTT-NATS] Processing request for project: {request.project_key}, sprint: {request.sprint_id}")
+            log.debug(
+                f"[GANTT-NATS] Processing request for project: {request.project_key}, sprint: {request.sprint_id}")
             log.debug(
                 f"[GANTT-NATS] Request contains {len(request.issues) if request.issues else 0} issues and {len(request.connections) if request.connections else 0} connections")
 
             # Get Gantt chart with properly typed models
-            log.info("[GANTT-NATS] Calling application service to calculate Gantt chart")
+            log.debug("[GANTT-NATS] Calling application service to calculate Gantt chart")
             gantt_chart = await self.gantt_chart_service.get_gantt_chart(
                 session=session,
                 project_key=request.project_key,
@@ -40,7 +41,7 @@ class GanttChartRequestHandler(INATSRequestHandler):
                 issues=request.issues,
                 connections=request.connections
             )
-            log.info(f"[GANTT-NATS] Gantt chart calculation completed with {len(gantt_chart.tasks)} tasks")
+            log.debug(f"[GANTT-NATS] Gantt chart calculation completed with {len(gantt_chart.tasks)} tasks")
 
             # Create client response directly from gantt chart tasks
             client_issues = [
@@ -54,7 +55,7 @@ class GanttChartRequestHandler(INATSRequestHandler):
 
             # Create the final response model
             # client_response = GanttChartCalculationResponse(issues=client_issues)
-            log.info(f"[GANTT-NATS] Created client response with {len(client_issues)} issues")
+            log.debug(f"[GANTT-NATS] Created client response with {len(client_issues)} issues")
 
             # Serialize với datetime xử lý đúng
             response_data = {}

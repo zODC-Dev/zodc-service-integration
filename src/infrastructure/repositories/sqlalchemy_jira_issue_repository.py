@@ -329,7 +329,6 @@ class SQLAlchemyJiraIssueRepository(IJiraIssueRepository):
 
             # Add sprint filter
             if sprint_id or is_backlog is not None:
-                log.info(f"Sprint ID: {sprint_id}, Is backlog: {is_backlog}")
                 if sprint_id:
                     # Join with issue_sprint table to filter by sprint_id
                     query = query.join(

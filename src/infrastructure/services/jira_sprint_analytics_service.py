@@ -315,8 +315,8 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         start_date = sprint.start_date
         end_date = sprint.end_date
 
-        log.info("=== START CALCULATING INITIAL POINTS ===")
-        log.info(f"Sprint start date: {start_date}")
+        log.debug("=== START CALCULATING INITIAL POINTS ===")
+        log.debug(f"Sprint start date: {start_date}")
 
         # Chuẩn bị danh sách issue IDs cho các truy vấn batch
         all_issue_ids = [issue.jira_issue_id for issue in issues]
@@ -343,9 +343,9 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         )
 
         # Tìm các initial issues (issues có trong sprint tại thời điểm sprint bắt đầu)
-        log.info(f"len(issues): {len(issues)}")
+        log.debug(f"len(issues): {len(issues)}")
         initial_issues = self._get_initial_issues(issues, start_date)
-        log.info(f"len(initial_issues): {len(initial_issues)}")
+        log.debug(f"len(initial_issues): {len(initial_issues)}")
 
         total_points_initial = self._calculate_initial_points(
             initial_issues,
@@ -353,9 +353,9 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
             start_date
         )
 
-        log.info("\n=== FINAL RESULT ===")
-        log.info(f"Total initial points: {total_points_initial}")
-        log.info("=== END CALCULATING INITIAL POINTS ===\n")
+        log.debug("\n=== FINAL RESULT ===")
+        log.debug(f"Total initial points: {total_points_initial}")
+        log.debug("=== END CALCULATING INITIAL POINTS ===\n")
 
         # Tính toán scope changes và tổng điểm hiện tại
         assert sprint.id is not None, "Sprint ID must be provided"
@@ -505,7 +505,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
 
                     # Nếu có thay đổi điểm
                     if points_diff != 0:
-                        log.info(
+                        log.debug(
                             f"Issue {issue.key} story points changed from {old_points} to {new_points} at {change.created_at}")
 
                         # Cập nhật daily scope points
@@ -630,7 +630,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
             else:
                 total_initial_points += 0
 
-        log.info(f"Total initial points: {total_initial_points}")
+        log.debug(f"Total initial points: {total_initial_points}")
         return total_initial_points
 
     def _calculate_daily_data(

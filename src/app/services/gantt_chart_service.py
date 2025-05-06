@@ -185,7 +185,7 @@ class GanttChartApplicationService:
                         planned_end_time=task.plan_end_time
                     )
 
-                    log.info(
+                    log.debug(
                         f"[GANTT] Updating task {task.jira_key} with planned times: start={task.plan_start_time}, end={task.plan_end_time}")
 
                     # If this task is a child of a story, update the story_id field
@@ -196,16 +196,16 @@ class GanttChartApplicationService:
                         if parent_task and parent_task.jira_key:
                             log.debug(f"[GANTT] Setting story_id for task {task.jira_key}: {parent_task.jira_key}")
                             update_dto.story_id = parent_task.jira_key
-                            log.info(f"[GANTT] Task {task.jira_key} is part of story {parent_task.jira_key}")
+                            log.debug(f"[GANTT] Task {task.jira_key} is part of story {parent_task.jira_key}")
 
                     try:
-                        log.info(f"[GANTT] Calling issue_repository.update_by_key for {task.jira_key}")
+                        log.debug(f"[GANTT] Calling issue_repository.update_by_key for {task.jira_key}")
                         updated_issue = await self.issue_repository.update_by_key(
                             session=session,
                             jira_issue_key=task.jira_key,
                             issue_update=update_dto
                         )
-                        log.info(f"[GANTT] Successfully updated issue {task.jira_key} in database")
+                        log.debug(f"[GANTT] Successfully updated issue {task.jira_key} in database")
                         log.debug(
                             f"[GANTT] Updated issue details: planned_start_time={updated_issue.planned_start_time}, planned_end_time={updated_issue.planned_end_time}, story_id={updated_issue.story_id}")
                     except Exception as e:

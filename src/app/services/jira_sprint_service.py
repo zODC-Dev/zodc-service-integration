@@ -101,7 +101,7 @@ class JiraSprintApplicationService:
                 session=session,
                 sprint_id=sprint_id
             )
-            log.info(f"Reset is_system_linked flag for {updated_count} issues in sprint {sprint_id}")
+            log.debug(f"Reset is_system_linked flag for {updated_count} issues in sprint {sprint_id}")
         except Exception as e:
             log.error(f"Error resetting is_system_linked flag for issues in sprint {sprint_id}: {str(e)}")
 

@@ -173,13 +173,13 @@ class JiraProjectApplicationService:
                     await self.sync_log_repository.create_sync_log(session, initial_log_data)
 
                 # Sync project details
-                log.info("Syncing project details...")
+                log.debug("Syncing project details...")
                 project = await self._sync_project_details(session, request.user_id, request.project_key, request.project_id)
 
                 # Sync project users
-                log.info("Syncing project users...")
+                log.debug("Syncing project users...")
                 users = await self._sync_project_users(session, request.user_id, request.project_key)
-                log.info(f"Successfully synced {len(users)} users")
+                log.debug(f"Successfully synced {len(users)} users")
 
                 # Prepare synced users for response
                 synced_users = [
@@ -194,19 +194,19 @@ class JiraProjectApplicationService:
                 ]
 
                 # Sync sprints
-                log.info("Syncing project sprints...")
+                log.debug("Syncing project sprints...")
                 sprint_id_mapping = await self._sync_project_sprints(session, request.user_id, request.project_key)
-                log.info(f"Successfully synced {len(sprint_id_mapping)} sprints")
+                log.debug(f"Successfully synced {len(sprint_id_mapping)} sprints")
 
                 # Sync issues
-                log.info("Syncing project issues...")
+                log.debug("Syncing project issues...")
                 issues = await self._sync_project_issues(session, request.user_id, request.project_key)
-                log.info(f"Successfully synced {len(issues)} issues")
+                log.debug(f"Successfully synced {len(issues)} issues")
 
                 # Sync changelog
-                log.info("Syncing project changelog...")
+                log.debug("Syncing project changelog...")
                 issue_ids = [issue.jira_issue_id for issue in issues]
-                log.info(f"Syncing changelog for {len(issue_ids)} issues")
+                log.debug(f"Syncing changelog for {len(issue_ids)} issues")
                 # issue_ids = ['10383', '10382', '10381', '10380', '10379']
                 await self._sync_project_changelog(session, issue_ids)
 

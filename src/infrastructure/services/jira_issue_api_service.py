@@ -117,7 +117,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                     error_msg=f"Error fetching issue {issue_id}"
                 )
 
-                log.info(f"Response data when get issue: {response_data}")
+                log.debug(f"Response data when get issue: {response_data}")
 
                 # Map response to domain model
                 issue: JiraIssueModel = await self.client.map_to_domain(
@@ -148,7 +148,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
     async def create_issue(self, session: AsyncSession, user_id: int, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
         """Create new issue in Jira"""
-        log.info(f"Creating issue with data: {issue_data}")
+        log.debug(f"Creating issue with data: {issue_data}")
 
         # Prepare payload
         payload: Dict[str, Any] = {
@@ -167,11 +167,11 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         if issue_data.sprint_id:
             # Jira expects customfield_10020 as a value of 1 active sprint
             payload["fields"]["customfield_10020"] = issue_data.sprint_id
-            log.info(f"Adding issue to sprints: {issue_data.sprint_id}")
+            log.debug(f"Adding issue to sprints: {issue_data.sprint_id}")
 
         # Add optional fields
         if issue_data.assignee_id:
-            log.info(f"Updating assignee_id: {issue_data.assignee_id}")
+            log.debug(f"Updating assignee_id: {issue_data.assignee_id}")
             jira_user = await self.user_repository.get_user_by_id(session=session, user_id=int(issue_data.assignee_id))
             if jira_user and jira_user.jira_account_id:
                 payload["fields"]["assignee"] = {"id": jira_user.jira_account_id}
@@ -179,7 +179,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         if issue_data.estimate_point is not None:
             payload["fields"]["customfield_10016"] = issue_data.estimate_point
 
-        log.info(f"Creating issue with payload: {payload}")
+        log.debug(f"Creating issue with payload: {payload}")
         response_data = await self.client.post(
             session=session,
             endpoint="/rest/api/3/issue",
@@ -199,7 +199,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         # Handle initial status if specified
         if issue_data.status:
-            log.info(f"Setting initial status to {issue_data.status}")
+            log.debug(f"Setting initial status to {issue_data.status}")
             await self.transition_issue(session=session, user_id=user_id, issue_id=created_issue_id, status=issue_data.status)
             created_issue = await self.get_issue(session=session, user_id=user_id, issue_id=created_issue_id)
 
@@ -250,7 +250,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             payload["fields"]["description"] = self._text_to_adf(update.description)
 
         if update.assignee_id is not None:
-            log.info(f"Updating assignee_id: {update.assignee_id}")
+            log.debug(f"Updating assignee_id: {update.assignee_id}")
             jira_user = await self.user_repository.get_user_by_id(session=session, user_id=int(update.assignee_id))
             if jira_user and jira_user.jira_account_id:
                 payload["fields"]["assignee"] = {"id": jira_user.jira_account_id}
@@ -258,7 +258,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         if update.estimate_point is not None:
             payload["fields"]["customfield_10016"] = update.estimate_point
 
-        log.info(f"Updating issue {issue_id} with payload: {payload}")
+        log.debug(f"Updating issue {issue_id} with payload: {payload}")
 
         # Only send request if there is a field to update
         if payload["fields"]:
@@ -278,7 +278,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         # Update status if provided
         if status_to_update is not None:
-            log.info(f"Attempting to update status to {status_to_update}")
+            log.debug(f"Attempting to update status to {status_to_update}")
             status_success = await self.transition_issue(session=session, user_id=user_id, issue_id=issue_id, status=status_to_update)
             if status_success:
                 update_result["messages"].append(f"Successfully transitioned to {status_to_update}")
@@ -287,7 +287,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 update_result["messages"].append(f"Failed to transition to {status_to_update}")
 
         # Log kết quả cập nhật
-        log.info(f"Update result for issue {issue_id}: {update_result}")
+        log.debug(f"Update result for issue {issue_id}: {update_result}")
 
         # Return issue after update
         updated_issue = await self.get_issue(session=session, user_id=user_id, issue_id=issue_id)
@@ -371,7 +371,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         status_value = status_enum.value
 
         # 1. Lấy danh sách transitions có thể thực hiện
-        log.info(f"Getting transitions for issue {issue_id}")
+        log.debug(f"Getting transitions for issue {issue_id}")
         transitions = await self.get_issue_transitions(session=session, user_id=user_id, issue_id=issue_id)
 
         # 2. Tìm transition ID tương ứng với status mong muốn
@@ -384,7 +384,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             transition_name = t.get('name')
             transition_id_str = t.get('id')
 
-            log.info(f"Available transition: {transition_id_str} - {transition_name} -> {to_name}")
+            log.debug(f"Available transition: {transition_id_str} - {transition_name} -> {to_name}")
 
             # So sánh cả name và to.name với status value
             if (transition_name == status_value or to_name == status_value):
@@ -394,7 +394,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         if matching_transitions:
             # Lấy transition đầu tiên khớp
             transition_id = matching_transitions[0].get('id')
-            log.info(f"Found matching transition: {transition_id} for status {status_value}")
+            log.debug(f"Found matching transition: {transition_id} for status {status_value}")
 
         # 3. Nếu không tìm thấy transition phù hợp
         if not transition_id:
@@ -407,10 +407,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 return False
 
             current_status_value = current_issue.status.value
-            log.info(f"Current status of issue {issue_id} is {current_status_value}, wanted {status_value}")
+            log.debug(f"Current status of issue {issue_id} is {current_status_value}, wanted {status_value}")
 
             if current_issue.status == status_enum or current_status_value == status_value:
-                log.info(f"Issue {issue_id} is already in status {status_value}")
+                log.debug(f"Issue {issue_id} is already in status {status_value}")
                 return True
 
             log.error(f"Cannot transition issue {issue_id} from {current_status_value} to {status_value}")
@@ -418,7 +418,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         # 4. Thực hiện transition nếu tìm thấy ID phù hợp
         try:
-            log.info(f"Transitioning issue {issue_id} to {status_value} using transition ID {transition_id}")
+            log.debug(f"Transitioning issue {issue_id} to {status_value} using transition ID {transition_id}")
             await self.client.post(
                 session=session,
                 endpoint=f"/rest/api/3/issue/{issue_id}/transitions",
@@ -429,7 +429,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
             # 5. Kiểm tra lại trạng thái sau khi transition
             updated_issue = await self.get_issue(session=session, user_id=user_id, issue_id=issue_id)
-            log.info(f"After transition, issue {issue_id} is in status {updated_issue.status.value}")
+            log.debug(f"After transition, issue {issue_id} is in status {updated_issue.status.value}")
 
             return updated_issue.status == status_enum or updated_issue.status.value == status_value
 
@@ -523,7 +523,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 }
             }
 
-            log.info(f"Creating link '{relationship}' between {source_issue_id} and {target_issue_id}")
+            log.debug(f"Creating link '{relationship}' between {source_issue_id} and {target_issue_id}")
 
             # Call Jira API to create link
             await self.client.post(
@@ -534,7 +534,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 error_msg=f"Error creating link between {source_issue_id} and {target_issue_id}"
             )
 
-            log.info(f"Created link '{relationship}' between {source_issue_id} and {target_issue_id}")
+            log.debug(f"Created link '{relationship}' between {source_issue_id} and {target_issue_id}")
             return True
 
         except Exception as e:
@@ -573,7 +573,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                     error_msg=f"Error getting changelog for issue {issue_id}"
                 )
 
-                # log.info(f"Response data when get changelog: {response_data}")
+                # log.debug(f"Response data when get changelog: {response_data}")
 
                 if not response_data:
                     break
@@ -624,7 +624,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
     async def create_issue_with_admin_auth(self, session: AsyncSession, issue_data: JiraIssueAPICreateRequestDTO) -> JiraIssueModel:
         """Create new issue in Jira using admin auth"""
-        log.info(f"Creating issue with admin auth: {issue_data}")
+        log.debug(f"Creating issue with admin auth: {issue_data}")
 
         # Sử dụng admin client
         client_to_use = self.admin_client or self.client
@@ -646,11 +646,11 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         if issue_data.sprint_id:
             # Jira expects customfield_10020 as a value of 1 active sprint
             payload["fields"]["customfield_10020"] = issue_data.sprint_id
-            log.info(f"Adding issue to sprints: {issue_data.sprint_id}")
+            log.debug(f"Adding issue to sprints: {issue_data.sprint_id}")
 
         # Add optional fields
         if issue_data.assignee_id:
-            log.info(f"Updating assignee_id: {issue_data.assignee_id}")
+            log.debug(f"Updating assignee_id: {issue_data.assignee_id}")
             jira_user = await self.user_repository.get_user_by_id(session=session, user_id=int(issue_data.assignee_id))
             if jira_user and jira_user.jira_account_id:
                 payload["fields"]["assignee"] = {"id": jira_user.jira_account_id}
@@ -658,7 +658,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         if issue_data.estimate_point is not None:
             payload["fields"]["customfield_10016"] = issue_data.estimate_point
 
-        log.info(f"Creating issue with admin auth and payload: {payload}")
+        log.debug(f"Creating issue with admin auth and payload: {payload}")
         response_data = await client_to_use.post(
             session=None,
             endpoint="/rest/api/3/issue",
@@ -678,7 +678,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         # Handle initial status if specified
         if issue_data.status:
-            log.info(f"Setting initial status to {issue_data.status}")
+            log.debug(f"Setting initial status to {issue_data.status}")
             await self.transition_issue_with_admin_auth(created_issue_id, issue_data.status)
             created_issue = await self.get_issue_with_admin_auth(created_issue_id)
 
@@ -711,7 +711,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             payload["fields"]["description"] = self._text_to_adf(update.description)
 
         if update.assignee_id is not None:
-            log.info(f"Updating assignee_id: {update.assignee_id}")
+            log.debug(f"Updating assignee_id: {update.assignee_id}")
             jira_user = await self.user_repository.get_user_by_id(session=session, user_id=int(update.assignee_id))
             if jira_user and jira_user.jira_account_id:
                 payload["fields"]["assignee"] = {"id": jira_user.jira_account_id}
@@ -742,7 +742,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         # Update status if provided
         if status_to_update is not None:
-            log.info(f"Attempting to update status to {status_to_update}")
+            log.debug(f"Attempting to update status to {status_to_update}")
             status_success = await self.transition_issue_with_admin_auth(issue_id, status_to_update)
             if status_success:
                 update_result["messages"].append(f"Successfully transitioned to {status_to_update}")
@@ -751,7 +751,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 update_result["messages"].append(f"Failed to transition to {status_to_update}")
 
         # Log kết quả cập nhật
-        log.info(f"Update result for issue {issue_id}: {update_result}")
+        log.debug(f"Update result for issue {issue_id}: {update_result}")
 
         # Return issue after update
         updated_issue = await self.get_issue_with_admin_auth(issue_id)
@@ -780,7 +780,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 }
             }
 
-            log.info(f"Creating link '{relationship}' between {source_issue_id} and {target_issue_id} with admin auth")
+            log.debug(f"Creating link '{relationship}' between {source_issue_id} and {target_issue_id} with admin auth")
 
             # Call Jira API to create link
             await client_to_use.post(
@@ -791,7 +791,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 error_msg=f"Error creating link between {source_issue_id} and {target_issue_id}"
             )
 
-            log.info(f"Created link '{relationship}' between {source_issue_id} and {target_issue_id}")
+            log.debug(f"Created link '{relationship}' between {source_issue_id} and {target_issue_id}")
             return True
 
         except Exception as e:
@@ -817,7 +817,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         status_value = status_enum.value
 
         # 1. Lấy danh sách transitions có thể thực hiện
-        log.info(f"Getting transitions for issue {issue_id} with admin auth")
+        log.debug(f"Getting transitions for issue {issue_id} with admin auth")
         transitions = await self.get_issue_transitions_with_admin_auth(issue_id)
 
         # 2. Tìm transition ID tương ứng với status mong muốn
@@ -830,7 +830,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
             transition_name = t.get('name')
             transition_id_str = t.get('id')
 
-            log.info(f"Available transition: {transition_id_str} - {transition_name} -> {to_name}")
+            log.debug(f"Available transition: {transition_id_str} - {transition_name} -> {to_name}")
 
             # So sánh cả name và to.name với status value
             if (transition_name == status_value or to_name == status_value):
@@ -840,7 +840,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
         if matching_transitions:
             # Lấy transition đầu tiên khớp
             transition_id = matching_transitions[0].get('id')
-            log.info(f"Found matching transition: {transition_id} for status {status_value}")
+            log.debug(f"Found matching transition: {transition_id} for status {status_value}")
 
         # 3. Nếu không tìm thấy transition phù hợp
         if not transition_id:
@@ -853,10 +853,10 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 return False
 
             current_status_value = current_issue.status.value
-            log.info(f"Current status of issue {issue_id} is {current_status_value}, wanted {status_value}")
+            log.debug(f"Current status of issue {issue_id} is {current_status_value}, wanted {status_value}")
 
             if current_issue.status == status_enum or current_status_value == status_value:
-                log.info(f"Issue {issue_id} is already in status {status_value}")
+                log.debug(f"Issue {issue_id} is already in status {status_value}")
                 return True
 
             log.error(f"Cannot transition issue {issue_id} from {current_status_value} to {status_value}")
@@ -864,7 +864,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
         # 4. Thực hiện transition nếu tìm thấy ID phù hợp
         try:
-            log.info(
+            log.debug(
                 f"Transitioning issue {issue_id} to {status_value} using transition ID {transition_id} with admin auth")
             await client_to_use.post(
                 session=None,
@@ -876,7 +876,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
 
             # 5. Kiểm tra lại trạng thái sau khi transition
             updated_issue = await self.get_issue_with_admin_auth(issue_id)
-            log.info(f"After transition, issue {issue_id} is in status {updated_issue.status.value}")
+            log.debug(f"After transition, issue {issue_id} is in status {updated_issue.status.value}")
 
             return updated_issue.status == status_enum or updated_issue.status.value == status_value
 
@@ -912,7 +912,7 @@ class JiraIssueAPIService(IJiraIssueAPIService):
                 error_msg=f"Error deleting issue link with ID {link_id}"
             )
 
-            log.info(f"Successfully deleted issue link with ID {link_id}")
+            log.debug(f"Successfully deleted issue link with ID {link_id}")
             return True
         except Exception as e:
             log.error(f"Error deleting issue link with ID {link_id}: {str(e)}")
