@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
-from pydantic.alias_generators import to_camel
 
 from src.domain.constants.jira import JiraIssueStatus, JiraIssueType
 
@@ -21,6 +20,6 @@ class GanttTaskResponse(BaseModel):
     actual_start: Optional[datetime] = Field(default=None, description="Actual start time")
     actual_end: Optional[datetime] = Field(default=None, description="Actual end time")
 
-    class Config:
-        populate_by_name = True
-        alias_generator = to_camel
+    # class Config:
+    #     populate_by_name = True
+    #     alias_generator = to_camel

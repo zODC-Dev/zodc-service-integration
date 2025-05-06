@@ -151,3 +151,25 @@ async def get_gantt_chart_data(
         project_key=project_key,
         sprint_id=sprint_id
     )
+
+
+@router.get(
+    "/{project_key}/sprints/{sprint_id}/analytics/gantt-test",
+    response_model=StandardResponse,
+    summary="Test Gantt chart calculation with sample data",
+    description="For testing purpose only: Returns calculated Gantt chart with sample data"
+)
+async def test_gantt_chart_calculation(
+    project_key: str = Path(..., description="Project key"),
+    sprint_id: int = Path(..., description="Sprint ID"),
+    claims: JWTClaims = Depends(get_jwt_claims),
+    controller: JiraSprintAnalyticsController = Depends(get_sprint_analytics_controller),
+    session: AsyncSession = Depends(get_db)
+):
+    """Test Gantt chart calculation with sample data for development and debugging"""
+    return await controller.test_gantt_chart_calculation(
+        session=session,
+        user_id=int(claims.sub),
+        project_key=project_key,
+        sprint_id=sprint_id
+    )

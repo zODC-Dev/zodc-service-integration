@@ -4,7 +4,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.app.services.gantt_chart_service import GanttChartApplicationService
 from src.configs.logger import log
-from src.domain.models.gantt_chart import ProjectConfigModel
 from src.domain.models.nats.replies.gantt_chart_calculation import (
     GanttChartJiraIssueResult,
 )
@@ -32,17 +31,12 @@ class GanttChartRequestHandler(INATSRequestHandler):
             log.debug(
                 f"[GANTT-NATS] Request contains {len(request.issues) if request.issues else 0} issues and {len(request.connections) if request.connections else 0} connections")
 
-            # Create config if provided, otherwise use default
-            config = request.config if request.config else ProjectConfigModel()
-            log.debug(f"[GANTT-NATS] Using configuration: {config.model_dump()}")
-
             # Get Gantt chart with properly typed models
             log.info("[GANTT-NATS] Calling application service to calculate Gantt chart")
             gantt_chart = await self.gantt_chart_service.get_gantt_chart(
                 session=session,
                 project_key=request.project_key,
                 sprint_id=request.sprint_id,
-                config=config,
                 issues=request.issues,
                 connections=request.connections
             )

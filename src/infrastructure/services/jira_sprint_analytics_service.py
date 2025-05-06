@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+
+from datetime import date as datetime_date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -385,7 +386,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         self,
         issue: JiraIssueModel,
         jira_sprint_id: int,
-        date: datetime.date,
+        date: datetime_date,
         sprint_histories: List[JiraIssueHistoryModel] = None
     ) -> bool:
         """Kiểm tra xem issue có thuộc sprint vào một ngày cụ thể không"""
@@ -545,7 +546,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
     def _is_issue_completed_at_date(
         self,
         issue: JiraIssueModel,
-        date: datetime,
+        date: datetime_date,
         status_histories: List[JiraIssueHistoryModel] = None
     ) -> bool:
         """Kiểm tra xem issue đã hoàn thành tại một ngày cụ thể chưa"""
@@ -571,7 +572,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
     def _get_issue_points_at_date(
         self,
         issue: JiraIssueModel,
-        date: datetime.date,  # date in UTC
+        date: datetime_date,  # date in UTC
         points_histories: List[JiraIssueHistoryModel] = None
     ) -> float:
         """Lấy số điểm của issue tại một ngày cụ thể"""
@@ -648,7 +649,7 @@ class JiraSprintAnalyticsService(IJiraSprintAnalyticsService):
         daily_data: List[DailySprintData] = []
 
         # Danh sách các ngày trong sprint
-        days: List[datetime] = []
+        days: List[datetime_date] = []
         current_date = start_date
         while current_date.date() <= end_date.date():
             days.append(current_date.date())

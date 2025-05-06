@@ -15,7 +15,6 @@ from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.nats_message_handler import INATSRequestHandler
 from src.domain.services.redis_service import IRedisService
-from src.utils.date_utils import convert_timestamp_to_timestamptz
 
 
 class WorkflowEditRequestHandler(INATSRequestHandler):
@@ -40,34 +39,34 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
             # Convert raw message to DTO
             request = WorkflowEditRequest.model_validate(message)
 
-            # Check last synced at
-            issue_keys = [issue.jira_key for issue in request.issues if issue.jira_key]
-            db_issues = await self.jira_issue_repository.get_issues_by_keys(session=session, keys=issue_keys)
+            # # Check last synced at
+            # issue_keys = [issue.jira_key for issue in request.issues if issue.jira_key]
+            # db_issues = await self.jira_issue_repository.get_issues_by_keys(session=session, keys=issue_keys)
 
-            for issue in request.issues:
-                log.info(f"Checking issue {issue.jira_key} with last synced at {issue.last_synced_at}")
-                if issue.last_synced_at:
-                    # Convert NATS timestamp to one with timezone info for proper comparison
-                    nats_last_synced = convert_timestamp_to_timestamptz(issue.last_synced_at)
+            # for issue in request.issues:
+            #     log.info(f"Checking issue {issue.jira_key} with last synced at {issue.last_synced_at}")
+            #     if issue.last_synced_at:
+            #         # Convert NATS timestamp to one with timezone info for proper comparison
+            #         nats_last_synced = convert_timestamp_to_timestamptz(issue.last_synced_at)
 
-                    db_issue = next((db_issue for db_issue in db_issues if db_issue.key == issue.jira_key), None)
-                    if db_issue and db_issue.last_synced_at:
-                        log.debug(
-                            f"DB last_synced_at: {db_issue.last_synced_at}, NATS last_synced_at (with tz): {nats_last_synced}")
+            #         db_issue = next((db_issue for db_issue in db_issues if db_issue.key == issue.jira_key), None)
+            #         if db_issue and db_issue.last_synced_at:
+            #             log.debug(
+            #                 f"DB last_synced_at: {db_issue.last_synced_at}, NATS last_synced_at (with tz): {nats_last_synced}")
 
-                        if db_issue.last_synced_at > nats_last_synced:
-                            log.info(f"Issue {issue.jira_key} was synced after {nats_last_synced}, skipping")
-                            return {
-                                "success": False,
-                                "error": f"Issue {issue.jira_key} was synced after {nats_last_synced}, skipping",
-                                "data": WorkflowEditReply(
-                                    success=False,
-                                    error_message=f"Issue {issue.jira_key} was synced after {nats_last_synced}, skipping",
-                                    issues=[],
-                                    removed_connections=0,
-                                    added_connections=0
-                                ).model_dump()
-                            }
+            #             if db_issue.last_synced_at > nats_last_synced:
+            #                 log.info(f"Issue {issue.jira_key} was synced after {nats_last_synced}, skipping")
+            #                 return {
+            #                     "success": False,
+            #                     "error": f"Issue {issue.jira_key} was synced after {nats_last_synced}, skipping",
+            #                     "data": WorkflowEditReply(
+            #                         success=False,
+            #                         error_message=f"Issue {issue.jira_key} was synced after {nats_last_synced}, skipping",
+            #                         issues=[],
+            #                         removed_connections=0,
+            #                         added_connections=0
+            #                     ).model_dump()
+            #                 }
 
             # Tạo mapping ban đầu từ node_mappings nếu có
             node_to_jira_key_map: Dict[str, str] = {}

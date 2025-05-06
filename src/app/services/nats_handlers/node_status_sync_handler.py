@@ -51,16 +51,16 @@ class NodeStatusSyncHandler(INATSRequestHandler):
             request = NodeStatusSyncRequest.model_validate(message)
             transaction_id = request.transaction_id
 
-            # Check last synced at
-            if request.last_synced_at:
-                issue = await self.jira_issue_repository.get_by_jira_issue_key(session=session, jira_issue_key=request.jira_key)
-                if issue and issue.last_synced_at and issue.last_synced_at > request.last_synced_at:
-                    log.info(f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping")
-                    return NodeStatusSyncReply(
-                        success=False,
-                        error_message=f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping",
-                        data={"transaction_id": request.transaction_id}
-                    ).model_dump()
+            # # Check last synced at
+            # if request.last_synced_at:
+            #     issue = await self.jira_issue_repository.get_by_jira_issue_key(session=session, jira_issue_key=request.jira_key)
+            #     if issue and issue.last_synced_at and issue.last_synced_at > request.last_synced_at:
+            #         log.info(f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping")
+            #         return NodeStatusSyncReply(
+            #             success=False,
+            #             error_message=f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping",
+            #             data={"transaction_id": request.transaction_id}
+            #         ).model_dump()
 
             log.info(
                 f"[NodeStatusSyncHandler] Nhận request cập nhật trạng thái, transaction_id={request.transaction_id}, jira_key={request.jira_key}, status={request.status}")

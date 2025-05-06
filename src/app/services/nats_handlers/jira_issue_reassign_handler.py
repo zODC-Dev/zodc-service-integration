@@ -62,19 +62,19 @@ class JiraIssueReassignRequestHandler(INATSRequestHandler):
 
             assert user_id is not None, "user_id is not None"
 
-            # Check last synced at
-            if request.last_synced_at:
-                issue = await self.jira_issue_repository.get_by_jira_issue_key(session=session, jira_issue_key=request.jira_key)
-                if issue and issue.last_synced_at and issue.last_synced_at > request.last_synced_at:
-                    log.info(f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping")
-                    return JiraIssueReassignNATSReplyDTO(
-                        success=False,
-                        jira_key=request.jira_key,
-                        node_id=request.node_id,
-                        old_user_id=request.old_user_id,
-                        new_user_id=request.new_user_id,
-                        error_message=f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping"
-                    ).model_dump()
+            # # Check last synced at
+            # if request.last_synced_at:
+            #     issue = await self.jira_issue_repository.get_by_jira_issue_key(session=session, jira_issue_key=request.jira_key)
+            #     if issue and issue.last_synced_at and issue.last_synced_at > request.last_synced_at:
+            #         log.info(f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping")
+            #         return JiraIssueReassignNATSReplyDTO(
+            #             success=False,
+            #             jira_key=request.jira_key,
+            #             node_id=request.node_id,
+            #             old_user_id=request.old_user_id,
+            #             new_user_id=request.new_user_id,
+            #             error_message=f"Issue {request.jira_key} was synced after {request.last_synced_at}, skipping"
+            #         ).model_dump()
 
             # Update assignee in Jira
             success = await self.jira_issue_service.update_issue_assignee(
