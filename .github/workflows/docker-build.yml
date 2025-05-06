@@ -36,3 +36,11 @@ jobs:
       - name: Push Latest Image
         run: |
           docker push ${{ secrets.REGISTRY_HOST }}/${{ env.REGISTRY_PROJECT }}/${{ env.SERVICE_NAME }}:latest
+
+      - name: Pull In Server
+        run: |
+          sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_IP }} "
+            sudo docker-compose -f ${{ secrets.SSH_PATH }} pull &&
+            sudo docker-compose -f ${{ secrets.SSH_PATH }} down &&
+            sudo docker-compose -f ${{ secrets.SSH_PATH }} up -d
+          "
