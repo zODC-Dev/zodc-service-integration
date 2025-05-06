@@ -24,7 +24,7 @@ class NodeStatusSyncHandler(INATSRequestHandler):
         try:
             # Convert IN_PROGRESS, IN_REVIEW, DONE, TO_DO to JiraIssueStatus
             if status.lower() == "in_progress" or status.lower() == "in_process":
-                return JiraIssueStatus.IN_PROGRES
+                return JiraIssueStatus.IN_PROGRESS
             elif status.lower() == "done" or status.lower() == "completed":
                 return JiraIssueStatus.DONE
             elif status.lower() == "to_do":

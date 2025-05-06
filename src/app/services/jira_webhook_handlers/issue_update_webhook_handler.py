@@ -18,7 +18,6 @@ from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
 from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.sync_log_repository import ISyncLogRepository
 from src.domain.services.jira_issue_api_service import IJiraIssueAPIService
-from src.utils.date_utils import convert_timestamptz_to_timestamp
 
 
 class IssueUpdateWebhookHandler(JiraWebhookHandler):

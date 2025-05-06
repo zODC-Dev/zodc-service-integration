@@ -15,7 +15,7 @@ from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.repositories.jira_user_repository import IJiraUserRepository
 from src.domain.services.nats_message_handler import INATSRequestHandler
 from src.domain.services.redis_service import IRedisService
-from src.utils.date_utils import is_db_timestamp_newer, convert_timestamp_to_timestamptz
+from src.utils.date_utils import convert_timestamp_to_timestamptz
 
 
 class WorkflowEditRequestHandler(INATSRequestHandler):

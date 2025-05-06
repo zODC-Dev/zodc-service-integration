@@ -1,14 +1,12 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-
 
 # Define Vietnam timezone (UTC+7)
 VIETNAM_TZ = timezone(timedelta(hours=7))
 
 
 def convert_timestamp_to_timestamptz(dt: Optional[datetime]) -> Optional[datetime]:
-    """
-    Convert a timestamp without timezone (naive datetime) to timestamp with timezone (aware datetime).
+    """Convert a timestamp without timezone (naive datetime) to timestamp with timezone (aware datetime).
 
     Assumes input datetime is in Vietnam timezone (UTC+7) if it doesn't have timezone info.
 
@@ -30,8 +28,7 @@ def convert_timestamp_to_timestamptz(dt: Optional[datetime]) -> Optional[datetim
 
 
 def convert_timestamptz_to_timestamp(dt: Optional[datetime]) -> Optional[datetime]:
-    """
-    Convert a timestamp with timezone (aware datetime) to timestamp without timezone (naive datetime).
+    """Convert a timestamp with timezone (aware datetime) to timestamp without timezone (naive datetime).
 
     Converts to Vietnam time (UTC+7) first, then removes timezone info.
 
@@ -55,8 +52,7 @@ def convert_timestamptz_to_timestamp(dt: Optional[datetime]) -> Optional[datetim
 
 
 def is_db_timestamp_newer(db_timestamp: Optional[datetime], nats_timestamp: Optional[datetime]) -> bool:
-    """
-    Compare DB timestamp (with timezone) with NATS timestamp (without timezone).
+    """Compare DB timestamp (with timezone) with NATS timestamp (without timezone).
 
     Args:
         db_timestamp: Timestamp from database, with timezone info
