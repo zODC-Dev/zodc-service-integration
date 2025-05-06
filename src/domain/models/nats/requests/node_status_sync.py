@@ -1,4 +1,7 @@
 
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -17,3 +20,4 @@ class NodeStatusSyncRequest(BaseModel):
     jira_key: str
     node_id: str
     status: str
+    last_synced_at: Optional[datetime] = None

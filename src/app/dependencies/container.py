@@ -302,7 +302,8 @@ class DependencyContainer:
                 instance.gantt_chart_service
             ),
             NATSSubscribeTopic.NODE_STATUS_SYNC.value: NodeStatusSyncHandler(
-                instance.jira_issue_api_service
+                instance.jira_issue_api_service,
+                instance.jira_issue_repository
             ),
             NATSSubscribeTopic.WORKFLOW_EDIT.value: WorkflowEditRequestHandler(
                 instance.jira_issue_application_service,
@@ -313,7 +314,8 @@ class DependencyContainer:
             ),
             NATSSubscribeTopic.JIRA_ISSUE_REASSIGN.value: JiraIssueReassignRequestHandler(
                 instance.jira_issue_application_service,
-                instance.jira_user_repository
+                instance.jira_user_repository,
+                instance.jira_issue_repository
             )
         }
 

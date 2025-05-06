@@ -10,7 +10,7 @@ from src.app.controllers.media_controller import MediaController
 from src.app.controllers.microsoft_calendar_controller import MicrosoftCalendarController
 from src.app.controllers.system_config_controller import SystemConfigController
 from src.app.controllers.util_controller import UtilController
-from src.app.dependencies.repositories import get_jira_project_repository
+from src.app.dependencies.repositories import get_jira_project_repository, get_jira_sprint_repository
 from src.app.dependencies.services import (
     get_gantt_chart_service,
     get_jira_issue_history_sync_service,
@@ -35,6 +35,7 @@ from src.app.services.microsoft_calendar_service import MicrosoftCalendarApplica
 from src.app.services.system_config_service import SystemConfigApplicationService
 from src.app.services.util_service import UtilService
 from src.domain.repositories.jira_project_repository import IJiraProjectRepository
+from src.domain.repositories.jira_sprint_repository import IJiraSprintRepository
 from src.domain.services.jira_performance_summary_service import IJiraPerformanceSummaryService
 from src.domain.services.jira_sprint_database_service import IJiraSprintDatabaseService
 
@@ -61,10 +62,11 @@ def get_jira_project_controller(
 
 async def get_sprint_analytics_controller(
     sprint_analytics_service: JiraSprintAnalyticsApplicationService = Depends(get_sprint_analytics_application_service),
-    gantt_chart_service: GanttChartApplicationService = Depends(get_gantt_chart_service)
+    gantt_chart_service: GanttChartApplicationService = Depends(get_gantt_chart_service),
+    sprint_repository: IJiraSprintRepository = Depends(get_jira_sprint_repository)
 ) -> JiraSprintAnalyticsController:
     """Get the sprint analytics controller"""
-    return JiraSprintAnalyticsController(sprint_analytics_service, gantt_chart_service)
+    return JiraSprintAnalyticsController(sprint_analytics_service, gantt_chart_service, sprint_repository)
 
 
 async def get_webhook_controller(

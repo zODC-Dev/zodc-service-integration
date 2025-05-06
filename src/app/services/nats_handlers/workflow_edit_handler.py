@@ -39,6 +39,35 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
             # Convert raw message to DTO
             request = WorkflowEditRequest.model_validate(message)
 
+            # # Check last synced at
+            # issue_keys = [issue.jira_key for issue in request.issues if issue.jira_key]
+            # db_issues = await self.jira_issue_repository.get_issues_by_keys(session=session, keys=issue_keys)
+
+            # for issue in request.issues:
+            #     log.info(f"Checking issue {issue.jira_key} with last synced at {issue.last_synced_at}")
+            #     if issue.last_synced_at:
+            #         # Convert NATS timestamp to one with timezone info for proper comparison
+            #         nats_last_synced = convert_timestamp_to_timestamptz(issue.last_synced_at)
+
+            #         db_issue = next((db_issue for db_issue in db_issues if db_issue.key == issue.jira_key), None)
+            #         if db_issue and db_issue.last_synced_at:
+            #             log.debug(
+            #                 f"DB last_synced_at: {db_issue.last_synced_at}, NATS last_synced_at (with tz): {nats_last_synced}")
+
+            #             if db_issue.last_synced_at > nats_last_synced:
+            #                 log.info(f"Issue {issue.jira_key} was synced after {nats_last_synced}, skipping")
+            #                 return {
+            #                     "success": False,
+            #                     "error": f"Issue {issue.jira_key} was synced after {nats_last_synced}, skipping",
+            #                     "data": WorkflowEditReply(
+            #                         success=False,
+            #                         error_message=f"Issue {issue.jira_key} was synced after {nats_last_synced}, skipping",
+            #                         issues=[],
+            #                         removed_connections=0,
+            #                         added_connections=0
+            #                     ).model_dump()
+            #                 }
+
             # Tạo mapping ban đầu từ node_mappings nếu có
             node_to_jira_key_map: Dict[str, str] = {}
             for mapping in request.node_mappings:
@@ -71,6 +100,8 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
 
             # Return response
             response = WorkflowEditReply(
+                success=True,
+                error_message=None,
                 issues=created_issues,
                 removed_connections=removed_count,
                 added_connections=added_count
@@ -86,7 +117,7 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
             return {
                 "success": False,
                 "error": str(e),
-                "data": WorkflowEditReply(issues=[], removed_connections=0, added_connections=0).model_dump()
+                "data": WorkflowEditReply(success=False, error_message=str(e), issues=[], removed_connections=0, added_connections=0).model_dump()
             }
 
     async def _remove_connections(self, session: AsyncSession, connections_to_remove: List[WorkflowEditConnection], node_to_jira_key_map: Dict[str, str]) -> int:

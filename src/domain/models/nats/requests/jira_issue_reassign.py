@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -6,3 +9,4 @@ class JiraIssueReassignNATSRequestDTO(BaseModel):
     node_id: str = Field(..., description="Node ID in system")
     old_user_id: int = Field(..., description="Old user ID in system")
     new_user_id: int = Field(..., description="New user ID in system")
+    last_synced_at: Optional[datetime] = None

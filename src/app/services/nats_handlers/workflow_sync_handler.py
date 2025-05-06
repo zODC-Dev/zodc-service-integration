@@ -39,6 +39,23 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             # Convert raw message to DTO
             request = WorkflowSyncRequest.model_validate(message)
 
+            # issue_keys = [issue.jira_key for issue in request.issues if issue.jira_key]
+            # db_issues = await self.jira_issue_repository.get_issues_by_keys(session=session, keys=issue_keys)
+            # for issue in request.issues:
+            #     if issue.last_synced_at:
+            #         db_issue = next((db_issue for db_issue in db_issues if db_issue.key == issue.jira_key), None)
+            #         if db_issue and db_issue.last_synced_at and db_issue.last_synced_at > issue.last_synced_at:
+            #             log.info(f"Issue {issue.jira_key} was synced after {issue.last_synced_at}, skipping")
+            #             return {
+            #                 "success": False,
+            #                 "error": f"Issue {issue.jira_key} was synced after {issue.last_synced_at}, skipping",
+            #                 "data": WorkflowSyncReply(
+            #                     success=False,
+            #                     error_message=f"Issue {issue.jira_key} was synced after {issue.last_synced_at}, skipping",
+            #                     issues=[]
+            #                 ).model_dump()
+            #             }
+
             # Tạo mapping ban đầu từ các issue đã có Jira key
             node_to_jira_key_map = {}
             for issue in request.issues:
@@ -62,7 +79,10 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
                 await self._process_connections(request.connections, node_to_jira_key_map)
 
             # Return response with created issues
-            response = WorkflowSyncReply(issues=created_issues)
+            response = WorkflowSyncReply(
+                success=True,
+                issues=created_issues
+            )
 
             # Check if we processed any issues successfully
             if not created_issues and (request.issues or request.connections):
@@ -85,7 +105,11 @@ class WorkflowSyncRequestHandler(INATSRequestHandler):
             return {
                 "success": False,
                 "error": str(e),
-                "data": WorkflowSyncReply(issues=[]).model_dump()
+                "data": WorkflowSyncReply(
+                    success=False,
+                    error_message=str(e),
+                    issues=[]
+                ).model_dump()
             }
 
     async def _process_issues(self, session: AsyncSession, request: WorkflowSyncRequest) -> List[WorkflowSyncReplyIssue]:
