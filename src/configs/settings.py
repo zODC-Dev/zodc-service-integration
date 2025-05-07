@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     # Azure Blob Storage settings
     AZURE_STORAGE_ACCOUNT_CONTAINER_NAME: str = "media-files"
 
-    BE_HOST: str = "https://zodc-api.thanhf.dev"
+    BE_HOST: str = "https://zodc-api.thanhf.dev/services/"
 
     class Config:
         """Configuration settings."""

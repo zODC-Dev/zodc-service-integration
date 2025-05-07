@@ -32,7 +32,7 @@ class JiraSprintApplicationService:
         """Terminate all workflows in a sprint by calling the workflow service API"""
         try:
             async with aiohttp.ClientSession() as session:
-                url = f"{settings.BE_HOST}/services/requests/sprint/{sprint_id}/complete"
+                url = f"{settings.BE_HOST}/requests/sprint/{sprint_id}/complete"
                 async with session.post(url) as response:
                     if response.status != 200:
                         error_text = await response.text()
