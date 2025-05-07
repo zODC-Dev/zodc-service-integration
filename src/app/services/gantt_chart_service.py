@@ -147,15 +147,19 @@ class GanttChartApplicationService:
                 log.debug(f"[GANTT] Processing {len(connections)} connections")
                 log.debug(f"[GANTT] Connection types: {[conn.type for conn in connections_list]}")
 
+            # Create a map of node_ids to check if they exist in the database
+            issues_map = {issue.node_id: True for issue in gantt_chart_issues_list}
+            log.debug(f"[GANTT] Created issues map with {len(issues_map)} entries")
+
             # Build hierarchy map - parent to children relationships
-            hierarchy_map = self._build_hierarchy_map(connections_list)
+            hierarchy_map = self._build_hierarchy_map(connections_list, issues_map)
             log.debug(f"[GANTT] Hierarchy map created: {len(hierarchy_map)} parent nodes")
             for parent, children in hierarchy_map.items():
                 log.debug(f"[GANTT] Parent {parent} has {len(children)} children: {children}")
 
             # Giữ nguyên các connection, không cần chuyển đổi phức tạp
             # Gang calculator mới sẽ xử lý propagation
-            flattened_connections = self._flatten_connections(connections_list, hierarchy_map)
+            flattened_connections = self._flatten_connections(connections_list, hierarchy_map, issues_map)
             log.debug(f"[GANTT] Flattened connections: {len(flattened_connections)} connections")
 
             # Calculate schedule
@@ -200,6 +204,7 @@ class GanttChartApplicationService:
 
                     try:
                         log.debug(f"[GANTT] Calling issue_repository.update_by_key for {task.jira_key}")
+                        log.debug(f"[GANTT] Update DTO: {update_dto}")
                         updated_issue = await self.issue_repository.update_by_key(
                             session=session,
                             jira_issue_key=task.jira_key,
@@ -209,7 +214,10 @@ class GanttChartApplicationService:
                         log.debug(
                             f"[GANTT] Updated issue details: planned_start_time={updated_issue.planned_start_time}, planned_end_time={updated_issue.planned_end_time}, story_id={updated_issue.story_id}")
                     except Exception as e:
-                        log.error(f"[GANTT] Failed to update issue {task.jira_key} in database: {str(e)}")
+                        log.error(
+                            f"[GANTT] Failed to update issue {task.jira_key} in database: {str(e)}", exc_info=True)
+                        log.error(
+                            f"[GANTT] Update details: planned_start_time={task.plan_start_time}, planned_end_time={task.plan_end_time}")
                 else:
                     log.warning(f"[GANTT] Task {task.node_id} has no jira_key, skipping database update")
 
@@ -245,32 +253,71 @@ class GanttChartApplicationService:
             log.error(f"[GANTT] Error getting Gantt chart: {str(e)}", exc_info=True)
             raise
 
-    def _build_hierarchy_map(self, connections: List[GanttChartConnectionModel]) -> Dict[str, List[str]]:
+    def _build_hierarchy_map(self, connections: List[GanttChartConnectionModel], issues_map: Dict[str, bool] = None) -> Dict[str, List[str]]:
         """Build a map of parent-child relationships from 'contains' connections"""
         hierarchy_map: Dict[str, List[str]] = {}
+        invalid_connections_count = 0
+
+        if issues_map is None:
+            issues_map = {}
+
+        log.debug(f"[GANTT] Building hierarchy map from {len(connections)} 'contains' connections")
 
         for connection in connections:
             if connection.type.lower() == "contains":
                 parent = connection.from_node_id
                 child = connection.to_node_id
 
+                # Check if both parent and child have Jira keys in the database
+                parent_valid = parent in issues_map
+                child_valid = child in issues_map
+
+                if not parent_valid or not child_valid:
+                    invalid_connections_count += 1
+                    log.debug(f"[GANTT] Skipping hierarchy connection {parent} -> {child}: " +
+                              f"parent_valid={parent_valid}, child_valid={child_valid}")
+                    continue
+
                 if parent not in hierarchy_map:
                     hierarchy_map[parent] = []
 
                 hierarchy_map[parent].append(child)
+                log.debug(f"[GANTT] Added parent-child relationship: {parent} -> {child}")
+
+        if invalid_connections_count > 0:
+            log.warning(
+                f"[GANTT] Removed {invalid_connections_count} hierarchy connections due to missing Jira keys in database")
 
         return hierarchy_map
 
     def _flatten_connections(
         self,
         connections: List[GanttChartConnectionModel],
-        hierarchy_map: Dict[str, List[str]]
+        hierarchy_map: Dict[str, List[str]],
+        issues_map: Dict[str, bool] = None
     ) -> List[GanttChartConnectionModel]:
         """Convert all connections to flat dependency relationships for scheduling"""
         flattened = []
+        invalid_connections_count = 0
+
+        if issues_map is None:
+            issues_map = {}
+
+        log.debug(f"[GANTT] Processing {len(connections)} connections for flattening")
+        log.debug(f"[GANTT] Issues map has {len(issues_map)} entries")
 
         # Process all connections, keep only "relates to" and "contains"
         for connection in connections:
+            # Check if both source and target nodes have Jira keys in the database
+            source_valid = connection.from_node_id in issues_map
+            target_valid = connection.to_node_id in issues_map
+
+            if not source_valid or not target_valid:
+                invalid_connections_count += 1
+                log.debug(f"[GANTT] Skipping connection {connection.from_node_id} -> {connection.to_node_id} ({connection.type}): " +
+                          f"source_valid={source_valid}, target_valid={target_valid}")
+                continue
+
             conn_type = connection.type.lower()
 
             # Keep "relates to" as is - these are direct dependencies
@@ -280,6 +327,8 @@ class GanttChartApplicationService:
                     to_node_id=connection.to_node_id,
                     type="relates to"
                 ))
+                log.debug(
+                    f"[GANTT] Added 'relates to' connection: {connection.from_node_id} -> {connection.to_node_id}")
 
             # Keep "contains" as is - these define the hierarchy structure
             # Gantt calculator will use hierarchy_map for parent-child relationships
@@ -289,6 +338,10 @@ class GanttChartApplicationService:
                     to_node_id=connection.to_node_id,
                     type="contains"
                 ))
+                log.debug(f"[GANTT] Added 'contains' connection: {connection.from_node_id} -> {connection.to_node_id}")
+
+        if invalid_connections_count > 0:
+            log.warning(f"[GANTT] Removed {invalid_connections_count} connections due to missing Jira keys in database")
 
         log.debug(f"[GANTT] Flattened connections: {len(flattened)} connections")
         return flattened
