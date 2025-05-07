@@ -2,10 +2,12 @@ from datetime import datetime, timedelta
 import re
 from typing import Optional
 
+import aiohttp
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.app.schemas.responses.jira_project import TaskCountByStatus
 from src.configs.logger import log
+from src.configs.settings import settings
 from src.domain.constants.jira import JiraIssueStatus, JiraSprintState
 from src.domain.models.jira_sprint import JiraSprintModel
 from src.domain.repositories.jira_issue_repository import IJiraIssueRepository
@@ -25,6 +27,20 @@ class JiraSprintApplicationService:
         self.jira_sprint_api_service = jira_sprint_api_service
         self.jira_sprint_database_service = jira_sprint_database_service
         self.jira_issue_repository = jira_issue_repository
+
+    async def _terminate_workflows(self, sprint_id: int) -> None:
+        """Terminate all workflows in a sprint by calling the workflow service API"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                url = f"{settings.BE_HOST}/services/requests/sprint/{sprint_id}/complete"
+                async with session.post(url) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        log.error(f"Failed to terminate workflows for sprint {sprint_id}: {error_text}")
+                    else:
+                        log.info(f"Successfully terminated workflows for sprint {sprint_id}")
+        except Exception as e:
+            log.error(f"Error terminating workflows for sprint {sprint_id}: {str(e)}")
 
     async def get_current_sprint(
         self,
@@ -94,6 +110,9 @@ class JiraSprintApplicationService:
         # End sprint in Jira
         await self.jira_sprint_api_service.end_sprint_with_admin_auth(sprint_id=sprint.jira_sprint_id)
         sprint.state = JiraSprintState.CLOSED.value
+
+        # Terminate all workflows in this sprint
+        await self._terminate_workflows(sprint_id)
 
         # Reset is_system_linked flag for all issues in this sprint
         try:
