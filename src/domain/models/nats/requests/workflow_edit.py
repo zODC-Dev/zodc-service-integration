@@ -16,8 +16,8 @@ class WorkflowEditIssue(BaseModel):
 
 
 class WorkflowEditConnection(BaseModel):
-    from_issue_key: str  # node_id hoặc jira_key
-    to_issue_key: str    # node_id hoặc jira_key
+    from_issue_key: str  # node_id
+    to_issue_key: str    # node_id
     type: str            # "relates to" hoặc "contains"
 
 

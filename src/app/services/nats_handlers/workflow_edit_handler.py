@@ -127,8 +127,13 @@ class WorkflowEditRequestHandler(INATSRequestHandler):
         for connection in connections_to_remove:
             try:
                 # Lấy Jira key từ node ID hoặc dùng giá trị trực tiếp nếu là jira_key
-                source_key = node_to_jira_key_map.get(connection.from_issue_key, connection.from_issue_key)
-                target_key = node_to_jira_key_map.get(connection.to_issue_key, connection.to_issue_key)
+                source_key = node_to_jira_key_map.get(connection.from_issue_key)
+                target_key = node_to_jira_key_map.get(connection.to_issue_key)
+
+                if not source_key or not target_key:
+                    log.error(
+                        f"Missing Jira key for connection {connection.from_issue_key} -> {connection.to_issue_key}")
+                    continue
 
                 log.debug(f"Removing link between {source_key} and {target_key}")
 
