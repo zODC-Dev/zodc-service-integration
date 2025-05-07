@@ -8,9 +8,10 @@ class ProjectConfigModel(BaseModel):
     """Configuration for schedule calculation"""
     working_hours_per_day: int = 8
     estimate_point_to_hours: int = 4
-    start_work_hour: time = time(9, 0)
-    end_work_hour: time = time(17, 30)
-    lunch_break_minutes: int = 30
+    start_work_hour: time = time(8, 30)
+    end_work_hour: time = time(17, 0)
+    lunch_break_start: time = time(12, 30)  # Default lunch break start time
+    lunch_break_end: time = time(13, 0)     # Default lunch break end time
     # include_weekends: bool = False  # Removed as it will never be True
 
 

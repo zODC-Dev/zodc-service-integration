@@ -269,19 +269,33 @@ class SystemConfigApplicationService:
 
         return config.value if config else 30  # Default: 30 minutes
 
+    async def get_lunch_break_start_time(self, session: AsyncSession) -> time:
+        """Get lunch_break_start_time config with fallback to default value"""
+        key = SystemConfigConstants.LUNCH_BREAK_START_TIME
+        config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
+
+        return config.value if config else time(12, 30)  # Default: 12:30 PM
+
+    async def get_lunch_break_end_time(self, session: AsyncSession) -> time:
+        """Get lunch_break_end_time config with fallback to default value"""
+        key = SystemConfigConstants.LUNCH_BREAK_END_TIME
+        config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
+
+        return config.value if config else time(13, 0)  # Default: 1:00 PM
+
     async def get_start_work_hour(self, session: AsyncSession) -> time:
         """Get start_work_hour config with fallback to default value"""
         key = SystemConfigConstants.START_WORK_HOUR
         config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
-        return config.value if config else time(9, 0)  # Default: 9:00 AM
+        return config.value if config else time(8, 30)  # Default: 8:30 AM
 
     async def get_end_work_hour(self, session: AsyncSession) -> time:
         """Get end_work_hour config with fallback to default value"""
         key = SystemConfigConstants.END_WORK_HOUR
         config = await self.get_config_by_key(session=session, key=key, scope=ConfigScope.GENERAL)
 
-        return config.value if config else time(17, 30)  # Default: 5:30 PM
+        return config.value if config else time(17, 0)  # Default: 5:00 PM
 
     async def get_project_config(self, session: AsyncSession, id: int) -> Optional[ProjectConfigModel]:
         """Get a project-specific configuration by ID"""

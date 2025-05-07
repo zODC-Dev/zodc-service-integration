@@ -29,14 +29,6 @@ class GanttChartCalculationImprovements:
         return all(d.tzinfo == first_tz for d in all_dates)
 
     @staticmethod
-    def calculate_effective_working_hours(
-        hours_per_day: int,
-        lunch_break_minutes: int
-    ) -> float:
-        """Tính toán số giờ làm việc hiệu quả trong một ngày"""
-        return hours_per_day - (lunch_break_minutes / 60)
-
-    @staticmethod
     def simplify_workday_handling(
         current_time: datetime,
         work_start: time,
