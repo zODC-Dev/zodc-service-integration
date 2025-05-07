@@ -118,7 +118,6 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
             for change in event.changes:
                 # Kiểm tra xem đã tồn tại thay đổi này trong cơ sở dữ liệu chưa
                 # Lấy thời gian thay đổi nhưng loại bỏ timezone để phù hợp với DB
-                created_at_naive = event.created_at.replace(tzinfo=None)
 
                 # Kiểm tra các bản ghi tương tự đã tồn tại
                 try:
@@ -156,7 +155,7 @@ class SQLAlchemyJiraIssueHistoryRepository(IJiraIssueHistoryRepository):
                     old_string=change.from_string,
                     new_string=change.to_string,
                     author_id=event.author_id,
-                    created_at=created_at_naive,  # Đã loại bỏ timezone
+                    created_at=event.created_at,  # Đã loại bỏ timezone
                     jira_change_id=event.jira_change_id
                 )
                 session.add(history_item)
