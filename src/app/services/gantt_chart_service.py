@@ -55,7 +55,8 @@ class GanttChartApplicationService:
                 session=session, project_key=project_key
             )
             working_hours_per_day = await self.system_config_service.get_working_hours_per_day(session=session)
-            lunch_break_minutes = await self.system_config_service.get_lunch_break_minutes(session=session)
+            lunch_break_start_time = await self.system_config_service.get_lunch_break_start_time(session=session)
+            lunch_break_end_time = await self.system_config_service.get_lunch_break_end_time(session=session)
             start_work_hour = await self.system_config_service.get_start_work_hour(session=session)
             end_work_hour = await self.system_config_service.get_end_work_hour(session=session)
 
@@ -63,7 +64,8 @@ class GanttChartApplicationService:
             config = ProjectConfigModel(
                 estimate_point_to_hours=hours_per_point,
                 working_hours_per_day=working_hours_per_day,
-                lunch_break_minutes=lunch_break_minutes,
+                lunch_break_start=lunch_break_start_time,
+                lunch_break_end=lunch_break_end_time,
                 start_work_hour=start_work_hour,
                 end_work_hour=end_work_hour
             )

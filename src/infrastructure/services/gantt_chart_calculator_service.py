@@ -432,13 +432,14 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
         work_end = config.end_work_hour
         hours_per_day = config.working_hours_per_day
         hours_per_point = config.estimate_point_to_hours
-        lunch_break_minutes = config.lunch_break_minutes
+        lunch_break_start = config.lunch_break_start
+        lunch_break_end = config.lunch_break_end
 
         # Define minimum task duration (30 minutes for tasks with zero estimate)
         min_task_duration_hours = 0.5  # 30 minutes
 
         log.info(
-            f"[GANTT-CALC] Work configuration: {work_start} to {work_end}, {hours_per_day} hours/day, {hours_per_point} hours/point, {lunch_break_minutes} min lunch")
+            f"[GANTT-CALC] Work configuration: {work_start} to {work_end}, {hours_per_day} hours/day, {hours_per_point} hours/point, lunch break: {lunch_break_start} to {lunch_break_end}")
         log.info(f"[GANTT-CALC] Sprint period: {sprint_start} to {sprint_end}")
 
         task_count = 0
@@ -531,7 +532,8 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
                 work_start,
                 work_end,
                 hours_per_day,
-                lunch_break_minutes
+                lunch_break_start,
+                lunch_break_end
             )
             log.debug(f"[GANTT-CALC] Task {node_id} end time: {end_time} (duration: {estimate_hours} hours)")
 
@@ -545,7 +547,8 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
                     work_start,
                     work_end,
                     hours_per_day,
-                    lunch_break_minutes
+                    lunch_break_start,
+                    lunch_break_end
                 )
                 log.debug(f"[GANTT-CALC] Task {node_id} adjusted end time: {end_time}")
 
@@ -584,7 +587,11 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
         tasks: List[TaskScheduleModel],
         hierarchy_map: Dict[str, List[str]]
     ) -> List[TaskScheduleModel]:
-        """Adjust story times based on child tasks"""
+        """Adjust story times based on child tasks.
+
+        Story's start time will be the earliest start time of its child tasks,
+        and its end time will be the latest end time of its child tasks.
+        """
         # Build a map for easier lookup
         task_map = {task.node_id: task for task in tasks}
 
@@ -594,7 +601,6 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
         # For each story, adjust times based on child tasks
         for story_id, child_ids in hierarchy_map.items():
             if not child_ids or story_id not in task_map:
-                log.debug(f"[GANTT-CALC] Story {story_id} has no children or is not in task map, skipping")
                 continue
 
             # Get the story task
@@ -603,25 +609,17 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
             # Find earliest start and latest end among children
             earliest_start = None
             latest_end = None
-            valid_children = 0
 
             for child_id in child_ids:
                 if child_id in task_map:
-                    valid_children += 1
                     child_task = task_map[child_id]
-
                     if earliest_start is None or child_task.plan_start_time < earliest_start:
                         earliest_start = child_task.plan_start_time
-
                     if latest_end is None or child_task.plan_end_time > latest_end:
                         latest_end = child_task.plan_end_time
 
             # Update story times if children were found
             if earliest_start is not None and latest_end is not None:
-                log.debug(f"[GANTT-CALC] Adjusting story {story_id} times based on {valid_children} children")
-                log.debug(
-                    f"[GANTT-CALC] Story {story_id} before: start={story_task.plan_start_time}, end={story_task.plan_end_time}")
-
                 # Create a new task with updated times
                 updated_story = TaskScheduleModel(
                     node_id=story_task.node_id,
@@ -642,9 +640,6 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
                         tasks[i] = updated_story
                         adjusted_count += 1
                         break
-
-                log.debug(
-                    f"[GANTT-CALC] Story {story_id} after: start={updated_story.plan_start_time}, end={updated_story.plan_end_time}")
 
         log.info(f"[GANTT-CALC] Adjusted {adjusted_count} stories based on child tasks")
         return tasks
@@ -713,7 +708,8 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
         work_start: time,
         work_end: time,
         hours_per_day: int,
-        lunch_break_minutes: int,
+        lunch_break_start: time,
+        lunch_break_end: time,
         include_weekends: bool = False  # Parameter kept for compatibility but ignored
     ) -> datetime:
         """Add work hours to start time, respecting work schedule"""
@@ -744,13 +740,25 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
             current_datetime = datetime.combine(current_time.date(), current_time_time)
             hours_left_today = (work_end_datetime - current_datetime).total_seconds() / 3600
 
-            # Handle lunch break
-            lunch_break_start = time(12, 0)
-            lunch_break_end = time(12, 0 + lunch_break_minutes)
+            # If we're in lunch break time, skip to after lunch
+            if lunch_break_start <= current_time_time < lunch_break_end:
+                current_time = current_time.replace(
+                    hour=lunch_break_end.hour,
+                    minute=lunch_break_end.minute,
+                    second=0,
+                    microsecond=0
+                )
+                current_time_time = current_time.time()
+                # Recalculate hours left after lunch
+                work_end_datetime = datetime.combine(current_time.date(), work_end)
+                current_datetime = datetime.combine(current_time.date(), current_time_time)
+                hours_left_today = (work_end_datetime - current_datetime).total_seconds() / 3600
 
-            if current_time_time <= lunch_break_start and work_end > lunch_break_end:
-                # Lunch break is still ahead or just starting
-                hours_left_today -= lunch_break_minutes / 60  # Convert minutes to hours
+            # If lunch break is still ahead, subtract lunch break time
+            elif current_time_time < lunch_break_start and work_end > lunch_break_end:
+                lunch_break_duration = (datetime.combine(current_time.date(), lunch_break_end) -
+                                        datetime.combine(current_time.date(), lunch_break_start)).total_seconds() / 3600
+                hours_left_today -= lunch_break_duration
 
             # If no time left today, move to next work day
             if hours_left_today <= 0:
@@ -764,13 +772,15 @@ class GanttChartCalculatorService(IGanttChartCalculatorService):
             # Add hours to current time
             current_time = current_time + timedelta(hours=hours_to_add_today)
 
-            # Handle lunch break crossing
+            # If we cross lunch break, add lunch break time
             if (current_time_time < lunch_break_start and
                 current_time.time() >= lunch_break_start and
                     remaining_hours > 0):
-                current_time = current_time + timedelta(minutes=lunch_break_minutes)
+                lunch_break_duration = (datetime.combine(current_time.date(), lunch_break_end) -
+                                        datetime.combine(current_time.date(), lunch_break_start)).total_seconds() / 3600
+                current_time = current_time + timedelta(hours=lunch_break_duration)
 
-            # If day is complete, move to next work day
+            # If we've reached or passed end of work day, move to next work day
             if current_time.time() >= work_end:
                 current_time = self._next_work_day(current_time, work_start)
 
